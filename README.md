@@ -41,16 +41,19 @@ central-valley-drought-classifier/
 └── outputs/            # figures, maps, metrics (not committed)
 ```
 
-## Status
-Project initialized ✅ — starting with EDA and anomaly labeling.
+## 📈 Status
+Project initialized ✅ — data download ✅ — Central Valley clip ✅ — next: climatology & anomalies
 
-## Roadmap
-- [ ] CHIRPS monthly aggregation + anomalies
-- [ ] Drought class labeling (percentiles)
-- [ ] Baseline models: Logistic Regression, RandomForest, XGBoost
-- [ ] Evaluation reports and confusion matrix
-- [ ] Maps of drought classes (static PNGs)
-- [ ] (Optional) Streamlit mini-dashboard
+## ✅ Progress Log
+- [x] Initialize repo, env, and README
+- [x] Download CHIRPS monthly (1991–2024/2025 YTD)
+- [x] Clip to Central Valley (bbox) and save NetCDF
+- [ ] Compute monthly climatology (1991–2020)
+- [ ] Compute monthly anomalies
+- [ ] Label drought classes (dry/normal/wet)
+- [ ] Baseline model + metrics
+- [ ] Maps and final report assets
+
 
 ## References
 - CHIRPS: Climate Hazards Group, UCSB — https://www.chc.ucsb.edu/data/chirps
