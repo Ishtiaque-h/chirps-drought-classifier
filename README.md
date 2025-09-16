@@ -41,10 +41,10 @@ central-valley-drought-classifier/
 └── outputs/            # figures, maps, metrics (not committed)
 ```
 
-## 📈 Status
+## Status
 Project initialized ✅ — starting with EDA and anomaly labeling.
 
-## 🔭 Roadmap
+## Roadmap
 - [ ] CHIRPS monthly aggregation + anomalies
 - [ ] Drought class labeling (percentiles)
 - [ ] Baseline models: Logistic Regression, RandomForest, XGBoost
@@ -52,6 +52,6 @@ Project initialized ✅ — starting with EDA and anomaly labeling.
 - [ ] Maps of drought classes (static PNGs)
 - [ ] (Optional) Streamlit mini-dashboard
 
-## 📚 References
+## References
 - CHIRPS: Climate Hazards Group, UCSB — https://www.chc.ucsb.edu/data/chirps
 
