@@ -4,13 +4,13 @@ This project uses **CHIRPS** satellite-based precipitation data to analyze and c
 The focus is portfolio-ready: clean, reproducible, and easy to understand—without unnecessary complexity.
 
 ## Goals
-- Classify each month as **dry / normal / wet** using CHIRPS (2015–2024).
+- Classify drought conditions in the :contentReference[oaicite:0]{index=0} using :contentReference[oaicite:1]{index=1} monthly precipitation data (1991–2025).
 - Produce clear **maps and charts** of rainfall anomalies and drought classes.
 - Build a **reproducible ML pipeline** (data ➜ features ➜ model ➜ evaluation).
 
 ## Region & Data
-- **Region:** California Central Valley (≈ 35.4°N–40.6°N, 122.5°W–119.0°W)
-- **Dataset:** CHIRPS Daily (0.05°), aggregated to monthly for modeling.
+- **Region:** California Central Valley (≈ 35.4°N–40.6°N, 122.5°W–119.0°W).
+- **Dataset:** CHIRPS v3 Monthly (0.05°), 1991–2025.
 - **Why CHIRPS here?** Good stati on blending, strong monthly skill, long record.
 
 ## Environment (with mamba)
@@ -42,17 +42,19 @@ central-valley-drought-classifier/
 ```
 
 ## Status
-Project initialized ✅ — data download ✅ — Central Valley clip ✅ — next: climatology & anomalies
+Project initialized ✅ — data download ✅ — Central Valley clip ✅ — climatology ✅ — anomalies ✅ — drought labels ✅ — EDA ✅ — next: modeling
 
 ## 📈 Progress Log
 - [x] Initialize repo, env, and README
-- [x] Download CHIRPS monthly (1991–2024/2025 YTD)
+- [x] Download CHIRPS monthly (1991–2025)
 - [x] Clip to Central Valley (bbox) and save NetCDF
-- [ ] Compute monthly climatology (1991–2020)
-- [ ] Compute monthly anomalies
-- [ ] Label drought classes (dry/normal/wet)
+- [x] Compute monthly climatology (1991–2020)
+- [x] Compute monthly anomalies (1991–2025)
+- [x] Label drought classes (dry/normal/wet)
+- [x] Exploratory data analysis (time series + spatial maps)
+- [ ] Build model-ready dataset
 - [ ] Baseline model + metrics
-- [ ] Maps and final report assets
+- [ ] Final visualizations and report
 
 ## Pipeline (high-level)
 
@@ -74,6 +76,19 @@ Project initialized ✅ — data download ✅ — Central Valley clip ✅ — ne
                                                     │
                                                     ▼
                                           [ Modeling + Maps + Report ]
+
+                                        
+## Key Data Artifacts
+
+| File Path                                                      | Description                                                                      | Dimensions                        |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------- | --------------------------------- |
+| `data/processed/chirps_v3_monthly_cvalley_1991_2025.nc`        | Regional subset of  v3 monthly precipitation for  (1991–2025)                    | time × lat × lon (415 × 104 × 70) |
+| `data/processed/chirps_v3_monthly_cvalley_clim_1991_2020.nc`   | Long-term monthly climatology (1991–2020 baseline means)                         | month × lat × lon (12 × 104 × 70) |
+| `data/processed/chirps_v3_monthly_cvalley_anom_1991_2025.nc`   | Monthly precipitation anomalies (actual − climatology)                           | time × lat × lon (415 × 104 × 70) |
+| `data/processed/chirps_v3_monthly_cvalley_labels_1991_2025.nc` | Drought class labels (dry / normal / wet) with 20th / 80th percentile thresholds | time × lat × lon (415 × 104 × 70) |
+| `outputs/drought_shares.csv`                                   | Monthly fraction of the region in each drought class                             | time × 3 classes                  |
+| `outputs/drought_shares_stacked.png`                           | Stacked area plot of dry / normal / wet area shares over time                    | —                                 |
+| `outputs/drought_map_YYYY-MM.png`                              | Spatial drought class map for selected months                                    | lat × lon                         |
 
 ## References
 - CHIRPS: Climate Hazards Group, UCSB — https://www.chc.ucsb.edu/data/chirps
