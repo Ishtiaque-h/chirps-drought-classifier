@@ -1,0 +1,25 @@
+# Data (keep structure, ignore contents)
+data/*
+!data/.gitkeep
+!data/raw/
+!data/processed/
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+# Outputs (figures, models)
+outputs/*
+!outputs/.gitkeep
+
+# Jupyter noise
+notebooks/.ipynb_checkpoints/
+
+# Python build/cache
+__pycache__/
+*.pyc
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
