@@ -1,17 +1,17 @@
 # Central Valley Drought Classifier 
 
 This project uses **CHIRPS** satellite-based precipitation data to analyze and classify drought risk in **California’s Central Valley**. 
-The focus is portfolio-ready: clean, reproducible, and easy to understand—without unnecessary complexity.
+The focus is to prepare a portfolio-ready, clean, and reproducible ML project.
 
 ## Goals
-- Classify drought conditions in the :contentReference[oaicite:0]{index=0} using :contentReference[oaicite:1]{index=1} monthly precipitation data (1991–2025).
+- Classify drought conditions in the **California’s Central Valley** using **CHIRPS** monthly precipitation data (1991–2025).
 - Produce clear **maps and charts** of rainfall anomalies and drought classes.
 - Build a **reproducible ML pipeline** (data ➜ features ➜ model ➜ evaluation).
 
 ## Region & Data
 - **Region:** California Central Valley (≈ 35.4°N–40.6°N, 122.5°W–119.0°W).
 - **Dataset:** CHIRPS v3 Monthly (0.05°), 1991–2025.
-- **Why CHIRPS here?** Good stati on blending, strong monthly skill, long record.
+- **Why CHIRPS here?** Good statistics on blending, strong monthly skill, long record.
 
 ## Environment (with mamba)
 ```bash
@@ -40,9 +40,6 @@ central-valley-drought-classifier/
 ├── scripts/            # helper scripts (preprocessing, labeling)
 └── outputs/            # figures, maps, metrics (not committed)
 ```
-
-## Status
-Project initialized ✅ — data download ✅ — Central Valley clip ✅ — climatology ✅ — anomalies ✅ — drought labels ✅ — EDA ✅ — next: modeling
 
 ## 📈 Progress Log
 - [x] Initialize repo, env, and README
@@ -89,6 +86,9 @@ Project initialized ✅ — data download ✅ — Central Valley clip ✅ — cl
 | `outputs/drought_shares.csv`                                   | Monthly fraction of the region in each drought class                             | time × 3 classes                  |
 | `outputs/drought_shares_stacked.png`                           | Stacked area plot of dry / normal / wet area shares over time                    | —                                 |
 | `outputs/drought_map_YYYY-MM.png`                              | Spatial drought class map for selected months                                    | lat × lon                         |
+
+## Acknowledgement
+Used AI tools (ChatGpt & Gemini) to design, improve, and test code.
 
 ## References
 - CHIRPS: Climate Hazards Group, UCSB — https://www.chc.ucsb.edu/data/chirps
