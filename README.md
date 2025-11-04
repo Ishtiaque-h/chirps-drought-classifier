@@ -54,8 +54,8 @@ central-valley-drought-classifier/
 - [ ] Final visualizations and report
 
 ## Pipeline (high-level)
-```
-graph TD;
+```mermaid
+graph TD
 
     A(("CHIRPS v3 Monthly (1991–2025, global, yearly .nc)"))
     G(("Modeling + Maps + Report"))
