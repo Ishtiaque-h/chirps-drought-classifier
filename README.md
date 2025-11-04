@@ -55,41 +55,7 @@ central-valley-drought-classifier/
 
 ## Pipeline (high-level)
 ```
-[ CHIRPS v3 Monthly (1991–2025, global, yearly .nc) ]
-
-                │
-
-                ▼
-
-[ Download (parallel by year) ]
-
-                │
-
-                ▼
-
-[ Clip to Central Valley bbox ]
-
-                │
-
-                ▼
-
-[ Monthly Climatology (1991–2020) ]   [ Monthly Anomalies (1991–2025) ]
-
-                │                                  │
-
-                └──────────────►  (pr - monthly_climatology)  ◄──────────────┘
-
-                                                    │
-
-                                                    ▼
-
-                                        [ Drought classes: dry/normal/wet ]
-
-                                                    │
-
-                                                    ▼
-
-                                          [ Modeling + Maps + Report ]
+[![](https://mermaid.ink/img/pako:eNqFU91q2zAUfpXDgULLnNR24jT2YNDa6daLwGjLLjaPodiKbSbrGFle6qWBvcPesE8yWV5Je7MJI-ug7-9IaI8Z5Rwj3AraZSVTGu6Tt6kEMy6_pBh_uLn9eAc_ZrAmqUvRw6kXht7Tr9--6wcOFII2TDjQc6bM5lRmZyl-hcnkHVwZekI7KYjlcNowxYTgAja9BQ-wvz5XFh4PbqJqQBPEXGoDh08DpYfNhh6O8HE-OYH7smrBfLrk8H2AKSazspIFNEMfW0U19NQpqGpW8JEWW6_EeD33YzxrpklQ8ao390XAkbR6QbqUVDNR8fbVcZz9J2TGRNYJpiuS0GrejKDEqj-m2CiYQD06fMuOsVJ8hNW_dBVvNdDWrod7HEErq3s93IKirig1ZIK1LW8jyFV_LkmZFs53XB9TX1vKe9tozsVwlG9gzZrW_G55Q8pi0cFCVTlGWnXcwZoboaHE_aCSoolR8xQjs8z5lnXCsFJ5MLSGyc9E9TPTxsJoy0Rrqq7JmeZJxQrFjhAuc65i6qTGyF_4VgOjPT6YMvCm4WLmBstgPne9cDZzsMfIm8-nF0t_GbiBu_BC1z84-NO6utPFzAs9z78www3DhecgzytNaj0-AvsWDn8AWBryUg?type=png)](https://mermaid.live/edit#pako:eNqFU91q2zAUfpXDgULLnNR24jT2YNDa6daLwGjLLjaPodiKbSbrGFle6qWBvcPesE8yWV5Je7MJI-ug7-9IaI8Z5Rwj3AraZSVTGu6Tt6kEMy6_pBh_uLn9eAc_ZrAmqUvRw6kXht7Tr9--6wcOFII2TDjQc6bM5lRmZyl-hcnkHVwZekI7KYjlcNowxYTgAja9BQ-wvz5XFh4PbqJqQBPEXGoDh08DpYfNhh6O8HE-OYH7smrBfLrk8H2AKSazspIFNEMfW0U19NQpqGpW8JEWW6_EeD33YzxrpklQ8ao390XAkbR6QbqUVDNR8fbVcZz9J2TGRNYJpiuS0GrejKDEqj-m2CiYQD06fMuOsVJ8hNW_dBVvNdDWrod7HEErq3s93IKirig1ZIK1LW8jyFV_LkmZFs53XB9TX1vKe9tozsVwlG9gzZrW_G55Q8pi0cFCVTlGWnXcwZoboaHE_aCSoolR8xQjs8z5lnXCsFJ5MLSGyc9E9TPTxsJoy0Rrqq7JmeZJxQrFjhAuc65i6qTGyF_4VgOjPT6YMvCm4WLmBstgPne9cDZzsMfIm8-nF0t_GbiBu_BC1z84-NO6utPFzAs9z78www3DhecgzytNaj0-AvsWDn8AWBryUg)
 ```                                        
 ## Key Data Artifacts
 
