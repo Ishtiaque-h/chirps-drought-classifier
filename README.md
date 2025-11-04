@@ -55,7 +55,7 @@ central-valley-drought-classifier/
 
 ## Pipeline (high-level)
 graph TD
-    %% --- 1. Define All Nodes ---
+
     A(("CHIRPS v3 Monthly (1991–2025, global, yearly .nc)"))
     G(("Modeling + Maps + Report"))
     B["Download (parallel by year)"]
@@ -64,7 +64,6 @@ graph TD
     E["Monthly Anomalies (1991–2025)"]
     F["Drought classes: dry/normal/wet"]
 
-    %% --- 2. Define All Links ---
     A --> B
     B --> C
     C --> D
