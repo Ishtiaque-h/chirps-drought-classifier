@@ -55,7 +55,7 @@ central-valley-drought-classifier/
 
 ## Pipeline (high-level)
 ```mermaid
-flowchart TD;
+graph TD;
     A["CHIRPS v3 Monthly (1991–2025, global, yearly .nc)"] --> B["Download (parallel by year)"];
     B --> C["Clip to Central Valley bbox"];
     
