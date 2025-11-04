@@ -56,12 +56,15 @@ central-valley-drought-classifier/
 ## Pipeline (high-level)
 ```mermaid
 graph TD;
-    A["CHIRPS v3 Monthly (1991–2025, global, yearly .nc)"] --> B["Download (parallel by year)"];
+    A["CHIRPS v3 Monthly (1991–
+2025, global, yearly .nc)"] --> B["Download (parallel by year)"];
     B --> C["Clip to Central Valley bbox"];
     
     %% This is the key branching part
-    C --> D["Monthly Climatology (1991–2020)"];
-    C --> E["Monthly Anomalies (1991–2025)"];
+    C --> D["Monthly Climatology (1991–
+2020)"];
+    C --> E["Monthly Anomalies (1991–
+2025)"];
     
     %% This is the calculation step
     D --> |"pr - monthly_climatology"| E;
