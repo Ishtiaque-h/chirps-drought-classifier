@@ -54,7 +54,7 @@ central-valley-drought-classifier/
 - [ ] Final visualizations and report
 
 ## Pipeline (high-level)
-
+```
 [ CHIRPS v3 Monthly (1991–2025, global, yearly .nc) ]
   _  _          │
                 ▼
@@ -73,7 +73,7 @@ central-valley-drought-classifier/
                                                     │
                                                     ▼
                                           [ Modeling + Maps + Report ]
-                                        
+```                                        
 ## Key Data Artifacts
 
 | File Path                                                      | Description                                                                      | Dimensions                        |
