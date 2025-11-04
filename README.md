@@ -56,7 +56,7 @@ central-valley-drought-classifier/
 ## Pipeline (high-level)
 
 [ CHIRPS v3 Monthly (1991–2025, global, yearly .nc) ]
-                │
+  _  _          │
                 ▼
 [ Download (parallel by year) ]
                 │
@@ -65,9 +65,9 @@ central-valley-drought-classifier/
                 │
                 ▼
 [ Monthly Climatology (1991–2020) ]   [ Monthly Anomalies (1991–2025) ]
-                │        _                         │
+                │                                  │
                 └──────────────►  (pr - monthly_climatology)  ◄──────────────┘
-                                                    │
+                  nbsp;                             │
                                                     ▼
                                         [ Drought classes: dry/normal/wet ]
                                                     │
