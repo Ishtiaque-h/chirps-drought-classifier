@@ -1,7 +1,15 @@
-# Central Valley Drought Classifier 
+## 🌦️ Central Valley Drought Classifier**
+**Predicting drought conditions from CHIRPS precipitation using machine learning**
 
-This project uses **CHIRPS** satellite-based precipitation data to analyze and classify drought risk in **California’s Central Valley**. 
-The focus is to prepare a portfolio-ready, clean, and reproducible ML project.
+## 🧭 Project Overview
+
+This project builds a machine learning pipeline to predict monthly drought classes — Dry, Normal, or Wet — for California’s Central Valley (1991–2025) using CHIRPS v3.0 satellite precipitation data.
+
+It integrates a full scientific workflow:
+
+Data acquisition → Climate preprocessing → Feature engineering → Label generation → Model training → Explainability (SHAP)
+
+Goal: Develop a robust, interpretable, and scalable drought prediction system that can support regional agricultural and water-management decisions.
 
 ## Goals
 - Classify drought conditions in the **California’s Central Valley** using **CHIRPS** monthly precipitation data (1991–2025).
