@@ -16,11 +16,11 @@ It integrates a full scientific workflow:
 
 ## 📍 Study Region
 **Central Valley, California (USA)**  
-- Latitude: 35.4° N – 40.6° N  
-- Longitude: −122.5° W – −119.0° W  
-- Major crops: almonds, grapes, citrus — highly drought-sensitive  
+>- Latitude: 35.4° N – 40.6° N  
+>- Longitude: −122.5° W – −119.0° W  
+>- Major crops: almonds, grapes, citrus — highly drought-sensitive  
 
-- **Why CHIRPS here?:** Good statistics on blending, strong monthly skill, long record.
+**Why CHIRPS here?:** Good statistics on blending, strong monthly skill, long record.
 
 ---
 
