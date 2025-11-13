@@ -82,9 +82,9 @@ graph TD;
 ## Labeling Strategy
 Use anomalies over the 1991–2020 baseline to compute thresholds (20th & 80th percentile anomaly).
 
-- **Dry:** anomaly ≤ 20th percentile  
-- **Normal:** between 20th – 80th percentile  
-- **Wet:** anomaly ≥ 80th percentile  
+>- **Dry:** anomaly ≤ 20th percentile  
+>- **Normal:** between 20th – 80th percentile  
+>- **Wet:** anomaly ≥ 80th percentile  
 → computed per pixel × month across the 1991–2020 baseline.
 
 Final labeled dataset: **3,021,200 samples × 12 columns**
