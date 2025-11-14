@@ -35,7 +35,7 @@ Data were downloaded programmatically via parallel bash scripts and processed wi
 
 ---
 
-## Project Structure
+## 📂 Project Structure
 ```
 central-valley-drought-classifier/
 ├── README.md
@@ -72,14 +72,12 @@ graph TD;
 ```
 
 ---
-
-## Monthly climatology and anomalies
+## 🔍 Preprocessing
+### Monthly climatology and anomalies
 **Climatology baseline:** 1991–2020 (first 30 years).
 **Anomalies:** full time span 1991–2025 relative to that climatology.
 
----
-
-## Labeling Strategy
+### 🔹 Labeling Strategy
 Use anomalies over the 1991–2020 baseline to compute thresholds (20th & 80th percentile anomaly).
 
 >- **Dry:** anomaly ≤ 20th percentile  
@@ -89,9 +87,7 @@ Use anomalies over the 1991–2020 baseline to compute thresholds (20th & 80th p
 
 Final labeled dataset: **3,021,200 samples × 12 columns**
 
----
-
-## ⚙️ Feature Engineering
+### 🔹 Feature Engineering
 | Feature | Description |
 |----------|--------------|
 | `pr` | Monthly precipitation (mm) |
@@ -100,9 +96,7 @@ Final labeled dataset: **3,021,200 samples × 12 columns**
 | `month_sin`, `month_cos` | Cyclic seasonal encoding |
 | `year` | Calendar year (for analysis only) |
 
----
-
-## Key Data Artifacts (Preprocessing)
+### 🔹 Key Data Artifacts
 
 | File Path                                                      | Description                                                                      | Dimensions                        |
 | -------------------------------------------------------------- | -------------------------------------------------------------------------------- | --------------------------------- |
@@ -117,11 +111,11 @@ Final labeled dataset: **3,021,200 samples × 12 columns**
 ---
 
 ## 🧠 Modeling
-### Train/val/test split (time-based)
-    * **A temporal split (no shuffling by default):**
-        * **Train:** earliest block of years (≈ 26 years)
-        * **Validation:** next ~4 years
-        * **Test:** 2021–2025 (400 k grid-month samples)
+### 🔹 Train/val/test split (time-based)
+    >- **A temporal split (no shuffling by default):**
+    >→ **Train:** earliest block of years (≈ 26 years)
+    >→ **Validation:** next ~4 years
+    >→ **Test:** 2021–2025 (400 k grid-month samples)
 
 | Model | Accuracy | Macro F1 | Key Takeaways |
 |-------|-----------|----------|----------------|
@@ -133,8 +127,8 @@ Models were trained on past climate, validated on recent years, and tested on th
 
 ---
 
-## 📊 Model Performance
-**Confusion Matrix (XGBoost)**  
+## 📊 Final Model Performance Analysis
+### 🔹 Confusion Matrix (XGBoost)
 
 | True \ Pred | Dry | Normal | Wet |
 |--------------|------|--------|------|
@@ -143,13 +137,11 @@ Models were trained on past climate, validated on recent years, and tested on th
 | **Wet (1)** | 0.1 % | 12.0 % | **87.9 %** |
 
 **Interpretation**
-- Minimal confusion between dry ↔ wet classes  
-- Strong separation across categories  
-- Excellent generalization on unseen years  
+>- Minimal confusion between dry ↔ wet classes  
+>- Strong separation across categories  
+>- Excellent generalization on unseen years  
 
----
-
-## 🔍 Feature Importance (XGBoost)
+### 🔹 Feature Importance (XGBoost)
 | Rank | Feature | Importance (weight) |
 |------|----------|----------------------|
 | 1 | **`pr_anom`** | 0.61 |
@@ -159,7 +151,7 @@ Models were trained on past climate, validated on recent years, and tested on th
 | 5 | `anom_lag3` | 0.03 |
 | 6 | `anom_lag1` | 0.02 |
 
-> Precipitation and its deviation from climatology dominate — aligning perfectly with hydrological intuition.
+Precipitation and its deviation from climatology dominate — aligning perfectly with hydrological intuition.
 
 ---
 
@@ -167,23 +159,22 @@ Models were trained on past climate, validated on recent years, and tested on th
 We used **SHAP (SHapley Additive exPlanations)** to interpret the XGBoost model, focusing on *dry-class probability*.
 
 ### 🔹 Global Importance
-- `pr_anom` and `pr` jointly account for > 60 % of model variance.  
-- Seasonal features (`month_cos`, `month_sin`) refine classification near seasonal transitions.  
-- Lagged anomalies offer minor yet useful temporal memory.
+>- `pr_anom` and `pr` jointly account for > 60 % of model variance.  
+>- Seasonal features (`month_cos`, `month_sin`) refine classification near seasonal transitions.  
+>- Lagged anomalies offer minor yet useful temporal memory.
 
 ### 🔹 Feature Effects
-- **Negative precipitation anomalies** sharply increase drought probability.  
-- **Positive anomalies** reduce drought likelihood.  
-- Clear **nonlinear threshold** near zero anomaly — small deficits rapidly trigger drought predictions.  
-- Interaction (`pr` × `pr_anom`) amplifies drought risk under already dry baseline rainfall.
+>- **Negative precipitation anomalies** sharply increase drought probability.  
+>- **Positive anomalies** reduce drought likelihood.  
+>- Clear **nonlinear threshold** near zero anomaly — small deficits rapidly trigger drought predictions.  
+>- Interaction (`pr` × `pr_anom`) amplifies drought risk under already dry baseline rainfall.
 
 ### 🔹 SHAP Plots (from analysis)
-- `xgb_shap_summary_bar.png` – global feature importance  
-- `xgb_shap_summary_beeswarm.png` – feature-level contributions  
-- `xgb_shap_dependence_pr_anom_dry.png` – non-linear anomaly effect  
-
-**Insight:**  
-> The model learned physically consistent relationships — not statistical artifacts — confirming scientific interpretability.
+>- `xgb_shap_summary_bar.png` – global feature importance  
+>- `xgb_shap_summary_beeswarm.png` – feature-level contributions  
+>- `xgb_shap_dependence_pr_anom_dry.png` – non-linear anomaly effect  
+  
+The model learned physically consistent relationships — not statistical artifacts — confirming scientific interpretability.
 
 ---
 
@@ -203,18 +194,15 @@ All steps are reproducible via modular scripts:
 ---
 
 ## 🧾 Key Takeaways
-- XGBoost achieved **> 90 % accuracy** with interpretable drivers  
-- `pr_anom` (rainfall deviation) is the **most influential feature**  
-- Model behavior matches known drought dynamics  
-- Workflow is fully reproducible and ready for scaling 
+>- XGBoost achieved **> 90 % accuracy** with interpretable drivers  
+>- `pr_anom` (rainfall deviation) is the **most influential feature**  
+>- Model behavior matches known drought dynamics  
+>- Workflow is fully reproducible and ready for scaling 
 
 ---
 
+## ✨ Acknowledgement
+Used AI tools (ChatGpt & Gemini) to plan & design project; improve & test code; prepare & refine readme.
 
-
-## Acknowledgement
-Used AI tools (ChatGpt & Gemini) to design, improve, and test code.
-
-## References
-- CHIRPS: Climate Hazards Group, UCSB — https://www.chc.ucsb.edu/data/chirps
-
+## ※ References
+> CHIRPS: Climate Hazards Group, UCSB — https://www.chc.ucsb.edu/data/chirps
