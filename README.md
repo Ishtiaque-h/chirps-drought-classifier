@@ -27,7 +27,7 @@ It integrates a full scientific workflow:
 ## 🧩 Data & Sources
 | Dataset | Description | Temporal Range | Resolution |
 |----------|--------------|----------------|-------------|
-| **CHIRPS v3.0 Monthly** | Climate Hazards Group InfraRed Precipitation with Station data | 1991 – 2025 | 0.05° (~5 km) |
+| **[CHIRPS v3.0 Monthly](https://www.chc.ucsb.edu/data/chirps3)** | Climate Hazards Group InfraRed Precipitation with Station data | 1991 – 2025 | 0.05° (~5 km) |
 | **Derived Climatology** | 1991 – 2020 monthly mean baseline | — | Same |
 | **Anomalies** | Monthly deviation from climatology | 1991 – 2025 | Same |
 
@@ -202,7 +202,12 @@ All steps are reproducible via modular scripts:
 ---
 
 ## ✨ Acknowledgement
-Used AI tools (ChatGpt & Gemini) to plan & design project; improve & test code; prepare & refine readme.
+Ethically used AI tools (ChatGPT & Gemini) to plan & design project; improve & test code; prepare & refine readme.
 
-## ※ References
-> CHIRPS: Climate Hazards Group, UCSB — https://www.chc.ucsb.edu/data/chirps
+---
+
+## ※ Author
+Md Ishtiaque Hossain \
+MSc Candidate, Computer and Information Sciences \
+University of Delaware \
+[LinkedIn](linkedin.com/in/ishtiaque-h) | [GitHub](https://github.com/Ishtiaque-h)
