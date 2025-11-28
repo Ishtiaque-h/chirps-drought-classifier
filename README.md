@@ -5,7 +5,7 @@
 
 ## 🧭 Project Overview
 
-This project builds a **machine learning pipeline** to predict **monthly drought classes** — *Dry*, *Normal*, or *Wet* — for **California’s Central Valley (1991–2025)** using **CHIRPS v3.0 satellite precipitation data**.
+This project builds a **machine learning pipeline** to predict **monthly drought classes** — *Dry*, *Normal*, or *Wet* — for **California’s Central Valley (1991–2025)** using **CHIRPS v3.0 raing gauge and satellite precipitation data**.
 
 It integrates a full scientific workflow:  
 > Data acquisition → Climate preprocessing → Feature engineering → Label generation → Model training → Explainability (SHAP)
