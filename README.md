@@ -210,4 +210,4 @@ Ethically used AI tools (ChatGPT & Gemini) to plan & design project; improve & t
 Md Ishtiaque Hossain \
 MSc Candidate, Computer and Information Sciences \
 University of Delaware \
-[LinkedIn](linkedin.com/in/ishtiaque-h) | [GitHub](https://github.com/Ishtiaque-h)
+[LinkedIn](https://linkedin.com/in/ishtiaque-h) | [GitHub](https://github.com/Ishtiaque-h)
