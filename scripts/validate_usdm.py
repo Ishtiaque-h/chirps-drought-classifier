@@ -43,15 +43,17 @@ Outputs:
 """
 from pathlib import Path
 import io
-import numpy as np
 import pandas as pd
 import xgboost as xgb
 import matplotlib.pyplot as plt
+import urllib.error
+import urllib.parse
 import urllib.request
 
-OUT_DIR = Path("outputs"); OUT_DIR.mkdir(exist_ok=True)
-DATA    = Path("data/processed/dataset_forecast.parquet")
-MODEL   = Path("outputs/forecast_xgb_model.json")
+BASE_DIR = Path(__file__).resolve().parents[1]
+OUT_DIR = BASE_DIR / "outputs"; OUT_DIR.mkdir(exist_ok=True)
+DATA    = BASE_DIR / "data/processed/dataset_forecast.parquet"
+MODEL   = BASE_DIR / "outputs/forecast_xgb_model.json"
 
 FEATURES = [
     "spi1_lag1", "spi1_lag2", "spi1_lag3",
@@ -83,16 +85,74 @@ def fetch_usdm_county(fips: str) -> pd.DataFrame:
     Returns a DataFrame with columns: date, None, D0, D1, D2, D3, D4
     where values are the percent area in each category.
     """
+    params = urllib.parse.urlencode({
+        "aoi": fips,
+        "StartDate": "2021-01-01T00:00:00Z",
+        "EndDate": "2025-12-31T00:00:00Z",
+        "statisticsType": 1,
+    })
     url = (
         "https://usdmdataservices.unl.edu/api/CountyStatistics/GetDroughtSeverityStatisticsByAreaPercent"
-        f"?aoi={fips}&startdate=20210101&enddate=20251231&statisticsType=1"
+        f"?{params}"
     )
+    print(f"    URL: {url}")
     try:
         with urllib.request.urlopen(url, timeout=30) as resp:
-            raw = resp.read().decode("utf-8")
-        df = pd.read_json(io.StringIO(raw))
-        df["date"] = pd.to_datetime(df["releaseDate"])
+            status = getattr(resp, "status", None)
+            content_type = resp.headers.get("Content-Type", "")
+            raw_bytes = resp.read()
+        print(f"    Status: {status}")
+        print(f"    Content-Type: {content_type}")
+
+        if status != 200:
+            print(f"  Warning: skipping FIPS {fips} due to HTTP status {status}")
+            return pd.DataFrame()
+
+        raw = raw_bytes.decode("utf-8", errors="replace")
+        content_type_l = content_type.lower()
+        try:
+            if "json" in content_type_l:
+                df = pd.read_json(io.StringIO(raw))
+            elif "csv" in content_type_l:
+                df = pd.read_csv(io.StringIO(raw))
+            else:
+                print(
+                    f"  Warning: skipping FIPS {fips} due to unsupported content type: {content_type}"
+                )
+                return pd.DataFrame()
+        except ValueError as e:
+            preview = raw[:200].replace("\n", " ")
+            print(f"  Warning: parse failed for FIPS {fips}: {e}")
+            print(f"  Body preview (first 200 chars): {preview}")
+            return pd.DataFrame()
+
+        if "releaseDate" in df.columns:
+            df["date"] = pd.to_datetime(df["releaseDate"])
+        elif "MapDate" in df.columns:
+            df["date"] = pd.to_datetime(df["MapDate"], format="%Y%m%d", errors="coerce")
+        elif "ValidStart" in df.columns:
+            df["date"] = pd.to_datetime(df["ValidStart"], errors="coerce")
+        else:
+            print(
+                f"  Warning: no recognized date column for FIPS {fips}. "
+                f"Columns: {list(df.columns)}"
+            )
+            return pd.DataFrame()
+
+        df = df.dropna(subset=["date"])
         return df
+    except urllib.error.HTTPError as e:
+        content_type = e.headers.get("Content-Type", "") if e.headers else ""
+        body_preview = ""
+        try:
+            body_preview = e.read().decode("utf-8", errors="replace")[:200].replace("\n", " ")
+        except Exception:
+            body_preview = "<unavailable>"
+        print(f"    Status: {e.code}")
+        print(f"    Content-Type: {content_type}")
+        print(f"  Warning: skipping FIPS {fips} due to HTTP status {e.code}")
+        print(f"  Body preview (first 200 chars): {body_preview}")
+        return pd.DataFrame()
     except Exception as e:
         print(f"  Warning: could not fetch FIPS {fips}: {e}")
         return pd.DataFrame()
@@ -141,8 +201,13 @@ if none_col:
 weekly_cv.index = pd.to_datetime(weekly_cv.index)
 monthly_usdm = weekly_cv.resample("MS").mean()
 
-# D1+ fraction: sum of D1, D2, D3, D4 (as % of area, divide by 100)
-monthly_usdm["d1plus_frac"] = monthly_usdm[d_cols].sum(axis=1) / 100.0
+# Drought class columns from this endpoint are cumulative in practice
+# (D1 means D1+, D2 means D2+, etc.), so D1+ is the D1 column itself.
+if "D1" in monthly_usdm.columns:
+    monthly_usdm["d1plus_frac"] = monthly_usdm["D1"] / 100.0
+else:
+    # Fallback for unexpected schemas where classes are mutually exclusive.
+    monthly_usdm["d1plus_frac"] = monthly_usdm[d_cols].sum(axis=1) / 100.0
 
 print(f"USDM monthly records: {len(monthly_usdm)}")
 
@@ -167,9 +232,12 @@ test["pred_label"] = test["pred_label"].map(inv_map)
 # Monthly dry fraction from model
 test["month_dt"] = pd.to_datetime(test["time"]) + pd.DateOffset(months=1)
 test["month_dt"] = test["month_dt"].dt.to_period("M").dt.to_timestamp()
-monthly_model = test.groupby("month_dt").apply(
-    lambda g: (g["pred_label"] == -1).mean()
-).rename("model_dry_frac")
+monthly_model = (
+    test.assign(is_dry=(test["pred_label"] == -1).astype(float))
+    .groupby("month_dt")["is_dry"]
+    .mean()
+    .rename("model_dry_frac")
+)
 
 # -----------------------------------------------------------------------
 # 4. Align and compare
