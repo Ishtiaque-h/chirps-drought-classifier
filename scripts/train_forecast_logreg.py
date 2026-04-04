@@ -53,7 +53,6 @@ pipe = Pipeline([
     ("scale",  StandardScaler()),
     ("clf",    LogisticRegression(
         max_iter=1000,
-        multi_class="multinomial",
         class_weight="balanced",
         solver="lbfgs",
         C=1.0,
