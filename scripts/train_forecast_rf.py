@@ -11,11 +11,13 @@ Outputs:
   outputs/forecast_rf_val_metrics.txt
   outputs/forecast_rf_cm.png
   outputs/forecast_rf_feature_importance.png
+  outputs/forecast_rf_model.pkl
 """
 from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import joblib
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.ensemble import RandomForestClassifier
@@ -59,6 +61,7 @@ pipe = Pipeline([
 
 print("Fitting RandomForest...")
 pipe.fit(X_train, y_train)
+joblib.dump(pipe, OUT_DIR / "forecast_rf_model.pkl")
 
 # ---- validation-set metrics (model monitoring, not reported as primary result) ----
 y_val_pred  = pipe.predict(X_val)
@@ -107,3 +110,4 @@ with open(metrics_path, "w") as f:
 print("Wrote:", metrics_path)
 print("Wrote:", cm_path)
 print("Wrote:", fi_path)
+print("Wrote:", OUT_DIR / "forecast_rf_model.pkl")
