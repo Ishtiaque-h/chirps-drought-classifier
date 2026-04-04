@@ -19,6 +19,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import xgboost as xgb
 from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
+from sklearn.utils.class_weight import compute_sample_weight
 
 DATA    = Path("data/processed/dataset_forecast.parquet")
 OUT_DIR = Path("outputs"); OUT_DIR.mkdir(exist_ok=True)
@@ -52,7 +53,9 @@ y_train_enc = y_train.map(label_map).values
 y_val_enc   = y_val.map(label_map).values
 y_test_enc  = y_test.map(label_map).values
 
-dtrain = xgb.DMatrix(X_train, label=y_train_enc, feature_names=FEATURES)
+train_weights = compute_sample_weight(class_weight="balanced", y=y_train_enc)
+
+dtrain = xgb.DMatrix(X_train, label=y_train_enc, weight=train_weights, feature_names=FEATURES)
 dval   = xgb.DMatrix(X_val,   label=y_val_enc,   feature_names=FEATURES)
 dtest  = xgb.DMatrix(X_test,  label=y_test_enc,  feature_names=FEATURES)
 
