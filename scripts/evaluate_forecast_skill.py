@@ -40,6 +40,11 @@ Inputs:
   data/processed/dataset_forecast.parquet
   outputs/forecast_xgb_test_probs.npz   (softmax probabilities from XGBoost)
   outputs/forecast_xgb_model.json       (used to regenerate probs if .npz absent)
+  outputs/forecast_logreg_model.pkl     (optional; adds LogReg row to skill table)
+  outputs/forecast_rf_model.pkl         (optional; adds RF row to skill table)
+  outputs/xgb_spatial_test_probs.npz    (optional; adds XGBoost-Spatial row)
+  outputs/convlstm_test_probs.npz       (optional; adds ConvLSTM row)
+  data/processed/convlstm_meta.npz      (lat/lon/test_feature_times for ConvLSTM)
 
 Outputs:
   outputs/forecast_skill_scores.txt
@@ -53,14 +58,20 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import xgboost as xgb
+import joblib
 from sklearn.calibration import calibration_curve
 from sklearn.isotonic import IsotonicRegression
 from sklearn.metrics import roc_auc_score, confusion_matrix, ConfusionMatrixDisplay
 
-DATA       = Path("data/processed/dataset_forecast.parquet")
-PROBS_NPZ  = Path("outputs/forecast_xgb_test_probs.npz")
-MODEL_PATH = Path("outputs/forecast_xgb_model.json")
-OUT_DIR    = Path("outputs"); OUT_DIR.mkdir(exist_ok=True)
+DATA          = Path("data/processed/dataset_forecast.parquet")
+PROBS_NPZ     = Path("outputs/forecast_xgb_test_probs.npz")
+MODEL_PATH    = Path("outputs/forecast_xgb_model.json")
+LOGREG_MODEL  = Path("outputs/forecast_logreg_model.pkl")
+RF_MODEL      = Path("outputs/forecast_rf_model.pkl")
+XGB_SPATIAL_NPZ  = Path("outputs/xgb_spatial_test_probs.npz")
+CONVLSTM_NPZ     = Path("outputs/convlstm_test_probs.npz")
+CONVLSTM_META    = Path("data/processed/convlstm_meta.npz")
+OUT_DIR       = Path("outputs"); OUT_DIR.mkdir(exist_ok=True)
 
 FEATURES = [
     "spi1_lag1", "spi1_lag2", "spi1_lag3",
@@ -128,6 +139,115 @@ iso_cal = IsotonicRegression(out_of_bounds="clip")
 iso_cal.fit(val_probs[:, 0], (val_y_enc == LABEL_MAP[-1]).astype(int))
 
 test["xgb_prob_dry_cal"] = iso_cal.predict(test["xgb_prob_dry"].values)
+
+# ── Logistic Regression probabilities (if model available) ───────────────────
+if LOGREG_MODEL.exists():
+    print("Loading Logistic Regression model for skill comparison...")
+    logreg_pipe = joblib.load(LOGREG_MODEL)
+    lr_classes  = list(logreg_pipe.classes_)           # e.g. [-1, 0, 1]
+    lr_probs    = logreg_pipe.predict_proba(test[FEATURES])  # (n, 3)
+    for ci, c in enumerate(CLASSES):
+        col_idx = lr_classes.index(c)
+        test[f"lr_prob_{c}"] = lr_probs[:, col_idx]
+    test["lr_pred"] = logreg_pipe.predict(test[FEATURES])
+    HAS_LOGREG = True
+else:
+    print("WARNING: Logistic Regression model not found at", LOGREG_MODEL)
+    HAS_LOGREG = False
+
+# ── Random Forest probabilities (if model available) ─────────────────────────
+if RF_MODEL.exists():
+    print("Loading Random Forest model for skill comparison...")
+    rf_pipe    = joblib.load(RF_MODEL)
+    rf_classes = list(rf_pipe.classes_)
+    rf_probs   = rf_pipe.predict_proba(test[FEATURES])
+    for ci, c in enumerate(CLASSES):
+        col_idx = rf_classes.index(c)
+        test[f"rf_prob_{c}"] = rf_probs[:, col_idx]
+    test["rf_pred"] = rf_pipe.predict(test[FEATURES])
+    HAS_RF = True
+else:
+    print("WARNING: Random Forest model not found at", RF_MODEL)
+    HAS_RF = False
+
+# ── XGBoost-Spatial probabilities (if available) ─────────────────────────────
+if XGB_SPATIAL_NPZ.exists():
+    print("Loading XGBoost-Spatial probabilities from", XGB_SPATIAL_NPZ)
+    sp_loaded    = np.load(XGB_SPATIAL_NPZ, allow_pickle=True)
+    sp_probs     = sp_loaded["proba"]          # (n_rows, 3)  columns: [dry, normal, wet]
+    assert len(sp_probs) == len(test), (
+        f"XGB-Spatial probs length ({len(sp_probs)}) != test rows ({len(test)}). "
+        "Retrain the spatial model and re-run."
+    )
+    test["xgb_spatial_prob_dry"]    = sp_probs[:, 0]
+    test["xgb_spatial_prob_normal"] = sp_probs[:, 1]
+    test["xgb_spatial_prob_wet"]    = sp_probs[:, 2]
+    test["xgb_spatial_pred"]        = np.array(
+        [INV_LABEL_MAP[i] for i in sp_probs.argmax(axis=1)]
+    )
+    HAS_XGB_SPATIAL = True
+else:
+    print("WARNING: XGBoost-Spatial probs not found at", XGB_SPATIAL_NPZ)
+    HAS_XGB_SPATIAL = False
+
+# ── ConvLSTM probabilities (if available) ────────────────────────────────────
+HAS_CONVLSTM = False
+if CONVLSTM_NPZ.exists() and CONVLSTM_META.exists():
+    cl_meta = np.load(CONVLSTM_META, allow_pickle=True)
+    if "test_feature_times" not in cl_meta:
+        print("WARNING: convlstm_meta.npz is missing 'test_feature_times'. "
+              "Re-run build_dataset_convlstm.py to regenerate meta.")
+    else:
+        print("Loading ConvLSTM probabilities from", CONVLSTM_NPZ)
+        cl_loaded  = np.load(CONVLSTM_NPZ, allow_pickle=True)
+        cl_proba   = cl_loaded["proba"]                       # (N_test, 3, lat, lon)
+        cl_lat     = cl_meta["lat"]                           # (nlat,)
+        cl_lon     = cl_meta["lon"]                           # (nlon,)
+        cl_times   = pd.to_datetime(cl_meta["test_feature_times"])  # (N_test,)
+
+        N_cl, _, nlat, nlon = cl_proba.shape
+        # Compute per-pixel argmax prediction: (N_test, nlat, nlon) encoded {0,1,2}
+        cl_pred_enc = cl_proba.argmax(axis=1)
+        _inv_enc    = {0: -1, 1: 0, 2: 1}
+
+        # Flatten to long-format DataFrame for merging with test df
+        # shape after ravel: N_cl * nlat * nlon rows
+        t_idx  = np.repeat(np.arange(N_cl), nlat * nlon)
+        lt_idx = np.tile(np.repeat(np.arange(nlat), nlon), N_cl)
+        ln_idx = np.tile(np.arange(nlon), N_cl * nlat)
+
+        cl_df = pd.DataFrame({
+            "time":                  cl_times[t_idx],
+            "latitude":              cl_lat[lt_idx],
+            "longitude":             cl_lon[ln_idx],
+            "convlstm_prob_dry":     cl_proba[:, 0].ravel(),
+            "convlstm_prob_normal":  cl_proba[:, 1].ravel(),
+            "convlstm_prob_wet":     cl_proba[:, 2].ravel(),
+            "convlstm_pred":         np.vectorize(_inv_enc.get)(cl_pred_enc.ravel()),
+        })
+
+        # Align time types before merging
+        test["time"] = pd.to_datetime(test["time"])
+        test = test.merge(
+            cl_df[["time", "latitude", "longitude",
+                   "convlstm_prob_dry", "convlstm_prob_normal",
+                   "convlstm_prob_wet", "convlstm_pred"]],
+            on=["time", "latitude", "longitude"],
+            how="left",
+        )
+        n_missing = int(test["convlstm_prob_dry"].isna().sum())
+        if n_missing > 0:
+            print(f"  WARNING: {n_missing} test rows had no ConvLSTM match; "
+                  "filling with uninformative prior (1/3).")
+            for _col in ["convlstm_prob_dry", "convlstm_prob_normal", "convlstm_prob_wet"]:
+                test[_col] = test[_col].fillna(1 / 3)
+        test["convlstm_pred"] = test["convlstm_pred"].fillna(0).astype(int)
+        HAS_CONVLSTM = True
+else:
+    if not CONVLSTM_NPZ.exists():
+        print("WARNING: ConvLSTM probs not found at", CONVLSTM_NPZ)
+    if not CONVLSTM_META.exists():
+        print("WARNING: ConvLSTM meta not found at", CONVLSTM_META)
 
 # ── helper functions ──────────────────────────────────────────────────────────
 
@@ -219,6 +339,18 @@ monthly = test.groupby("month_dt").agg(
     xgb_pred_mode   = ("xgb_pred",    lambda s: int(s.mode()[0])),
     clim_pred_mode  = ("clim_pred",   lambda s: int(s.mode()[0])),
     persist_pred_mode=("persist_pred",lambda s: int(s.mode()[0])),
+    **({f"lr_dry_frac":  (f"lr_prob_{-1}", "mean"),
+        f"lr_pred_mode": ("lr_pred", lambda s: int(s.mode()[0]))}
+       if HAS_LOGREG else {}),
+    **({f"rf_dry_frac":  (f"rf_prob_{-1}", "mean"),
+        f"rf_pred_mode": ("rf_pred", lambda s: int(s.mode()[0]))}
+       if HAS_RF else {}),
+    **({"xgb_spatial_dry_frac":  ("xgb_spatial_prob_dry", "mean"),
+        "xgb_spatial_pred_mode": ("xgb_spatial_pred", lambda s: int(s.mode()[0]))}
+       if HAS_XGB_SPATIAL else {}),
+    **({"convlstm_dry_frac":  ("convlstm_prob_dry", "mean"),
+        "convlstm_pred_mode": ("convlstm_pred", lambda s: int(s.mode()[0]))}
+       if HAS_CONVLSTM else {}),
 ).reset_index()
 
 # true binary indicator for dry class at monthly level
@@ -249,6 +381,48 @@ try:
     auc_pers = roc_auc_score(obs_dry, monthly["persist_dry_frac"].values)
 except Exception:
     auc_xgb = auc_pers = np.nan
+
+# ── LogReg and RF metrics (if models were loaded) ─────────────────────────────
+if HAS_LOGREG:
+    bs_lr    = brier_score(obs_dry, monthly["lr_dry_frac"].values)
+    bss_lr   = bss(bs_lr, bs_clim)
+    hss_lr   = heidke_skill_score(y_true_monthly, monthly["lr_pred_mode"].values, CLASSES)
+    try:
+        auc_lr = roc_auc_score(obs_dry, monthly["lr_dry_frac"].values)
+    except Exception:
+        auc_lr = np.nan
+
+if HAS_RF:
+    bs_rf    = brier_score(obs_dry, monthly["rf_dry_frac"].values)
+    bss_rf   = bss(bs_rf, bs_clim)
+    hss_rf   = heidke_skill_score(y_true_monthly, monthly["rf_pred_mode"].values, CLASSES)
+    try:
+        auc_rf = roc_auc_score(obs_dry, monthly["rf_dry_frac"].values)
+    except Exception:
+        auc_rf = np.nan
+
+# ── XGBoost-Spatial and ConvLSTM metrics ─────────────────────────────────────
+if HAS_XGB_SPATIAL:
+    bs_sp   = brier_score(obs_dry, monthly["xgb_spatial_dry_frac"].values)
+    bss_sp  = bss(bs_sp, bs_clim)
+    hss_sp  = heidke_skill_score(
+        y_true_monthly, monthly["xgb_spatial_pred_mode"].values, CLASSES
+    )
+    try:
+        auc_sp = roc_auc_score(obs_dry, monthly["xgb_spatial_dry_frac"].values)
+    except Exception:
+        auc_sp = np.nan
+
+if HAS_CONVLSTM:
+    bs_cl   = brier_score(obs_dry, monthly["convlstm_dry_frac"].values)
+    bss_cl  = bss(bs_cl, bs_clim)
+    hss_cl  = heidke_skill_score(
+        y_true_monthly, monthly["convlstm_pred_mode"].values, CLASSES
+    )
+    try:
+        auc_cl = roc_auc_score(obs_dry, monthly["convlstm_dry_frac"].values)
+    except Exception:
+        auc_cl = np.nan
 
 # ── Confusion matrix at monthly level ─────────────────────────────────────────
 cm_monthly = confusion_matrix(y_true_monthly, monthly["xgb_pred_mode"].values,
@@ -301,9 +475,29 @@ rows = [
      "BSS_dry": "0.0000 (ref)", "HSS": f"{hss_clim:.4f}", "ROC-AUC_dry": "—"},
     {"Forecaster": "Persistence baseline",    "BS_dry": f"{bs_pers:.4f}",
      "BSS_dry": f"{bss_pers:.4f}", "HSS": f"{hss_pers:.4f}", "ROC-AUC_dry": f"{auc_pers:.4f}"},
-    {"Forecaster": "XGBoost (raw)",           "BS_dry": f"{bs_xgb:.4f}",
+    {"Forecaster": "XGBoost (no spatial)",    "BS_dry": f"{bs_xgb:.4f}",
      "BSS_dry": f"{bss_xgb:.4f}",  "HSS": f"{hss_xgb:.4f}",  "ROC-AUC_dry": f"{auc_xgb:.4f}"},
 ]
+if HAS_XGB_SPATIAL:
+    rows.append(
+        {"Forecaster": "XGBoost-Spatial",     "BS_dry": f"{bs_sp:.4f}",
+         "BSS_dry": f"{bss_sp:.4f}", "HSS": f"{hss_sp:.4f}", "ROC-AUC_dry": f"{auc_sp:.4f}"}
+    )
+if HAS_CONVLSTM:
+    rows.append(
+        {"Forecaster": "ConvLSTM",            "BS_dry": f"{bs_cl:.4f}",
+         "BSS_dry": f"{bss_cl:.4f}", "HSS": f"{hss_cl:.4f}", "ROC-AUC_dry": f"{auc_cl:.4f}"}
+    )
+if HAS_LOGREG:
+    rows.append(
+        {"Forecaster": "Logistic Regression", "BS_dry": f"{bs_lr:.4f}",
+         "BSS_dry": f"{bss_lr:.4f}", "HSS": f"{hss_lr:.4f}", "ROC-AUC_dry": f"{auc_lr:.4f}"}
+    )
+if HAS_RF:
+    rows.append(
+        {"Forecaster": "Random Forest",       "BS_dry": f"{bs_rf:.4f}",
+         "BSS_dry": f"{bss_rf:.4f}", "HSS": f"{hss_rf:.4f}", "ROC-AUC_dry": f"{auc_rf:.4f}"}
+    )
 table_df = pd.DataFrame(rows)
 csv_path = OUT_DIR / "forecast_skill_bss_hss_table.csv"
 table_df.to_csv(csv_path, index=False)
@@ -320,21 +514,40 @@ summary = (
     "  All PRIMARY metrics below are computed at the monthly level.\n"
     "  Pixel-level metrics inflate significance due to spatial autocorrelation.\n"
     "  BSS reference = climatological class frequency from training set (1991–2016).\n\n"
+    "Spatial complexity ladder:\n"
+    "  Climatology → Persistence → XGBoost (no spatial)\n"
+    "    → XGBoost-Spatial (spatial features) → ConvLSTM (spatial architecture)\n\n"
     "── Monthly-level Brier Scores (dry class) ──\n"
     f"  Climatological (reference) : {bs_clim:.4f}\n"
     f"  Persistence baseline       : {bs_pers:.4f}\n"
-    f"  XGBoost                    : {bs_xgb:.4f}\n\n"
-    "── Brier Skill Score (BSS, dry class, ref = climatology) ──\n"
-    f"  Persistence : {bss_pers:.4f}  (>0 means better than climatology)\n"
-    f"  XGBoost     : {bss_xgb:.4f}\n\n"
-    "── Heidke Skill Score (HSS, 3-class, monthly dominant class) ──\n"
-    f"  Climatological : {hss_clim:.4f}\n"
-    f"  Persistence    : {hss_pers:.4f}\n"
-    f"  XGBoost        : {hss_xgb:.4f}\n\n"
-    "── ROC-AUC (dry vs. not-dry, monthly mean probability) ──\n"
-    f"  Persistence : {auc_pers:.4f}\n"
-    f"  XGBoost     : {auc_xgb:.4f}\n\n"
-    "Outputs:\n"
+    f"  XGBoost (no spatial)       : {bs_xgb:.4f}\n"
+    + (f"  XGBoost-Spatial            : {bs_sp:.4f}\n" if HAS_XGB_SPATIAL else "")
+    + (f"  ConvLSTM                   : {bs_cl:.4f}\n" if HAS_CONVLSTM   else "")
+    + (f"  Logistic Regression        : {bs_lr:.4f}\n" if HAS_LOGREG     else "")
+    + (f"  Random Forest              : {bs_rf:.4f}\n" if HAS_RF         else "")
+    + "\n── Brier Skill Score (BSS, dry class, ref = climatology) ──\n"
+    f"  Persistence         : {bss_pers:.4f}  (>0 means better than climatology)\n"
+    f"  XGBoost (no spatial): {bss_xgb:.4f}\n"
+    + (f"  XGBoost-Spatial     : {bss_sp:.4f}\n" if HAS_XGB_SPATIAL else "")
+    + (f"  ConvLSTM            : {bss_cl:.4f}\n" if HAS_CONVLSTM   else "")
+    + (f"  Logistic Regression : {bss_lr:.4f}\n" if HAS_LOGREG     else "")
+    + (f"  Random Forest       : {bss_rf:.4f}\n" if HAS_RF         else "")
+    + "\n── Heidke Skill Score (HSS, 3-class, monthly dominant class) ──\n"
+    f"  Climatological      : {hss_clim:.4f}\n"
+    f"  Persistence         : {hss_pers:.4f}\n"
+    f"  XGBoost (no spatial): {hss_xgb:.4f}\n"
+    + (f"  XGBoost-Spatial     : {hss_sp:.4f}\n" if HAS_XGB_SPATIAL else "")
+    + (f"  ConvLSTM            : {hss_cl:.4f}\n" if HAS_CONVLSTM   else "")
+    + (f"  Logistic Regression : {hss_lr:.4f}\n" if HAS_LOGREG     else "")
+    + (f"  Random Forest       : {hss_rf:.4f}\n" if HAS_RF         else "")
+    + "\n── ROC-AUC (dry vs. not-dry, monthly mean probability) ──\n"
+    f"  Persistence         : {auc_pers:.4f}\n"
+    f"  XGBoost (no spatial): {auc_xgb:.4f}\n"
+    + (f"  XGBoost-Spatial     : {auc_sp:.4f}\n" if HAS_XGB_SPATIAL else "")
+    + (f"  ConvLSTM            : {auc_cl:.4f}\n" if HAS_CONVLSTM   else "")
+    + (f"  Logistic Regression : {auc_lr:.4f}\n" if HAS_LOGREG     else "")
+    + (f"  Random Forest       : {auc_rf:.4f}\n" if HAS_RF         else "")
+    + "\nOutputs:\n"
     f"  {cm_path}\n"
     f"  {rel_path}\n"
     f"  {csv_path}\n"
