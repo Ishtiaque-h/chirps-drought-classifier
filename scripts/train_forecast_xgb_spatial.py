@@ -42,6 +42,7 @@ import xgboost as xgb
 from sklearn.metrics import (
     classification_report, confusion_matrix, ConfusionMatrixDisplay,
 )
+from sklearn.utils.class_weight import compute_sample_weight
 
 BASE_DIR   = Path(__file__).resolve().parents[1]
 PROC       = BASE_DIR / "data" / "processed"
@@ -161,7 +162,9 @@ y_test_enc  = y_test.map(LABEL_MAP).values
 # --------------------------------------------------------------------------
 # 4. Train XGBoost
 # --------------------------------------------------------------------------
-dtrain = xgb.DMatrix(X_train, label=y_train_enc, feature_names=FEATURES)
+train_weights = compute_sample_weight(class_weight="balanced", y=y_train_enc)
+
+dtrain = xgb.DMatrix(X_train, label=y_train_enc, weight=train_weights, feature_names=FEATURES)
 dval   = xgb.DMatrix(X_val,   label=y_val_enc,   feature_names=FEATURES)
 dtest  = xgb.DMatrix(X_test,  label=y_test_enc,  feature_names=FEATURES)
 
