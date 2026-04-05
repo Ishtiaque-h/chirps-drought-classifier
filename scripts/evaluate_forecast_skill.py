@@ -52,6 +52,9 @@ Outputs:
   outputs/forecast_skill_bss_hss_table.csv
   outputs/forecast_reliability_diagram.png
   outputs/forecast_monthly_cm.png
+  outputs/calib_study_results.csv         (calibration study, new)
+  outputs/calib_study_reliability_diagram.png  (calibration study, new)
+  outputs/calib_study_decomposition_barplot.png (calibration study, new)
 """
 from pathlib import Path
 import numpy as np
@@ -62,6 +65,7 @@ import xgboost as xgb
 import joblib
 from sklearn.calibration import calibration_curve
 from sklearn.isotonic import IsotonicRegression
+from sklearn.linear_model import LogisticRegression as _LogisticReg  # Platt scaling
 from sklearn.metrics import roc_auc_score, confusion_matrix, ConfusionMatrixDisplay
 
 DATA          = Path("data/processed/dataset_forecast.parquet")
@@ -550,6 +554,371 @@ hss_ci_xgb = bootstrap_metric(lambda i: heidke_skill_score(
     y_true_monthly[i], monthly["xgb_pred_mode"].values[i], CLASSES
 ), n_months, n_boot=N_BOOTSTRAP_ITERATIONS, seed=114)
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# CALIBRATION STUDY — XGBoost and XGBoost-Spatial                (NEW SECTION)
+# ─────────────────────────────────────────────────────────────────────────────
+# Protocol (no test leakage):
+#   1. Fit three calibrators (none / Platt / isotonic) on pixel-level validation
+#      data (2017–2020).
+#   2. Select best method per model by validation monthly-aggregated Brier Score.
+#   3. Apply best calibrator to frozen test set; evaluate at monthly level.
+#   4. Report BS, BSS, Murphy decomposition, bootstrap 95 % CI, and paired
+#      bootstrap significance tests vs climatology and between XGB variants.
+# New output files produced in this section:
+#   outputs/calib_study_results.csv
+#   outputs/calib_study_reliability_diagram.png
+#   outputs/calib_study_decomposition_barplot.png
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def bs_decomp(obs: np.ndarray, prob: np.ndarray, n_bins: int = 10) -> dict:
+    """Murphy 1973 Brier Score decomposition: BS = reliability − resolution + uncertainty.
+
+    Parameters
+    ----------
+    obs  : 1-D array of observed outcomes (fractions or binary, values in [0, 1]).
+    prob : 1-D array of forecast probabilities (clipped to [0, 1]).
+    n_bins : number of equal-width forecast bins.
+
+    Returns dict with keys: reliability, resolution, uncertainty, bs_check.
+    ``bs_check`` (= reliability − resolution + uncertainty) should closely match
+    ``brier_score(obs, prob)``; any small difference is the discretisation residual.
+    """
+    obs  = np.asarray(obs,  dtype=float)
+    prob = np.clip(np.asarray(prob, dtype=float), 0.0, 1.0)
+    n    = len(obs)
+    o_bar = float(obs.mean())
+    edges = np.linspace(0.0, 1.0 + 1e-9, n_bins + 1)
+    bidx  = np.clip(np.digitize(prob, edges) - 1, 0, n_bins - 1)
+    rel = res = 0.0
+    for k in range(n_bins):
+        mask = bidx == k
+        if not mask.any():
+            continue
+        f_k = float(prob[mask].mean())
+        o_k = float(obs[mask].mean())
+        n_k = int(mask.sum())
+        rel += (n_k / n) * (f_k - o_k) ** 2   # reliability: forecast vs obs within bin
+        res += (n_k / n) * (o_k - o_bar) ** 2  # resolution: obs within bin vs climatology
+    # General variance of observations: valid for both binary and fractional obs.
+    # For binary obs this equals o_bar*(1-o_bar); for fractional obs it equals Var(obs).
+    unc = float(np.mean((obs - o_bar) ** 2))    # uncertainty: intrinsic variability
+    return dict(reliability=rel, resolution=res, uncertainty=unc, bs_check=rel - res + unc)
+
+
+# ── Calibration method helpers ─────────────────────────────────────────────────
+
+def _fit_platt(vp: np.ndarray, vo: np.ndarray) -> _LogisticReg:
+    """Platt scaling: fit logistic regression on raw validation scores (pixel level)."""
+    lr = _LogisticReg(C=1.0, solver="lbfgs", max_iter=1000)
+    lr.fit(vp.reshape(-1, 1), vo)
+    return lr
+
+
+def _apply_platt(m: _LogisticReg, p: np.ndarray) -> np.ndarray:
+    """Apply fitted Platt model to new raw probabilities."""
+    return m.predict_proba(p.reshape(-1, 1))[:, 1]
+
+
+def _fit_isotonic_cal(vp: np.ndarray, vo: np.ndarray) -> IsotonicRegression:
+    """Fit isotonic regression calibration on raw validation scores (pixel level)."""
+    iso = IsotonicRegression(out_of_bounds="clip")
+    iso.fit(vp, vo)
+    return iso
+
+
+def _apply_isotonic_cal(m: IsotonicRegression, p: np.ndarray) -> np.ndarray:
+    """Apply fitted isotonic model to new raw probabilities."""
+    return m.predict(p)
+
+
+# ── Paired bootstrap significance test ────────────────────────────────────────
+
+def paired_boot_pvalue(sq_a: np.ndarray, sq_b: np.ndarray,
+                       n_boot: int = 2000, seed: int = 300) -> float:
+    """Two-sided paired bootstrap p-value for H0: E[BS_a] = E[BS_b].
+
+    sq_a and sq_b are per-month squared forecast errors for two competing models.
+    Uses the same bootstrap sample (same month indices) for both models at each draw.
+    """
+    rng      = np.random.default_rng(seed)
+    obs_diff = float(sq_a.mean() - sq_b.mean())
+    diffs    = np.empty(n_boot, dtype=float)
+    for i in range(n_boot):
+        idx      = rng.integers(0, len(sq_a), len(sq_a))
+        diffs[i] = float(sq_a[idx].mean() - sq_b[idx].mean())
+    diffs_c = diffs - diffs.mean()  # centre under null hypothesis
+    return float(np.mean(np.abs(diffs_c) >= np.abs(obs_diff)))
+
+
+# ── Validation monthly aggregation ────────────────────────────────────────────
+# Target month for each validation pixel (feature month + 1), matching test split.
+_val_mo_keys = (
+    pd.to_datetime(val["time"]) + pd.DateOffset(months=1)
+).dt.to_period("M").dt.to_timestamp()
+
+# Binary dry indicator and monthly dry-area fraction for the validation set.
+_val_obs_bin = (val[TARGET] == -1).astype(int).values
+_val_obs_mo  = (
+    pd.Series((val[TARGET] == -1).astype(float).values, index=_val_mo_keys)
+    .groupby(_val_mo_keys).mean()
+)  # monthly dry-area fraction, validation set
+
+# ── Optional: build XGB-Spatial validation probabilities ──────────────────────
+# Requires the saved spatial model and the same gridded NetCDF files used during
+# training (train_forecast_xgb_spatial.py).
+_XGB_SP_MDL_PATH = Path("outputs/xgb_spatial_model.json")
+_SPI_NC_PATH     = Path("data/processed/chirps_v3_monthly_cvalley_spi_1991_2025.nc")
+_PR_NC_PATH      = Path("data/processed/chirps_v3_monthly_cvalley_1991_2025.nc")
+_SPATIAL_FEAT    = ["spi1_nbr_mean", "spi3_nbr_mean", "spi6_nbr_mean", "pr_nbr_mean"]
+_FEAT_WITH_SP    = FEATURES + _SPATIAL_FEAT  # full feature list including spatial
+
+_sp_val_dry = None  # (n_val_pixels,) dry-class prob — filled below when possible
+
+if (HAS_XGB_SPATIAL and _XGB_SP_MDL_PATH.exists()
+        and _SPI_NC_PATH.exists() and _PR_NC_PATH.exists()):
+    try:
+        import xarray as xr
+        print("  Calibration study: computing XGB-Spatial validation probabilities ...")
+        _pr_ds  = xr.open_dataset(_PR_NC_PATH).load()
+        _spi_ds = xr.open_dataset(_SPI_NC_PATH).load()
+        _pra    = _pr_ds["pr"].astype("float32")
+        _ts     = _pra.time.values
+        _s1     = _spi_ds["spi1"].sel(time=_ts).astype("float32")
+        _s3     = _spi_ds["spi3"].sel(time=_ts).astype("float32")
+        _s6     = _spi_ds["spi6"].sel(time=_ts).astype("float32")
+        _ln     = "latitude" if "latitude" in _pra.coords else "lat"   # lat coord name
+        _ln2    = "longitude" if "longitude" in _pra.coords else "lon"  # lon coord name
+
+        def _nbr_mean_cal(da, nm):
+            """3×3 neighbourhood rolling mean (mirrors train_forecast_xgb_spatial.py)."""
+            return da.rolling({_ln: 3, _ln2: 3}, min_periods=1, center=True).mean().rename(nm)
+
+        _nds = xr.Dataset({
+            "spi1_nbr_mean": _nbr_mean_cal(_s1, "spi1_nbr_mean"),
+            "spi3_nbr_mean": _nbr_mean_cal(_s3, "spi3_nbr_mean"),
+            "spi6_nbr_mean": _nbr_mean_cal(_s6, "spi6_nbr_mean"),
+            "pr_nbr_mean":   _nbr_mean_cal(_pra, "pr_nbr_mean"),
+        }).stack(pixel=(_ln, _ln2))
+        _ndf = _nds.reset_index("pixel").to_dataframe()
+        if "time" not in _ndf.columns:
+            _ndf = _ndf.reset_index()
+        _ndf = _ndf.rename(columns={_ln: "latitude", _ln2: "longitude"})
+        _ndf["time"] = pd.to_datetime(_ndf["time"])
+
+        _vsp = val.merge(
+            _ndf[["time", "latitude", "longitude"] + _SPATIAL_FEAT],
+            on=["time", "latitude", "longitude"], how="left",
+        )
+        _vsp[_SPATIAL_FEAT] = _vsp[_SPATIAL_FEAT].fillna(0.0)
+
+        _spm  = xgb.Booster()
+        _spm.load_model(_XGB_SP_MDL_PATH.as_posix())
+        _dvsp = xgb.DMatrix(_vsp[_FEAT_WITH_SP], feature_names=_FEAT_WITH_SP)
+        _sp_val_dry = _spm.predict(_dvsp).reshape(-1, 3)[:, 0]
+        print(f"  XGB-Spatial val probs ready ({len(_sp_val_dry)} pixels).")
+    except Exception as _exc:
+        print(f"  WARNING: Calibration study — XGB-Spatial val probs unavailable ({_exc}).")
+        _sp_val_dry = None
+
+
+# ── Assemble (model_label, val_dry_pixel_probs, test_dry_pixel_probs) list ────
+_test_mo_keys = pd.to_datetime(test["month_dt"])
+_calib_targets = [("XGB", val_probs[:, 0], test["xgb_prob_dry"].values)]
+if HAS_XGB_SPATIAL and _sp_val_dry is not None:
+    _calib_targets.append(
+        ("XGB-Spatial", _sp_val_dry, test["xgb_spatial_prob_dry"].values)
+    )
+
+
+# ── For each model: compare calibration methods, select best by val BS ────────
+calib_study_rows: list = []   # rows collected into CSV at end of section
+_best_test_mo: dict   = {}    # model_label → best-calibrated monthly test dry fracs
+
+print("\n── Calibration Study ────────────────────────────────────────────────────")
+for _mlbl, _vdp, _tdp in _calib_targets:
+    _best_mname = None
+    _best_val_bs = np.inf
+    _fitted: dict = {}
+
+    for _mname in ("none", "platt", "isotonic"):
+        # --- fit calibrator on pixel-level validation data ---
+        if _mname == "none":
+            _fitted["none"] = None
+            _vdp_c = _vdp.copy()
+        elif _mname == "platt":
+            _fitted["platt"] = _fit_platt(_vdp, _val_obs_bin)
+            _vdp_c = _apply_platt(_fitted["platt"], _vdp)
+        else:
+            _fitted["isotonic"] = _fit_isotonic_cal(_vdp, _val_obs_bin)
+            _vdp_c = _apply_isotonic_cal(_fitted["isotonic"], _vdp)
+
+        # --- aggregate to validation months and score ---
+        _vmo  = pd.Series(_vdp_c, index=_val_mo_keys).groupby(_val_mo_keys).mean()
+        _cidx = _vmo.index.intersection(_val_obs_mo.index)
+        _vbs  = brier_score(_val_obs_mo.loc[_cidx].values, _vmo.loc[_cidx].values)
+        if _vbs < _best_val_bs:
+            _best_val_bs = _vbs
+            _best_mname  = _mname
+
+    # --- apply best calibrator to test pixels ---
+    if _best_mname == "none":
+        _tdp_c = _tdp.copy()
+    elif _best_mname == "platt":
+        _tdp_c = _apply_platt(_fitted["platt"], _tdp)
+    else:
+        _tdp_c = _apply_isotonic_cal(_fitted["isotonic"], _tdp)
+
+    # --- aggregate to test months (aligned to the monthly DataFrame index) ---
+    _tmo = (
+        pd.Series(_tdp_c, index=_test_mo_keys)
+        .groupby(_test_mo_keys).mean()
+        .reindex(monthly["month_dt"]).values
+    )
+    _best_test_mo[_mlbl] = _tmo
+
+    # --- test-set metrics ---
+    _bs_t  = brier_score(obs_dry_frac, _tmo)
+    _bss_t = bss(_bs_t, bs_clim)
+    _d     = bs_decomp(obs_dry_frac, _tmo)
+    calib_study_rows.append({
+        "model":            _mlbl,
+        "best_calibration": _best_mname,
+        "val_BS_selected":  round(_best_val_bs, 5),
+        "test_BS":          round(_bs_t,  5),
+        "test_BSS":         round(_bss_t, 5),
+        "reliability":      round(_d["reliability"], 5),
+        "resolution":       round(_d["resolution"],  5),
+        "uncertainty":      round(_d["uncertainty"],  5),
+    })
+    print(f"  {_mlbl}: best_calib={_best_mname}  val_BS={_best_val_bs:.5f}  "
+          f"test_BS={_bs_t:.5f}  test_BSS={_bss_t:.5f}")
+    print(f"    Decomp — reliability={_d['reliability']:.5f}  "
+          f"resolution={_d['resolution']:.5f}  uncertainty={_d['uncertainty']:.5f}")
+
+
+# ── Bootstrap CI and paired significance tests ─────────────────────────────────
+_clim_sq = (obs_dry_frac - monthly["clim_dry_frac"].values) ** 2  # per-month sq errors (climatology)
+for _ci, _crow in enumerate(calib_study_rows):
+    _mo  = _best_test_mo[_crow["model"]]
+    _sq  = (obs_dry_frac - _mo) ** 2
+
+    # bootstrap CI for BS (use default-arg capture to avoid closure over loop var)
+    _bs_ci = bootstrap_metric(
+        lambda idx, _m=_mo: float(np.mean((obs_dry_frac[idx] - _m[idx]) ** 2)),
+        n_months, n_boot=N_BOOTSTRAP_ITERATIONS, seed=200 + _ci,
+    )
+    # bootstrap CI for BSS (relative to climatology)
+    _bss_ci = bootstrap_metric(
+        lambda idx, _m=_mo: bss(
+            float(np.mean((obs_dry_frac[idx] - _m[idx]) ** 2)),
+            float(np.mean((obs_dry_frac[idx] - monthly["clim_dry_frac"].values[idx]) ** 2)),
+        ), n_months, n_boot=N_BOOTSTRAP_ITERATIONS, seed=210 + _ci,
+    )
+    # paired test: this model vs climatology
+    _p_clim = paired_boot_pvalue(_sq, _clim_sq, n_boot=N_BOOTSTRAP_ITERATIONS, seed=220 + _ci)
+    calib_study_rows[_ci]["test_BS_95CI"]  = fmt_ci(_bs_ci)
+    calib_study_rows[_ci]["test_BSS_95CI"] = fmt_ci(_bss_ci)
+    calib_study_rows[_ci]["p_vs_clim"]     = round(_p_clim, 4)
+
+# paired test between XGB-Spatial and XGB (if both are present)
+_p_sp_vs_xgb = np.nan
+if "XGB" in _best_test_mo and "XGB-Spatial" in _best_test_mo:
+    _xsq = (obs_dry_frac - _best_test_mo["XGB"]) ** 2
+    _ssq = (obs_dry_frac - _best_test_mo["XGB-Spatial"]) ** 2
+    _p_sp_vs_xgb = paired_boot_pvalue(_ssq, _xsq, n_boot=N_BOOTSTRAP_ITERATIONS, seed=230)
+    print(f"  Paired test (XGB-Spatial vs XGB): p = {_p_sp_vs_xgb:.4f}")
+
+# build and save results CSV
+_cdf = pd.DataFrame(calib_study_rows)
+if not np.isnan(_p_sp_vs_xgb) and len(_cdf) >= 2:
+    # annotate XGB-Spatial row with its significance vs XGB
+    _cdf["p_vs_XGB"] = np.nan
+    _cdf.loc[_cdf["model"] == "XGB-Spatial", "p_vs_XGB"] = round(float(_p_sp_vs_xgb), 4)
+calib_csv_path = OUT_DIR / "calib_study_results.csv"
+_cdf.to_csv(calib_csv_path, index=False)
+print(f"  Wrote: {calib_csv_path}")
+
+
+# ── Figure 1: Reliability diagram for calibrated XGB models (monthly level) ───
+def _rel_curve(obs_arr: np.ndarray, pred_arr: np.ndarray,
+               n_bins: int = 5) -> tuple:
+    """Bin-average reliability curve for fractional observations at monthly level.
+
+    Returns (mean_predicted, observed_fraction) arrays for non-empty bins.
+    """
+    edges = np.linspace(0.0, 1.0 + 1e-9, n_bins + 1)
+    bidx  = np.clip(np.digitize(pred_arr, edges) - 1, 0, n_bins - 1)
+    mp, of = [], []
+    for k in range(n_bins):
+        mask = bidx == k
+        if mask.any():
+            mp.append(float(pred_arr[mask].mean()))
+            of.append(float(obs_arr[mask].mean()))
+    return np.array(mp), np.array(of)
+
+
+_fig_rel2, _ax_rel2 = plt.subplots(figsize=(6, 5))
+_ax_rel2.plot([0, 1], [0, 1], "k--", lw=1.2, label="Perfect calibration")
+
+# climatology reference curve
+_mp_cl, _of_cl = _rel_curve(obs_dry_frac, monthly["clim_dry_frac"].values)
+_ax_rel2.plot(_mp_cl, _of_cl, "s-", color="#aaaaaa", label="Climatology", ms=6)
+
+# calibrated model curves
+_rel2_colors = {"XGB": "#2171b5", "XGB-Spatial": "#238b45"}
+for _rlbl, _rmo in _best_test_mo.items():
+    _mp_r, _of_r = _rel_curve(obs_dry_frac, _rmo)
+    _ax_rel2.plot(_mp_r, _of_r, "o-",
+                  color=_rel2_colors.get(_rlbl, "#d62728"),
+                  label=f"{_rlbl} (calibrated)", ms=6)
+
+_ax_rel2.set_xlabel("Mean predicted probability (dry)")
+_ax_rel2.set_ylabel("Observed dry-area fraction")
+_ax_rel2.set_title("Reliability diagram — calibrated models\n(60 independent test months)")
+_ax_rel2.legend(fontsize=9)
+_ax_rel2.set_xlim(0, 1)
+_ax_rel2.set_ylim(0, 1)
+_fig_rel2.tight_layout()
+_rel2_path = OUT_DIR / "calib_study_reliability_diagram.png"
+_fig_rel2.savefig(_rel2_path, dpi=150, bbox_inches="tight")
+plt.close(_fig_rel2)
+print(f"  Wrote: {_rel2_path}")
+
+
+# ── Figure 2: Brier Score decomposition barplot ────────────────────────────────
+_clim_d = bs_decomp(obs_dry_frac, monthly["clim_dry_frac"].values)
+_decomp_models: dict = {"Climatology": _clim_d}
+for _dlbl, _dmo in _best_test_mo.items():
+    _decomp_models[_dlbl] = bs_decomp(obs_dry_frac, _dmo)
+
+_bar_lbls = list(_decomp_models.keys())
+_n_bars   = len(_bar_lbls)
+_x_pos    = np.arange(_n_bars)
+_w        = 0.25
+_comp_clr = {"reliability": "#e6550d", "resolution": "#31a354", "uncertainty": "#3182bd"}
+
+_fig_dc, _ax_dc = plt.subplots(figsize=(max(6, 2 * _n_bars + 2), 4))
+for _ki, _comp in enumerate(("reliability", "resolution", "uncertainty")):
+    _vals = [_decomp_models[_lbl][_comp] for _lbl in _bar_lbls]
+    _ax_dc.bar(_x_pos + (_ki - 1) * _w, _vals, _w,
+               label=_comp.capitalize(), color=_comp_clr[_comp], alpha=0.85)
+
+_ax_dc.set_xticks(_x_pos)
+_ax_dc.set_xticklabels(_bar_lbls, rotation=15, ha="right")
+_ax_dc.set_ylabel("Score component")
+_ax_dc.set_title("Brier Score decomposition (test months)\n"
+                 "BS = reliability − resolution + uncertainty")
+_ax_dc.legend(fontsize=9)
+_ax_dc.axhline(0, color="black", lw=0.7)
+_fig_dc.tight_layout()
+_dc_path = OUT_DIR / "calib_study_decomposition_barplot.png"
+_fig_dc.savefig(_dc_path, dpi=150, bbox_inches="tight")
+plt.close(_fig_dc)
+print(f"  Wrote: {_dc_path}")
+
+# ── End of Calibration Study section ──────────────────────────────────────────
+
 # ── Confusion matrix at monthly level ─────────────────────────────────────────
 cm_monthly = confusion_matrix(y_true_monthly, monthly["xgb_pred_mode"].values,
                               labels=CLASSES, normalize="true")
@@ -646,7 +1015,7 @@ print("Wrote:", csv_path)
 # ── text summary ──────────────────────────────────────────────────────────────
 summary = (
     "Forecast Skill Evaluation — Central Valley 2021–2025\n"
-    "=" * 60 + "\n"
+    + "=" * 60 + "\n"
     f"Test months (independent temporal units): {n_months}\n"
     f"Pixels per month (spatially autocorrelated, secondary): "
     f"{len(test) // n_months:,}\n\n"
@@ -697,6 +1066,9 @@ summary = (
     f"  {cm_path}\n"
     f"  {rel_path}\n"
     f"  {csv_path}\n"
+    f"  {calib_csv_path} (calibration study)\n"
+    f"  {_rel2_path} (calibration study)\n"
+    f"  {_dc_path} (calibration study)\n"
 )
 print(summary)
 (OUT_DIR / "forecast_skill_scores.txt").write_text(summary)
