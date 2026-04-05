@@ -210,31 +210,76 @@ if CONVLSTM_NPZ.exists() and CONVLSTM_META.exists():
         cl_pred_enc = cl_proba.argmax(axis=1)
         _inv_enc    = {0: -1, 1: 0, 2: 1}
 
-        # Flatten to long-format DataFrame for merging with test df
-        # shape after ravel: N_cl * nlat * nlon rows
-        t_idx  = np.repeat(np.arange(N_cl), nlat * nlon)
-        lt_idx = np.tile(np.repeat(np.arange(nlat), nlon), N_cl)
-        ln_idx = np.tile(np.arange(nlon), N_cl * nlat)
+        def nearest_grid_indices(grid_vals: np.ndarray, query_vals: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+            """Return nearest original-grid indices and absolute diffs for each query."""
+            sort_idx = np.argsort(grid_vals)
+            grid_sorted = grid_vals[sort_idx]
+            pos = np.searchsorted(grid_sorted, query_vals)
+            pos = np.clip(pos, 1, len(grid_sorted) - 1)
+            left = grid_sorted[pos - 1]
+            right = grid_sorted[pos]
+            use_right = np.abs(query_vals - right) < np.abs(query_vals - left)
+            nearest_pos = np.where(use_right, pos, pos - 1)
+            nearest_orig_idx = sort_idx[nearest_pos]
+            nearest_diff = np.abs(query_vals - grid_vals[nearest_orig_idx])
+            return nearest_orig_idx, nearest_diff
 
-        cl_df = pd.DataFrame({
-            "time":                  cl_times[t_idx],
-            "latitude":              cl_lat[lt_idx],
-            "longitude":             cl_lon[ln_idx],
-            "convlstm_prob_dry":     cl_proba[:, 0].ravel(),
-            "convlstm_prob_normal":  cl_proba[:, 1].ravel(),
-            "convlstm_prob_wet":     cl_proba[:, 2].ravel(),
-            "convlstm_pred":         np.vectorize(_inv_enc.get)(cl_pred_enc.ravel()),
-        })
+        def coord_tolerance(grid_vals: np.ndarray) -> float:
+            uniq = np.unique(np.sort(grid_vals))
+            if len(uniq) <= 1:
+                return 1e-6
+            steps = np.diff(uniq)
+            steps = steps[steps > 0]
+            if len(steps) == 0:
+                return 1e-6
+            return float(steps.min() / 2.0 + 1e-9)
 
-        # Align time types before merging
+        # Align by nearest time + nearest lat/lon gridpoint (with tolerance)
         test["time"] = pd.to_datetime(test["time"])
-        test = test.merge(
-            cl_df[["time", "latitude", "longitude",
-                   "convlstm_prob_dry", "convlstm_prob_normal",
-                   "convlstm_prob_wet", "convlstm_pred"]],
-            on=["time", "latitude", "longitude"],
-            how="left",
+        cl_time_index = pd.DatetimeIndex(cl_times)
+        test_time_index = pd.DatetimeIndex(test["time"])
+        t_idx_exact = cl_time_index.get_indexer(test_time_index)
+        t_idx_nearest = cl_time_index.get_indexer(
+            test_time_index, method="nearest", tolerance=pd.Timedelta(days=31)
         )
+        n_time_fallback = int(((t_idx_exact == -1) & (t_idx_nearest != -1)).sum())
+        if n_time_fallback > 0:
+            print(
+                f"  NOTE: {n_time_fallback} rows had no exact ConvLSTM time match; "
+                "used nearest available time within 31 days."
+            )
+        t_idx = pd.Series(t_idx_nearest, index=test.index)
+
+        for _col in ["convlstm_prob_dry", "convlstm_prob_normal", "convlstm_prob_wet"]:
+            test[_col] = np.nan
+        test["convlstm_pred"] = np.nan
+
+        has_time = t_idx.notna().values
+        if has_time.any():
+            lat_q = test.loc[has_time, "latitude"].to_numpy()
+            lon_q = test.loc[has_time, "longitude"].to_numpy()
+
+            lat_idx, lat_diff = nearest_grid_indices(cl_lat, lat_q)
+            lon_idx, lon_diff = nearest_grid_indices(cl_lon, lon_q)
+
+            lat_tol = coord_tolerance(cl_lat)
+            lon_tol = coord_tolerance(cl_lon)
+            within_tol = (lat_diff <= lat_tol) & (lon_diff <= lon_tol)
+
+            matched_rows = test.index[has_time][within_tol]
+            if len(matched_rows) > 0:
+                time_idx_arr = t_idx.loc[matched_rows].astype(int).to_numpy()
+                lat_idx_arr = lat_idx[within_tol]
+                lon_idx_arr = lon_idx[within_tol]
+
+                matched_probs = cl_proba[time_idx_arr, :, lat_idx_arr, lon_idx_arr]
+                matched_pred_enc = cl_pred_enc[time_idx_arr, lat_idx_arr, lon_idx_arr]
+
+                test.loc[matched_rows, "convlstm_prob_dry"] = matched_probs[:, 0]
+                test.loc[matched_rows, "convlstm_prob_normal"] = matched_probs[:, 1]
+                test.loc[matched_rows, "convlstm_prob_wet"] = matched_probs[:, 2]
+                test.loc[matched_rows, "convlstm_pred"] = np.vectorize(_inv_enc.get)(matched_pred_enc)
+
         n_missing = int(test["convlstm_prob_dry"].isna().sum())
         if n_missing > 0:
             print(f"  WARNING: {n_missing} test rows had no ConvLSTM match; "
@@ -443,14 +488,18 @@ print("Wrote:", cm_path)
 fig_rel, axes = plt.subplots(1, 2, figsize=(11, 5), sharey=True)
 
 for ax, col, label, color in [
-    (axes[0], "xgb_dry_frac",     "XGBoost (raw)",        "#2171b5"),
-    (axes[1], "xgb_dry_cal_frac", "XGBoost (calibrated)", "#238b45"),
+    (axes[0], "xgb_prob_dry",     "XGBoost (raw)",        "#2171b5"),
+    (axes[1], "xgb_prob_dry_cal", "XGBoost (calibrated)", "#238b45"),
 ]:
     # use pixel-level for calibration curve (more points = smoother bins)
+    y_true_bin = (test[TARGET] == -1).astype(int)
+    if col == "xgb_prob_dry_cal":
+        y_prob = iso_cal.predict(test["xgb_prob_dry"].values)
+    else:
+        y_prob = test[col].values
     frac_pos, mean_pred = calibration_curve(
-        (test[TARGET] == -1).astype(int),
-        test[col] if col != "xgb_dry_cal_frac" else
-            iso_cal.predict(test["xgb_prob_dry"].values),
+        y_true_bin,
+        y_prob,
         n_bins=10,
         strategy="uniform",
     )
