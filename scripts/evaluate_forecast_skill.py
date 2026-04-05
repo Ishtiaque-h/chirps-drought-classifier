@@ -33,8 +33,9 @@ Skill metrics:
 
 Baselines:
   1. Climatological: per-calendar-month class-frequency distribution from train.
-  2. Persistence:    predict label[t+1] = label[t] (current month persists).
-  3. SPI-1 threshold: if spi1_lag1 <= -1 → dry; if spi1_lag1 >= 1 → wet; else normal.
+  2. Persistence:    predict label[t+1] = label[t] (current month SPI-1 class persists).
+  3. SPI-1 threshold heuristic: map current SPI-1 continuously to class probabilities
+     (dry/wet increase with |SPI-1|; normal dominates near SPI-1≈0).
 
 Inputs:
   data/processed/dataset_forecast.parquet
@@ -360,10 +361,25 @@ for ci, c in enumerate(CLASSES):
     test[f"persist_prob_{c}"] = (test["persist_pred"] == c).astype(float)
 
 # ── SPI-1 threshold baseline ──────────────────────────────────────────────────
-# Zero-ML rule: if current SPI-1 is dry, forecast dry next month, etc.
-test["thr_pred"] = test["persist_pred"]   # same rule
-for ci, c in enumerate(CLASSES):
-    test[f"thr_prob_{c}"] = test[f"persist_prob_{c}"]
+# Zero-ML heuristic baseline: convert current SPI-1 to probabilistic class
+# forecast (distinct from persistence's hard class carry-over).
+# - dry probability increases as SPI-1 becomes more negative
+# - wet probability increases as SPI-1 becomes more positive
+# - normal receives residual probability near neutral conditions
+spi_now = test["spi1_lag1"].values.astype(float)
+thr_prob_dry = np.clip((-spi_now) / 2.0, 0.0, 1.0)
+thr_prob_wet = np.clip((spi_now) / 2.0, 0.0, 1.0)
+thr_prob_normal = np.clip(1.0 - thr_prob_dry - thr_prob_wet, 0.0, 1.0)
+thr_norm = thr_prob_dry + thr_prob_normal + thr_prob_wet
+thr_prob_dry /= thr_norm
+thr_prob_normal /= thr_norm
+thr_prob_wet /= thr_norm
+
+test["thr_prob_-1"] = thr_prob_dry
+test["thr_prob_0"]  = thr_prob_normal
+test["thr_prob_1"]  = thr_prob_wet
+thr_argmax = np.vstack([thr_prob_dry, thr_prob_normal, thr_prob_wet]).T.argmax(axis=1)
+test["thr_pred"] = np.array([CLASSES[i] for i in thr_argmax], dtype=int)
 
 # ── monthly aggregation ───────────────────────────────────────────────────────
 print("Aggregating to monthly level (60 independent test months)...")
@@ -381,9 +397,13 @@ monthly = test.groupby("month_dt").agg(
     persist_dry_frac= (f"persist_prob_{-1}","mean"),
     persist_norm_frac=(f"persist_prob_{0}", "mean"),
     persist_wet_frac= (f"persist_prob_{1}", "mean"),
+    thr_dry_frac    = (f"thr_prob_{-1}", "mean"),
+    thr_norm_frac   = (f"thr_prob_{0}",  "mean"),
+    thr_wet_frac    = (f"thr_prob_{1}",  "mean"),
     xgb_pred_mode   = ("xgb_pred",    lambda s: int(s.mode()[0])),
     clim_pred_mode  = ("clim_pred",   lambda s: int(s.mode()[0])),
     persist_pred_mode=("persist_pred",lambda s: int(s.mode()[0])),
+    thr_pred_mode   = ("thr_pred",    lambda s: int(s.mode()[0])),
     **({f"lr_dry_frac":  (f"lr_prob_{-1}", "mean"),
         f"lr_pred_mode": ("lr_pred", lambda s: int(s.mode()[0]))}
        if HAS_LOGREG else {}),
@@ -398,76 +418,128 @@ monthly = test.groupby("month_dt").agg(
        if HAS_CONVLSTM else {}),
 ).reset_index()
 
-# true binary indicator for dry class at monthly level
-monthly["obs_dry"] = (monthly["y_true_dry_frac"] > 0.5).astype(float)
+# Monthly dry-event target for probabilistic scoring:
+# use observed monthly dry fraction directly (0..1) to avoid arbitrary majority threshold.
+monthly["obs_dry_frac"] = monthly["y_true_dry_frac"].astype(float)
+
+# Binary monthly dry event (for ROC-AUC only): dominant class is dry.
+monthly["obs_dry_bin"] = (monthly["y_true_mode"] == -1).astype(int)
 
 n_months = len(monthly)
 print(f"Test months: {n_months}")
 
 # ── Brier Scores ─────────────────────────────────────────────────────────────
-obs_dry = monthly["obs_dry"].values
+obs_dry_frac = monthly["obs_dry_frac"].values
 
-bs_xgb   = brier_score(obs_dry, monthly["xgb_dry_frac"].values)
-bs_clim  = brier_score(obs_dry, monthly["clim_dry_frac"].values)
-bs_pers  = brier_score(obs_dry, monthly["persist_dry_frac"].values)
+bs_xgb   = brier_score(obs_dry_frac, monthly["xgb_dry_frac"].values)
+bs_clim  = brier_score(obs_dry_frac, monthly["clim_dry_frac"].values)
+bs_pers  = brier_score(obs_dry_frac, monthly["persist_dry_frac"].values)
+bs_thr   = brier_score(obs_dry_frac, monthly["thr_dry_frac"].values)
 
 bss_xgb  = bss(bs_xgb,  bs_clim)
 bss_pers = bss(bs_pers, bs_clim)
+bss_thr  = bss(bs_thr,  bs_clim)
 
 # ── Heidke Skill Scores ───────────────────────────────────────────────────────
 y_true_monthly = monthly["y_true_mode"].values
 hss_xgb   = heidke_skill_score(y_true_monthly, monthly["xgb_pred_mode"].values,   CLASSES)
 hss_clim  = heidke_skill_score(y_true_monthly, monthly["clim_pred_mode"].values,   CLASSES)
 hss_pers  = heidke_skill_score(y_true_monthly, monthly["persist_pred_mode"].values, CLASSES)
+hss_thr   = heidke_skill_score(y_true_monthly, monthly["thr_pred_mode"].values, CLASSES)
 
 # ── ROC-AUC (dry vs. not-dry) ─────────────────────────────────────────────────
+obs_dry_bin = monthly["obs_dry_bin"].values
 try:
-    auc_xgb  = roc_auc_score(obs_dry, monthly["xgb_dry_frac"].values)
-    auc_pers = roc_auc_score(obs_dry, monthly["persist_dry_frac"].values)
+    auc_xgb  = roc_auc_score(obs_dry_bin, monthly["xgb_dry_frac"].values)
+    auc_pers = roc_auc_score(obs_dry_bin, monthly["persist_dry_frac"].values)
+    auc_thr  = roc_auc_score(obs_dry_bin, monthly["thr_dry_frac"].values)
 except Exception:
-    auc_xgb = auc_pers = np.nan
+    auc_xgb = auc_pers = auc_thr = np.nan
 
 # ── LogReg and RF metrics (if models were loaded) ─────────────────────────────
 if HAS_LOGREG:
-    bs_lr    = brier_score(obs_dry, monthly["lr_dry_frac"].values)
+    bs_lr    = brier_score(obs_dry_frac, monthly["lr_dry_frac"].values)
     bss_lr   = bss(bs_lr, bs_clim)
     hss_lr   = heidke_skill_score(y_true_monthly, monthly["lr_pred_mode"].values, CLASSES)
     try:
-        auc_lr = roc_auc_score(obs_dry, monthly["lr_dry_frac"].values)
+        auc_lr = roc_auc_score(obs_dry_bin, monthly["lr_dry_frac"].values)
     except Exception:
         auc_lr = np.nan
 
 if HAS_RF:
-    bs_rf    = brier_score(obs_dry, monthly["rf_dry_frac"].values)
+    bs_rf    = brier_score(obs_dry_frac, monthly["rf_dry_frac"].values)
     bss_rf   = bss(bs_rf, bs_clim)
     hss_rf   = heidke_skill_score(y_true_monthly, monthly["rf_pred_mode"].values, CLASSES)
     try:
-        auc_rf = roc_auc_score(obs_dry, monthly["rf_dry_frac"].values)
+        auc_rf = roc_auc_score(obs_dry_bin, monthly["rf_dry_frac"].values)
     except Exception:
         auc_rf = np.nan
 
 # ── XGBoost-Spatial and ConvLSTM metrics ─────────────────────────────────────
 if HAS_XGB_SPATIAL:
-    bs_sp   = brier_score(obs_dry, monthly["xgb_spatial_dry_frac"].values)
+    bs_sp   = brier_score(obs_dry_frac, monthly["xgb_spatial_dry_frac"].values)
     bss_sp  = bss(bs_sp, bs_clim)
     hss_sp  = heidke_skill_score(
         y_true_monthly, monthly["xgb_spatial_pred_mode"].values, CLASSES
     )
     try:
-        auc_sp = roc_auc_score(obs_dry, monthly["xgb_spatial_dry_frac"].values)
+        auc_sp = roc_auc_score(obs_dry_bin, monthly["xgb_spatial_dry_frac"].values)
     except Exception:
         auc_sp = np.nan
 
 if HAS_CONVLSTM:
-    bs_cl   = brier_score(obs_dry, monthly["convlstm_dry_frac"].values)
+    bs_cl   = brier_score(obs_dry_frac, monthly["convlstm_dry_frac"].values)
     bss_cl  = bss(bs_cl, bs_clim)
     hss_cl  = heidke_skill_score(
         y_true_monthly, monthly["convlstm_pred_mode"].values, CLASSES
     )
     try:
-        auc_cl = roc_auc_score(obs_dry, monthly["convlstm_dry_frac"].values)
+        auc_cl = roc_auc_score(obs_dry_bin, monthly["convlstm_dry_frac"].values)
     except Exception:
         auc_cl = np.nan
+
+# ── Bootstrap uncertainty intervals (monthly block bootstrap) ──────────────────
+def _bootstrap_ci(values: np.ndarray, alpha: float = 0.05) -> tuple[float, float]:
+    lo = float(np.nanpercentile(values, 100 * (alpha / 2)))
+    hi = float(np.nanpercentile(values, 100 * (1 - alpha / 2)))
+    return lo, hi
+
+def bootstrap_metric(metric_fn, n_months: int, n_boot: int = 2000, seed: int = 42) -> tuple[float, float]:
+    rng = np.random.default_rng(seed)
+    vals = np.empty(n_boot, dtype=float)
+    for i in range(n_boot):
+        idx = rng.integers(0, n_months, size=n_months)
+        vals[i] = metric_fn(idx)
+    return _bootstrap_ci(vals)
+
+def fmt_ci(ci: tuple[float, float]) -> str:
+    return f"[{ci[0]:.4f}, {ci[1]:.4f}]"
+
+n_boot = 2000
+bss_ci_pers = bootstrap_metric(lambda i: bss(
+    brier_score(obs_dry_frac[i], monthly["persist_dry_frac"].values[i]),
+    brier_score(obs_dry_frac[i], monthly["clim_dry_frac"].values[i])
+), n_months, n_boot=n_boot, seed=101)
+bss_ci_thr = bootstrap_metric(lambda i: bss(
+    brier_score(obs_dry_frac[i], monthly["thr_dry_frac"].values[i]),
+    brier_score(obs_dry_frac[i], monthly["clim_dry_frac"].values[i])
+), n_months, n_boot=n_boot, seed=102)
+bss_ci_xgb = bootstrap_metric(lambda i: bss(
+    brier_score(obs_dry_frac[i], monthly["xgb_dry_frac"].values[i]),
+    brier_score(obs_dry_frac[i], monthly["clim_dry_frac"].values[i])
+), n_months, n_boot=n_boot, seed=103)
+hss_ci_clim = bootstrap_metric(lambda i: heidke_skill_score(
+    y_true_monthly[i], monthly["clim_pred_mode"].values[i], CLASSES
+), n_months, n_boot=n_boot, seed=111)
+hss_ci_pers = bootstrap_metric(lambda i: heidke_skill_score(
+    y_true_monthly[i], monthly["persist_pred_mode"].values[i], CLASSES
+), n_months, n_boot=n_boot, seed=112)
+hss_ci_thr = bootstrap_metric(lambda i: heidke_skill_score(
+    y_true_monthly[i], monthly["thr_pred_mode"].values[i], CLASSES
+), n_months, n_boot=n_boot, seed=113)
+hss_ci_xgb = bootstrap_metric(lambda i: heidke_skill_score(
+    y_true_monthly[i], monthly["xgb_pred_mode"].values[i], CLASSES
+), n_months, n_boot=n_boot, seed=114)
 
 # ── Confusion matrix at monthly level ─────────────────────────────────────────
 cm_monthly = confusion_matrix(y_true_monthly, monthly["xgb_pred_mode"].values,
@@ -521,31 +593,41 @@ print("Wrote:", rel_path)
 # ── Skill score table ─────────────────────────────────────────────────────────
 rows = [
     {"Forecaster": "Climatological baseline", "BS_dry": f"{bs_clim:.4f}",
-     "BSS_dry": "0.0000 (ref)", "HSS": f"{hss_clim:.4f}", "ROC-AUC_dry": "—"},
+     "BSS_dry": "0.0000 (ref)", "BSS_dry_95CI": "—",
+     "HSS": f"{hss_clim:.4f}", "HSS_95CI": fmt_ci(hss_ci_clim), "ROC-AUC_dry": "—"},
     {"Forecaster": "Persistence baseline",    "BS_dry": f"{bs_pers:.4f}",
-     "BSS_dry": f"{bss_pers:.4f}", "HSS": f"{hss_pers:.4f}", "ROC-AUC_dry": f"{auc_pers:.4f}"},
+     "BSS_dry": f"{bss_pers:.4f}", "BSS_dry_95CI": fmt_ci(bss_ci_pers),
+     "HSS": f"{hss_pers:.4f}", "HSS_95CI": fmt_ci(hss_ci_pers), "ROC-AUC_dry": f"{auc_pers:.4f}"},
+    {"Forecaster": "SPI-1 threshold baseline", "BS_dry": f"{bs_thr:.4f}",
+     "BSS_dry": f"{bss_thr:.4f}", "BSS_dry_95CI": fmt_ci(bss_ci_thr),
+     "HSS": f"{hss_thr:.4f}", "HSS_95CI": fmt_ci(hss_ci_thr), "ROC-AUC_dry": f"{auc_thr:.4f}"},
     {"Forecaster": "XGBoost (no spatial)",    "BS_dry": f"{bs_xgb:.4f}",
-     "BSS_dry": f"{bss_xgb:.4f}",  "HSS": f"{hss_xgb:.4f}",  "ROC-AUC_dry": f"{auc_xgb:.4f}"},
+     "BSS_dry": f"{bss_xgb:.4f}",  "BSS_dry_95CI": fmt_ci(bss_ci_xgb),
+     "HSS": f"{hss_xgb:.4f}", "HSS_95CI": fmt_ci(hss_ci_xgb), "ROC-AUC_dry": f"{auc_xgb:.4f}"},
 ]
 if HAS_XGB_SPATIAL:
     rows.append(
         {"Forecaster": "XGBoost-Spatial",     "BS_dry": f"{bs_sp:.4f}",
-         "BSS_dry": f"{bss_sp:.4f}", "HSS": f"{hss_sp:.4f}", "ROC-AUC_dry": f"{auc_sp:.4f}"}
+         "BSS_dry": f"{bss_sp:.4f}", "BSS_dry_95CI": "—",
+         "HSS": f"{hss_sp:.4f}", "HSS_95CI": "—", "ROC-AUC_dry": f"{auc_sp:.4f}"}
     )
 if HAS_CONVLSTM:
     rows.append(
         {"Forecaster": "ConvLSTM",            "BS_dry": f"{bs_cl:.4f}",
-         "BSS_dry": f"{bss_cl:.4f}", "HSS": f"{hss_cl:.4f}", "ROC-AUC_dry": f"{auc_cl:.4f}"}
+         "BSS_dry": f"{bss_cl:.4f}", "BSS_dry_95CI": "—",
+         "HSS": f"{hss_cl:.4f}", "HSS_95CI": "—", "ROC-AUC_dry": f"{auc_cl:.4f}"}
     )
 if HAS_LOGREG:
     rows.append(
         {"Forecaster": "Logistic Regression", "BS_dry": f"{bs_lr:.4f}",
-         "BSS_dry": f"{bss_lr:.4f}", "HSS": f"{hss_lr:.4f}", "ROC-AUC_dry": f"{auc_lr:.4f}"}
+         "BSS_dry": f"{bss_lr:.4f}", "BSS_dry_95CI": "—",
+         "HSS": f"{hss_lr:.4f}", "HSS_95CI": "—", "ROC-AUC_dry": f"{auc_lr:.4f}"}
     )
 if HAS_RF:
     rows.append(
         {"Forecaster": "Random Forest",       "BS_dry": f"{bs_rf:.4f}",
-         "BSS_dry": f"{bss_rf:.4f}", "HSS": f"{hss_rf:.4f}", "ROC-AUC_dry": f"{auc_rf:.4f}"}
+         "BSS_dry": f"{bss_rf:.4f}", "BSS_dry_95CI": "—",
+         "HSS": f"{hss_rf:.4f}", "HSS_95CI": "—", "ROC-AUC_dry": f"{auc_rf:.4f}"}
     )
 table_df = pd.DataFrame(rows)
 csv_path = OUT_DIR / "forecast_skill_bss_hss_table.csv"
@@ -563,34 +645,40 @@ summary = (
     "  All PRIMARY metrics below are computed at the monthly level.\n"
     "  Pixel-level metrics inflate significance due to spatial autocorrelation.\n"
     "  BSS reference = climatological class frequency from training set (1991–2016).\n\n"
+    "  Dry-event Brier target = observed monthly dry-area fraction (not a majority threshold).\n"
+    "  ROC-AUC uses binary 'dry-dominant month' event for ranking diagnostics only.\n\n"
     "Spatial complexity ladder:\n"
-    "  Climatology → Persistence → XGBoost (no spatial)\n"
+    "  Climatology → Persistence → SPI-1 threshold heuristic → XGBoost (no spatial)\n"
     "    → XGBoost-Spatial (spatial features) → ConvLSTM (spatial architecture)\n\n"
     "── Monthly-level Brier Scores (dry class) ──\n"
     f"  Climatological (reference) : {bs_clim:.4f}\n"
     f"  Persistence baseline       : {bs_pers:.4f}\n"
+    f"  SPI-1 threshold baseline   : {bs_thr:.4f}\n"
     f"  XGBoost (no spatial)       : {bs_xgb:.4f}\n"
     + (f"  XGBoost-Spatial            : {bs_sp:.4f}\n" if HAS_XGB_SPATIAL else "")
     + (f"  ConvLSTM                   : {bs_cl:.4f}\n" if HAS_CONVLSTM   else "")
     + (f"  Logistic Regression        : {bs_lr:.4f}\n" if HAS_LOGREG     else "")
     + (f"  Random Forest              : {bs_rf:.4f}\n" if HAS_RF         else "")
     + "\n── Brier Skill Score (BSS, dry class, ref = climatology) ──\n"
-    f"  Persistence         : {bss_pers:.4f}  (>0 means better than climatology)\n"
-    f"  XGBoost (no spatial): {bss_xgb:.4f}\n"
+    f"  Persistence         : {bss_pers:.4f}  (95% CI {fmt_ci(bss_ci_pers)})\n"
+    f"  SPI-1 threshold     : {bss_thr:.4f}  (95% CI {fmt_ci(bss_ci_thr)})\n"
+    f"  XGBoost (no spatial): {bss_xgb:.4f}  (95% CI {fmt_ci(bss_ci_xgb)})\n"
     + (f"  XGBoost-Spatial     : {bss_sp:.4f}\n" if HAS_XGB_SPATIAL else "")
     + (f"  ConvLSTM            : {bss_cl:.4f}\n" if HAS_CONVLSTM   else "")
     + (f"  Logistic Regression : {bss_lr:.4f}\n" if HAS_LOGREG     else "")
     + (f"  Random Forest       : {bss_rf:.4f}\n" if HAS_RF         else "")
     + "\n── Heidke Skill Score (HSS, 3-class, monthly dominant class) ──\n"
-    f"  Climatological      : {hss_clim:.4f}\n"
-    f"  Persistence         : {hss_pers:.4f}\n"
-    f"  XGBoost (no spatial): {hss_xgb:.4f}\n"
+    f"  Climatological      : {hss_clim:.4f}  (95% CI {fmt_ci(hss_ci_clim)})\n"
+    f"  Persistence         : {hss_pers:.4f}  (95% CI {fmt_ci(hss_ci_pers)})\n"
+    f"  SPI-1 threshold     : {hss_thr:.4f}  (95% CI {fmt_ci(hss_ci_thr)})\n"
+    f"  XGBoost (no spatial): {hss_xgb:.4f}  (95% CI {fmt_ci(hss_ci_xgb)})\n"
     + (f"  XGBoost-Spatial     : {hss_sp:.4f}\n" if HAS_XGB_SPATIAL else "")
     + (f"  ConvLSTM            : {hss_cl:.4f}\n" if HAS_CONVLSTM   else "")
     + (f"  Logistic Regression : {hss_lr:.4f}\n" if HAS_LOGREG     else "")
     + (f"  Random Forest       : {hss_rf:.4f}\n" if HAS_RF         else "")
     + "\n── ROC-AUC (dry vs. not-dry, monthly mean probability) ──\n"
     f"  Persistence         : {auc_pers:.4f}\n"
+    f"  SPI-1 threshold     : {auc_thr:.4f}\n"
     f"  XGBoost (no spatial): {auc_xgb:.4f}\n"
     + (f"  XGBoost-Spatial     : {auc_sp:.4f}\n" if HAS_XGB_SPATIAL else "")
     + (f"  ConvLSTM            : {auc_cl:.4f}\n" if HAS_CONVLSTM   else "")
