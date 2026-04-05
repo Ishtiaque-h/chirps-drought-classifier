@@ -85,6 +85,8 @@ LABEL_MAP     = {-1: 0, 0: 1, 1: 2}   # XGBoost internal → class index
 INV_LABEL_MAP = {v: k for k, v in LABEL_MAP.items()}
 CLASSES       = [-1, 0, 1]             # dry, normal, wet
 CLASS_NAMES   = ["dry(-1)", "normal(0)", "wet(+1)"]
+SPI_HEURISTIC_SCALE = 2.0
+N_BOOTSTRAP_ITERATIONS = 2000
 
 # ── load dataset ──────────────────────────────────────────────────────────────
 print("Loading dataset...")
@@ -367,8 +369,9 @@ for ci, c in enumerate(CLASSES):
 # - wet probability increases as SPI-1 becomes more positive
 # - normal receives residual probability near neutral conditions
 spi_now = test["spi1_lag1"].values.astype(float)
-thr_prob_dry = np.clip((-spi_now) / 2.0, 0.0, 1.0)
-thr_prob_wet = np.clip((spi_now) / 2.0, 0.0, 1.0)
+# Use ±2 SPI as soft saturation bounds for this simple heuristic map.
+thr_prob_dry = np.clip((-spi_now) / SPI_HEURISTIC_SCALE, 0.0, 1.0)
+thr_prob_wet = np.clip((spi_now) / SPI_HEURISTIC_SCALE, 0.0, 1.0)
 thr_prob_normal = np.clip(1.0 - thr_prob_dry - thr_prob_wet, 0.0, 1.0)
 thr_norm = thr_prob_dry + thr_prob_normal + thr_prob_wet
 thr_prob_dry /= thr_norm
@@ -500,11 +503,13 @@ if HAS_CONVLSTM:
 
 # ── Bootstrap uncertainty intervals (monthly block bootstrap) ──────────────────
 def _bootstrap_ci(values: np.ndarray, alpha: float = 0.05) -> tuple[float, float]:
+    """Return two-sided percentile confidence interval for bootstrap samples."""
     lo = float(np.nanpercentile(values, 100 * (alpha / 2)))
     hi = float(np.nanpercentile(values, 100 * (1 - alpha / 2)))
     return lo, hi
 
 def bootstrap_metric(metric_fn, n_months: int, n_boot: int = 2000, seed: int = 42) -> tuple[float, float]:
+    """Bootstrap a monthly metric and return its percentile CI."""
     rng = np.random.default_rng(seed)
     vals = np.empty(n_boot, dtype=float)
     for i in range(n_boot):
@@ -513,9 +518,10 @@ def bootstrap_metric(metric_fn, n_months: int, n_boot: int = 2000, seed: int = 4
     return _bootstrap_ci(vals)
 
 def fmt_ci(ci: tuple[float, float]) -> str:
+    """Format confidence interval tuple as a compact [lo, hi] string."""
     return f"[{ci[0]:.4f}, {ci[1]:.4f}]"
 
-n_boot = 2000
+n_boot = N_BOOTSTRAP_ITERATIONS
 bss_ci_pers = bootstrap_metric(lambda i: bss(
     brier_score(obs_dry_frac[i], monthly["persist_dry_frac"].values[i]),
     brier_score(obs_dry_frac[i], monthly["clim_dry_frac"].values[i])
