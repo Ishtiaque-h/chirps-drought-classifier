@@ -909,6 +909,11 @@ if HAS_XGB_SPATIAL:
          "HSS": f"{hss_sp:.4f}", "HSS_95CI": fmt_ci(hss_ci_sp), "ROC-AUC_dry": f"{auc_sp:.4f}"}
     )
 if HAS_XGB_SPATIAL_CAL:
+    # Post-hoc probability calibration (isotonic/Platt) only rescales probabilities
+    # monotonically; it does not change argmax predictions.  Therefore HSS (which
+    # uses hard class predictions) and ROC-AUC (which measures ranking, not
+    # absolute probabilities) are identical to the base spatial model and are
+    # repeated here for completeness.
     rows.append(
         {"Forecaster": "XGBoost-Spatial + Isotonic", "BS_dry": f"{bs_sp_iso:.4f}",
          "BSS_dry": f"{bss_sp_iso:.4f}", "BSS_dry_95CI": fmt_ci(bss_ci_sp_iso),
