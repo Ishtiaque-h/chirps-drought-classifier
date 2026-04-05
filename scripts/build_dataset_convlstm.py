@@ -99,14 +99,18 @@ label_encoded = remap(label_valid)
 # Decide per-timestep train / val / test membership
 import pandas as pd
 time_years = pd.DatetimeIndex(times).year  # length T
+target_years = np.empty(T, dtype=int)
+target_years[:-1] = time_years[1:]
+target_years[-1] = -1
 
 def is_valid_sequence_end(t: int) -> bool:
     """True if we can build a seq_len window ending at t and have a target at t+1."""
     return (t >= SEQ_LEN - 1) and (t < T - 1)
 
-train_idx = [t for t in range(T) if is_valid_sequence_end(t) and time_years[t] <= TRAIN_END]
-val_idx   = [t for t in range(T) if is_valid_sequence_end(t) and TRAIN_END < time_years[t] <= VAL_END]
-test_idx  = [t for t in range(T) if is_valid_sequence_end(t) and time_years[t] > VAL_END]
+# Split by target year (t+1), matching tabular forecast dataset conventions.
+train_idx = [t for t in range(T) if is_valid_sequence_end(t) and target_years[t] <= TRAIN_END]
+val_idx   = [t for t in range(T) if is_valid_sequence_end(t) and TRAIN_END < target_years[t] <= VAL_END]
+test_idx  = [t for t in range(T) if is_valid_sequence_end(t) and target_years[t] > VAL_END]
 
 print(f"  Train windows: {len(train_idx)}  "
       f"Val windows: {len(val_idx)}  "
