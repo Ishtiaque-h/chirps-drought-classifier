@@ -26,7 +26,7 @@ Outputs
   outputs/xgb_spatial_cm.png
   outputs/xgb_spatial_feature_importance.png
   outputs/xgb_spatial_model.json
-  outputs/xgb_spatial_test_probs.npz
+    outputs/xgb_spatial_test_probs.npz   (calibrated `proba` + uncalibrated `proba_raw`)
 
 Inputs
   data/processed/dataset_forecast.parquet
@@ -39,6 +39,7 @@ import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
 import xgboost as xgb
+from sklearn.isotonic import IsotonicRegression
 from sklearn.metrics import (
     classification_report, confusion_matrix, ConfusionMatrixDisplay,
 )
@@ -194,11 +195,30 @@ model = xgb.train(
 )
 
 # --------------------------------------------------------------------------
-# 5. Evaluate
+# 5. Calibrate probabilities (isotonic on validation set)
+# --------------------------------------------------------------------------
+print("Calibrating XGBoost-Spatial probabilities (validation-set isotonic) ...")
+proba_val = model.predict(dval).reshape(-1, 3)
+proba_test_raw = model.predict(dtest).reshape(-1, 3)
+
+iso_models = []
+proba_test_cal = np.zeros_like(proba_test_raw, dtype="float32")
+for k in range(3):
+    iso = IsotonicRegression(out_of_bounds="clip")
+    iso.fit(proba_val[:, k], (y_val_enc == k).astype(int))
+    proba_test_cal[:, k] = iso.predict(proba_test_raw[:, k]).astype("float32")
+    iso_models.append(iso)
+
+# Ensure calibrated probabilities form a valid simplex row-wise.
+row_sum = proba_test_cal.sum(axis=1, keepdims=True)
+row_sum[row_sum <= 0] = 1.0
+proba_test = (proba_test_cal / row_sum).astype("float32")
+
+# --------------------------------------------------------------------------
+# 6. Evaluate
 # --------------------------------------------------------------------------
 inv_label_map = {v: k for k, v in LABEL_MAP.items()}
 
-proba_test = model.predict(dtest).reshape(-1, 3)
 y_pred_enc = proba_test.argmax(axis=1)
 y_pred     = np.array([inv_label_map[p] for p in y_pred_enc])
 y_true     = y_test.values
@@ -231,7 +251,7 @@ print(metrics_text)
 (OUT_DIR / "xgb_spatial_metrics.txt").write_text(metrics_text)
 
 # --------------------------------------------------------------------------
-# 6. Confusion matrix
+# 7. Confusion matrix
 # --------------------------------------------------------------------------
 cm  = confusion_matrix(y_true, y_pred, labels=[-1, 0, 1])
 fig, ax = plt.subplots(figsize=(5, 4))
@@ -246,7 +266,7 @@ fig.savefig(OUT_DIR / "xgb_spatial_cm.png", dpi=150)
 plt.close(fig)
 
 # --------------------------------------------------------------------------
-# 7. Feature importance
+# 8. Feature importance
 # --------------------------------------------------------------------------
 importance = model.get_score(importance_type="gain")
 imp_df = (
@@ -264,13 +284,14 @@ fig.savefig(OUT_DIR / "xgb_spatial_feature_importance.png", dpi=150)
 plt.close(fig)
 
 # --------------------------------------------------------------------------
-# 8. Save model and raw probabilities
+# 9. Save model and calibrated probabilities
 # --------------------------------------------------------------------------
 model.save_model(str(OUT_DIR / "xgb_spatial_model.json"))
 
 np.savez(
     OUT_DIR / "xgb_spatial_test_probs.npz",
     proba=proba_test.astype("float32"),
+    proba_raw=proba_test_raw.astype("float32"),
     y_true=y_true,
     features=FEATURES,
 )
