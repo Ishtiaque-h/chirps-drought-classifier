@@ -7,9 +7,10 @@ Architecture
   Input:  (batch, seq_len=3, C=4, lat, lon)
           channels: [spi1, spi3, spi6, pr_norm]
 
-  ConvLSTM stack (2 layers, hidden_dim=32, kernel 3×3)
-    → takes the last hidden state  (batch, 32, lat, lon)
-  Conv2d head (32 → 3 classes, kernel 1×1)
+    ConvLSTM stack (2 layers, hidden_dim=32, kernel 3×3)
+        → takes the last hidden state  (batch, 32, lat, lon)
+    Spatial dropout (p=0.4)
+    Conv2d head (hidden_dim → 3 classes, kernel 1×1)
     → output logits  (batch, 3, lat, lon)
 
 Loss: cross-entropy with ignore_index=-99
@@ -52,12 +53,13 @@ OUT_DIR   = BASE_DIR / "outputs"; OUT_DIR.mkdir(exist_ok=True)
 HIDDEN_DIM  = 32
 KERNEL_SIZE = 3
 NUM_LAYERS  = 2
+SPATIAL_DROPOUT = 0.4
 NUM_CLASSES = 3
-BATCH_SIZE  = 8
+BATCH_SIZE  = 4
 MAX_EPOCHS  = 80
 PATIENCE    = 10          # early-stopping patience (val-loss epochs)
 LR          = 1e-3
-WEIGHT_DECAY= 1e-4
+WEIGHT_DECAY= 1e-5
 IGNORE_IDX  = -99         # label for masked / out-of-domain pixels
 
 # --------------------------------------------------------------------------
@@ -80,6 +82,17 @@ y_test  = torch.from_numpy(np.load(PROC / "convlstm_y_test.npy"))
 print(f"  X_train {tuple(X_train.shape)}  y_train {tuple(y_train.shape)}")
 print(f"  X_val   {tuple(X_val.shape)}    y_val   {tuple(y_val.shape)}")
 print(f"  X_test  {tuple(X_test.shape)}   y_test  {tuple(y_test.shape)}")
+
+# Compute class weights from training labels (excluding ignore_index)
+train_valid = y_train[y_train != IGNORE_IDX]
+class_counts = torch.bincount(train_valid.view(-1), minlength=NUM_CLASSES).float()
+total_count = class_counts.sum().item()
+w_dry = total_count / (NUM_CLASSES * class_counts[0].item()) if class_counts[0] > 0 else 0.0
+w_normal = total_count / (NUM_CLASSES * class_counts[1].item()) if class_counts[1] > 0 else 0.0
+w_wet = total_count / (NUM_CLASSES * class_counts[2].item()) if class_counts[2] > 0 else 0.0
+class_weights = torch.tensor([w_dry, w_normal, w_wet], dtype=torch.float32).to(device)
+print("Class counts (encoded [0=dry,1=normal,2=wet]):", class_counts.int().tolist())
+print("Class weights:", [round(float(w), 4) for w in class_weights.tolist()])
 
 train_loader = DataLoader(
     TensorDataset(X_train, y_train), batch_size=BATCH_SIZE, shuffle=True,
@@ -168,8 +181,9 @@ class ConvLSTMForecast(nn.Module):
             cells.append(ConvLSTMCell(inp, hidden_dim, kernel_size))
         self.cells = nn.ModuleList(cells)
 
-        # BatchNorm between LSTM and classifier helps with small spatial datasets
+        # BatchNorm + spatial dropout help regularize small-data training.
         self.bn   = nn.BatchNorm2d(hidden_dim)
+        self.drop = nn.Dropout2d(p=SPATIAL_DROPOUT)
         self.head = nn.Conv2d(hidden_dim, num_classes, kernel_size=1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -191,7 +205,7 @@ class ConvLSTMForecast(nn.Module):
                 inp = h[l]         # next layer receives current hidden state
             out = h[-1]            # last layer's hidden state at final step
 
-        logits = self.head(self.bn(out))    # (B, num_classes, lat, lon)
+        logits = self.head(self.drop(self.bn(out)))    # (B, num_classes, lat, lon)
         return logits
 
 
@@ -207,7 +221,7 @@ model = ConvLSTMForecast(
     num_classes=NUM_CLASSES,
 ).to(device)
 
-criterion = nn.CrossEntropyLoss(ignore_index=IGNORE_IDX)
+criterion = nn.CrossEntropyLoss(weight=class_weights, ignore_index=IGNORE_IDX)
 optimizer = torch.optim.AdamW(model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
     optimizer, mode="min", patience=5, factor=0.5, min_lr=1e-5,
@@ -314,6 +328,7 @@ metrics_text = (
     f"Hidden dim   : {HIDDEN_DIM}    Layers: {NUM_LAYERS}    "
     f"Seq len: {X_train.shape[1]}    Channels: {in_channels}\n"
     f"Kernel size  : {KERNEL_SIZE}×{KERNEL_SIZE}\n"
+    f"Spatial dropout p: {SPATIAL_DROPOUT:.2f}\n"
     f"Total params : {total_params:,}\n"
     f"Best val loss: {best_val_loss:.4f}\n\n"
     f"Overall Accuracy (valid pixels): {acc:.4f}\n\n"
