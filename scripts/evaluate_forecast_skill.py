@@ -509,7 +509,11 @@ def _bootstrap_ci(values: np.ndarray, alpha: float = 0.05) -> tuple[float, float
     return lo, hi
 
 def bootstrap_metric(metric_fn, n_months: int, n_boot: int = 2000, seed: int = 42) -> tuple[float, float]:
-    """Bootstrap a monthly metric and return its percentile CI."""
+    """Bootstrap a monthly metric and return its percentile CI.
+
+    metric_fn must accept a 1-D integer index array (resampled month indices)
+    and return a scalar metric value computed on that resample.
+    """
     rng = np.random.default_rng(seed)
     vals = np.empty(n_boot, dtype=float)
     for i in range(n_boot):
@@ -521,31 +525,30 @@ def fmt_ci(ci: tuple[float, float]) -> str:
     """Format confidence interval tuple as a compact [lo, hi] string."""
     return f"[{ci[0]:.4f}, {ci[1]:.4f}]"
 
-n_boot = N_BOOTSTRAP_ITERATIONS
 bss_ci_pers = bootstrap_metric(lambda i: bss(
     brier_score(obs_dry_frac[i], monthly["persist_dry_frac"].values[i]),
     brier_score(obs_dry_frac[i], monthly["clim_dry_frac"].values[i])
-), n_months, n_boot=n_boot, seed=101)
+), n_months, n_boot=N_BOOTSTRAP_ITERATIONS, seed=101)
 bss_ci_thr = bootstrap_metric(lambda i: bss(
     brier_score(obs_dry_frac[i], monthly["thr_dry_frac"].values[i]),
     brier_score(obs_dry_frac[i], monthly["clim_dry_frac"].values[i])
-), n_months, n_boot=n_boot, seed=102)
+), n_months, n_boot=N_BOOTSTRAP_ITERATIONS, seed=102)
 bss_ci_xgb = bootstrap_metric(lambda i: bss(
     brier_score(obs_dry_frac[i], monthly["xgb_dry_frac"].values[i]),
     brier_score(obs_dry_frac[i], monthly["clim_dry_frac"].values[i])
-), n_months, n_boot=n_boot, seed=103)
+), n_months, n_boot=N_BOOTSTRAP_ITERATIONS, seed=103)
 hss_ci_clim = bootstrap_metric(lambda i: heidke_skill_score(
     y_true_monthly[i], monthly["clim_pred_mode"].values[i], CLASSES
-), n_months, n_boot=n_boot, seed=111)
+), n_months, n_boot=N_BOOTSTRAP_ITERATIONS, seed=111)
 hss_ci_pers = bootstrap_metric(lambda i: heidke_skill_score(
     y_true_monthly[i], monthly["persist_pred_mode"].values[i], CLASSES
-), n_months, n_boot=n_boot, seed=112)
+), n_months, n_boot=N_BOOTSTRAP_ITERATIONS, seed=112)
 hss_ci_thr = bootstrap_metric(lambda i: heidke_skill_score(
     y_true_monthly[i], monthly["thr_pred_mode"].values[i], CLASSES
-), n_months, n_boot=n_boot, seed=113)
+), n_months, n_boot=N_BOOTSTRAP_ITERATIONS, seed=113)
 hss_ci_xgb = bootstrap_metric(lambda i: heidke_skill_score(
     y_true_monthly[i], monthly["xgb_pred_mode"].values[i], CLASSES
-), n_months, n_boot=n_boot, seed=114)
+), n_months, n_boot=N_BOOTSTRAP_ITERATIONS, seed=114)
 
 # ── Confusion matrix at monthly level ─────────────────────────────────────────
 cm_monthly = confusion_matrix(y_true_monthly, monthly["xgb_pred_mode"].values,
