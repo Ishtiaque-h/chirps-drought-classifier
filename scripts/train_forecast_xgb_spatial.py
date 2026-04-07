@@ -296,4 +296,13 @@ np.savez(
     features=FEATURES,
 )
 
+# Save raw validation probabilities so that evaluate_forecast_skill.py can
+# fit and compare alternative calibrators (Platt, isotonic) using validation-
+# only fitting with a frozen test set.
+np.savez(
+    OUT_DIR / "xgb_spatial_val_probs.npz",
+    proba_raw=proba_val.astype("float32"),
+    y_val_enc=y_val_enc,
+)
+
 print("Saved outputs to", OUT_DIR)
