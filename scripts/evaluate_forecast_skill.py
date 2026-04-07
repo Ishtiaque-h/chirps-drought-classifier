@@ -732,6 +732,10 @@ if HAS_XGB_SPATIAL and _sp_val_dry is not None:
 
 
 # ── For each model: compare calibration methods, select best by val BS ────────
+# NOTE:
+#   We report only probabilistic skill (BS/BSS + decomposition) for calibrated
+#   variants. Monotonic post-hoc calibration rescales probabilities, so it does
+#   not change hard-class argmax predictions (HSS) or ranking-based ROC-AUC.
 calib_study_rows: list = []   # rows collected into CSV at end of section
 _best_test_mo: dict   = {}    # model_label → best-calibrated monthly test dry fracs
 
