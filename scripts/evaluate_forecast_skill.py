@@ -89,8 +89,8 @@ LABEL_MAP     = {-1: 0, 0: 1, 1: 2}   # XGBoost internal → class index
 INV_LABEL_MAP = {v: k for k, v in LABEL_MAP.items()}
 CLASSES       = [-1, 0, 1]             # dry, normal, wet
 CLASS_NAMES   = ["dry(-1)", "normal(0)", "wet(+1)"]
-SPI_HEURISTIC_SCALE = 2.0
-N_BOOTSTRAP_ITERATIONS = 2000
+SPI_HEURISTIC_SCALE = 2.0      # Linear scale: SPI=±1 -> 0.5, SPI=±2 -> 1.0 (pre-clip)
+N_BOOTSTRAP_ITERATIONS = 2000  # Standard bootstrap count for stable percentile CIs
 
 # ── load dataset ──────────────────────────────────────────────────────────────
 print("Loading dataset...")
@@ -602,8 +602,7 @@ def bs_decomp(obs: np.ndarray, prob: np.ndarray, n_bins: int = 10) -> dict:
         rel += (n_k / n) * (f_k - o_k) ** 2   # reliability: forecast vs obs within bin
         res += (n_k / n) * (o_k - o_bar) ** 2  # resolution: obs within bin vs climatology
     # Generalized uncertainty term uses observed variance: mean((obs - o_bar)^2).
-    # In this script obs are monthly dry-area fractions; the binary equality
-    # uncertainty = o_bar*(1-o_bar) is noted only as a reference case.
+    # Here obs are monthly dry-area fractions (not strictly binary).
     unc = float(np.mean((obs - o_bar) ** 2))    # uncertainty: intrinsic variability
     return dict(reliability=rel, resolution=res, uncertainty=unc, bs_check=rel - res + unc)
 
@@ -738,8 +737,8 @@ if HAS_XGB_SPATIAL and _sp_val_dry is not None:
 # ── For each model: compare calibration methods, select best by val BS ────────
 # NOTE:
 #   We report only probabilistic skill (BS/BSS + decomposition) for calibrated
-#   variants. Monotonic post-hoc calibration rescales probabilities, so it does
-#   not change hard-class argmax predictions (HSS) or ranking-based ROC-AUC.
+#   variants. Monotonic post-hoc calibration typically preserves hard-class
+#   argmax predictions (HSS) and ranking-based ROC-AUC, though edge cases may exist.
 calib_study_rows: list = []   # rows collected into CSV at end of section
 _best_test_mo: dict   = {}    # model_label → best-calibrated monthly test dry fracs
 
