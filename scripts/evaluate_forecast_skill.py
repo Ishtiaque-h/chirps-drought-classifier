@@ -373,7 +373,8 @@ for ci, c in enumerate(CLASSES):
 # - wet probability increases as SPI-1 becomes more positive
 # - normal receives residual probability near neutral conditions
 spi_now = test["spi1_lag1"].values.astype(float)
-# Use ±2 SPI as soft saturation bounds for this simple heuristic map.
+# SPI_HEURISTIC_SCALE controls mapping rate from SPI to probability
+# (e.g., SPI=±1 maps to ~0.5 before clipping; larger magnitudes saturate via np.clip).
 thr_prob_dry = np.clip((-spi_now) / SPI_HEURISTIC_SCALE, 0.0, 1.0)
 thr_prob_wet = np.clip((spi_now) / SPI_HEURISTIC_SCALE, 0.0, 1.0)
 thr_prob_normal = np.clip(1.0 - thr_prob_dry - thr_prob_wet, 0.0, 1.0)
@@ -600,8 +601,8 @@ def bs_decomp(obs: np.ndarray, prob: np.ndarray, n_bins: int = 10) -> dict:
         n_k = int(mask.sum())
         rel += (n_k / n) * (f_k - o_k) ** 2   # reliability: forecast vs obs within bin
         res += (n_k / n) * (o_k - o_bar) ** 2  # resolution: obs within bin vs climatology
-    # General variance of observations: valid for both binary and fractional obs.
-    # For binary obs this equals o_bar*(1-o_bar); for fractional obs it equals Var(obs).
+    # Generalized uncertainty term uses observed variance:
+    # mean((obs - o_bar)^2). For binary obs this equals o_bar*(1-o_bar).
     unc = float(np.mean((obs - o_bar) ** 2))    # uncertainty: intrinsic variability
     return dict(reliability=rel, resolution=res, uncertainty=unc, bs_check=rel - res + unc)
 
@@ -687,23 +688,25 @@ if (HAS_XGB_SPATIAL and _XGB_SP_MDL_PATH.exists()
         _s1     = _spi_ds["spi1"].sel(time=_ts).astype("float32")
         _s3     = _spi_ds["spi3"].sel(time=_ts).astype("float32")
         _s6     = _spi_ds["spi6"].sel(time=_ts).astype("float32")
-        _ln     = "latitude" if "latitude" in _pra.coords else "lat"   # lat coord name
-        _ln2    = "longitude" if "longitude" in _pra.coords else "lon"  # lon coord name
+        _lat_coord = "latitude" if "latitude" in _pra.coords else "lat"
+        _lon_coord = "longitude" if "longitude" in _pra.coords else "lon"
 
-        def _nbr_mean_cal(da, nm):
+        def _compute_nbr_mean(da, nm):
             """3×3 neighbourhood rolling mean (mirrors train_forecast_xgb_spatial.py)."""
-            return da.rolling({_ln: 3, _ln2: 3}, min_periods=1, center=True).mean().rename(nm)
+            return da.rolling(
+                {_lat_coord: 3, _lon_coord: 3}, min_periods=1, center=True
+            ).mean().rename(nm)
 
         _nds = xr.Dataset({
-            "spi1_nbr_mean": _nbr_mean_cal(_s1, "spi1_nbr_mean"),
-            "spi3_nbr_mean": _nbr_mean_cal(_s3, "spi3_nbr_mean"),
-            "spi6_nbr_mean": _nbr_mean_cal(_s6, "spi6_nbr_mean"),
-            "pr_nbr_mean":   _nbr_mean_cal(_pra, "pr_nbr_mean"),
-        }).stack(pixel=(_ln, _ln2))
+            "spi1_nbr_mean": _compute_nbr_mean(_s1, "spi1_nbr_mean"),
+            "spi3_nbr_mean": _compute_nbr_mean(_s3, "spi3_nbr_mean"),
+            "spi6_nbr_mean": _compute_nbr_mean(_s6, "spi6_nbr_mean"),
+            "pr_nbr_mean":   _compute_nbr_mean(_pra, "pr_nbr_mean"),
+        }).stack(pixel=(_lat_coord, _lon_coord))
         _ndf = _nds.reset_index("pixel").to_dataframe()
         if "time" not in _ndf.columns:
             _ndf = _ndf.reset_index()
-        _ndf = _ndf.rename(columns={_ln: "latitude", _ln2: "longitude"})
+        _ndf = _ndf.rename(columns={_lat_coord: "latitude", _lon_coord: "longitude"})
         _ndf["time"] = pd.to_datetime(_ndf["time"])
 
         _vsp = val.merge(
