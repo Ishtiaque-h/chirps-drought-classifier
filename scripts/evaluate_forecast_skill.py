@@ -89,7 +89,7 @@ LABEL_MAP     = {-1: 0, 0: 1, 1: 2}   # XGBoost internal → class index
 INV_LABEL_MAP = {v: k for k, v in LABEL_MAP.items()}
 CLASSES       = [-1, 0, 1]             # dry, normal, wet
 CLASS_NAMES   = ["dry(-1)", "normal(0)", "wet(+1)"]
-SPI_HEURISTIC_SCALE = 2.0      # Linear scale: SPI=±1 -> 0.5, SPI=±2 -> 1.0 (pre-clip)
+SPI_HEURISTIC_SCALE = 2.0      # Linear scale: SPI=±1 -> 0.5; |SPI|>2 clips to probability 1.0
 N_BOOTSTRAP_ITERATIONS = 2000  # Standard bootstrap count for stable percentile CIs
 
 # ── load dataset ──────────────────────────────────────────────────────────────
@@ -428,7 +428,7 @@ monthly = test.groupby("month_dt").agg(
 
 # Monthly dry-event target for probabilistic scoring:
 # use observed monthly dry fraction directly (0..1) to avoid arbitrary majority threshold.
-monthly["obs_dry_frac"] = monthly["y_true_dry_frac"].astype(float)
+obs_dry_frac = monthly["y_true_dry_frac"].astype(float).values
 
 # Binary monthly dry event (for ROC-AUC only): dominant class is dry.
 monthly["obs_dry_bin"] = (monthly["y_true_mode"] == -1).astype(int)
@@ -437,8 +437,6 @@ n_months = len(monthly)
 print(f"Test months: {n_months}")
 
 # ── Brier Scores ─────────────────────────────────────────────────────────────
-obs_dry_frac = monthly["obs_dry_frac"].values
-
 bs_xgb   = brier_score(obs_dry_frac, monthly["xgb_dry_frac"].values)
 bs_clim  = brier_score(obs_dry_frac, monthly["clim_dry_frac"].values)
 bs_pers  = brier_score(obs_dry_frac, monthly["persist_dry_frac"].values)
@@ -518,6 +516,11 @@ def bootstrap_metric(metric_fn, n_months: int, n_boot: int = 2000, seed: int = 4
 
     metric_fn must accept a 1-D integer index array (resampled month indices)
     and return a scalar metric value computed on that resample.
+
+    Returns
+    -------
+    tuple[float, float]
+        (lower_bound, upper_bound) percentile confidence interval.
     """
     rng = np.random.default_rng(seed)
     vals = np.empty(n_boot, dtype=float)
@@ -648,7 +651,7 @@ def paired_boot_pvalue(sq_a: np.ndarray, sq_b: np.ndarray,
     for i in range(n_boot):
         idx      = rng.integers(0, len(sq_a), len(sq_a))
         diffs[i] = float(sq_a[idx].mean() - sq_b[idx].mean())
-    diffs_c = diffs - diffs.mean()  # centre under null hypothesis
+    diffs_c = diffs - diffs.mean()  # center under null hypothesis
     return float(np.mean(np.abs(diffs_c) >= np.abs(obs_diff)))
 
 
@@ -688,8 +691,19 @@ if (HAS_XGB_SPATIAL and _XGB_SP_MDL_PATH.exists()
         _s1     = _spi_ds["spi1"].sel(time=_ts).astype("float32")
         _s3     = _spi_ds["spi3"].sel(time=_ts).astype("float32")
         _s6     = _spi_ds["spi6"].sel(time=_ts).astype("float32")
-        _lat_coord = "latitude" if "latitude" in _pra.coords else "lat"
-        _lon_coord = "longitude" if "longitude" in _pra.coords else "lon"
+        if "latitude" in _pra.coords:
+            _lat_coord = "latitude"
+        elif "lat" in _pra.coords:
+            _lat_coord = "lat"
+        else:
+            raise ValueError("No latitude coordinate found (expected 'latitude' or 'lat').")
+
+        if "longitude" in _pra.coords:
+            _lon_coord = "longitude"
+        elif "lon" in _pra.coords:
+            _lon_coord = "lon"
+        else:
+            raise ValueError("No longitude coordinate found (expected 'longitude' or 'lon').")
 
         def _compute_nbr_mean(da, nm):
             """3×3 neighbourhood rolling mean (mirrors train_forecast_xgb_spatial.py)."""
