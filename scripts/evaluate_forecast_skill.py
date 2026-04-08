@@ -33,7 +33,7 @@ Skill metrics:
 
 Baselines:
   1. Climatological: per-calendar-month class-frequency distribution from train.
-  2. Persistence:    predict label[t+1] = label[t] (current month SPI-1 class persists).
+  2. Persistence:    predict label[t+1] = label[t] (current month drought class persists).
   3. SPI-1 threshold heuristic: map current SPI-1 continuously to class probabilities
      (dry/wet increase with |SPI-1|; normal dominates near SPI-1≈0).
 
@@ -373,8 +373,8 @@ for ci, c in enumerate(CLASSES):
 # - wet probability increases as SPI-1 becomes more positive
 # - normal receives residual probability near neutral conditions
 spi_now = test["spi1_lag1"].values.astype(float)
-# SPI_HEURISTIC_SCALE controls mapping rate from SPI to probability
-# (e.g., SPI=±1 maps to ~0.5 before clipping; larger magnitudes saturate via np.clip).
+# SPI_HEURISTIC_SCALE controls linear SPI→probability mapping:
+# prob ≈ |SPI| / SPI_HEURISTIC_SCALE before clipping (SPI=±1 → 0.5, SPI=±2 → 1.0).
 thr_prob_dry = np.clip((-spi_now) / SPI_HEURISTIC_SCALE, 0.0, 1.0)
 thr_prob_wet = np.clip((spi_now) / SPI_HEURISTIC_SCALE, 0.0, 1.0)
 thr_prob_normal = np.clip(1.0 - thr_prob_dry - thr_prob_wet, 0.0, 1.0)
@@ -583,7 +583,7 @@ def bs_decomp(obs: np.ndarray, prob: np.ndarray, n_bins: int = 10) -> dict:
 
     Returns dict with keys: reliability, resolution, uncertainty, bs_check.
     ``bs_check`` (= reliability − resolution + uncertainty) should closely match
-    ``brier_score(obs, prob)``; any small difference is the discretisation residual.
+    ``brier_score(obs, prob)``; any small difference is the discretization residual.
     """
     obs  = np.asarray(obs,  dtype=float)
     prob = np.clip(np.asarray(prob, dtype=float), 0.0, 1.0)
@@ -601,8 +601,9 @@ def bs_decomp(obs: np.ndarray, prob: np.ndarray, n_bins: int = 10) -> dict:
         n_k = int(mask.sum())
         rel += (n_k / n) * (f_k - o_k) ** 2   # reliability: forecast vs obs within bin
         res += (n_k / n) * (o_k - o_bar) ** 2  # resolution: obs within bin vs climatology
-    # Generalized uncertainty term uses observed variance:
-    # mean((obs - o_bar)^2). For binary obs this equals o_bar*(1-o_bar).
+    # Generalized uncertainty term uses observed variance: mean((obs - o_bar)^2).
+    # In this script obs are monthly dry-area fractions; the binary equality
+    # uncertainty = o_bar*(1-o_bar) is noted only as a reference case.
     unc = float(np.mean((obs - o_bar) ** 2))    # uncertainty: intrinsic variability
     return dict(reliability=rel, resolution=res, uncertainty=unc, bs_check=rel - res + unc)
 
