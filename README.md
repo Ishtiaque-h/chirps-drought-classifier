@@ -1,210 +1,189 @@
 # Central Valley Drought Classifier
-**One-month-ahead drought forecasting from precipitation using machine learning**
 
-This project forecasts next month's drought class — *Dry*, *Normal*, or *Wet* — for California's Central Valley using WMO-standard SPI indices derived from 35 years (1991–2025) of CHIRPS v3.0 precipitation. The pipeline is built to journal standards: no data leakage, monthly-level evaluation against three naive baselines, and full probabilistic scoring with calibration and uncertainty quantification.
+**Can machine learning predict next month's drought from satellite precipitation alone?**
 
----
+We build a rigorous, leakage-free pipeline to forecast monthly drought classes (*Dry / Normal / Wet*) for California's Central Valley using CHIRPS v3.0 precipitation and WMO-standard SPI. All metrics are evaluated at the monthly level (60 independent test months, 2021–2025) against three naive baselines.
 
-## Study Region and Problem
+**Key finding:** No model — from logistic regression to ConvLSTM — substantially outperforms climatology in Brier Skill Score, despite showing ranking signal (ROC-AUC ~0.68). This is a scientifically valid result: monthly SPI-1 in a Mediterranean regime is largely unpredictable from local precipitation history at 1-month lead.
 
-**Central Valley, California** (35.4°–40.6°N, 122.5°–119.0°W, 0.05° grid, ~7,200 pixels).
-
-The region produces roughly 25% of US food supply. Drought is the primary agricultural risk — early warning one month ahead allows pre-season irrigation scheduling and crop-stress mitigation.
-
-**Forecast task:** given the SPI-1/3/6 and raw precipitation history through month *t*, predict whether month *t+1* will be *dry* (SPI-1 ≤ −1), *normal*, or *wet* (SPI-1 ≥ +1).
+> See [`ANALYSIS.md`](ANALYSIS.md) for the full research assessment, strategic recommendations, and publication roadmap.
 
 ---
 
-## Data and Labels
+## The Scientific Problem
 
-| Source | Description | Period | Resolution |
-|--------|-------------|--------|------------|
-| [CHIRPS v3.0](https://www.chc.ucsb.edu/data/chirps3) | Gauge-satellite blended precipitation | 1991–2025 | 0.05° monthly |
+Predicting drought 1 month ahead using only past precipitation is a hard problem. The target — SPI-1 at time *t+1* — depends entirely on precipitation at *t+1*, which is unknown. This makes the problem fundamentally different from *reconstruction* (classifying the current month) and sets a high bar for ML to add value beyond climatological base rates.
 
-**SPI computation (WMO standard):** for each pixel × calendar month, a gamma distribution is fitted to the 1991–2020 baseline precipitation. All values (1991–2025) are transformed via the gamma CDF and then the inverse normal to produce SPI-1 (single-month), SPI-3, and SPI-6.
-
-**Three-class target:** `drought_label_spi1[t+1]` — the SPI-1 class for the *next* month.
-- The target depends only on `pr[t+1]`, which is not in the feature set.
-- No accumulation-window overlap with features (unlike SPI-3 or SPI-6 as target).
+**Why this matters:**
+- Central Valley agriculture (almonds, grapes, citrus) loses billions during drought years
+- Operational drought early-warning relies on understanding what is and isn't predictable
+- The ML drought literature frequently inflates results through label leakage, spatial pseudo-replication, and missing baselines — this project addresses all three
 
 ---
 
-## Feature Set (9 features, all available at forecast time *t*)
+## Pipeline
 
-| Feature | Description |
-|---------|-------------|
-| `spi1_lag1/2/3` | SPI-1 at t, t−1, t−2 (recent drought memory) |
-| `spi3_lag1` | SPI-3 at t (medium-term drought signal) |
-| `spi6_lag1` | SPI-6 at t (long-term accumulated deficit) |
-| `pr_lag1/2/3` | Raw precipitation at t, t−1, t−2 |
-| `month_sin`, `month_cos` | Cyclic encoding of the *target* month |
-
----
-
-## Train / Validation / Test Split
-
-| Split | Years | Role |
-|-------|-------|------|
-| Train | 1991–2016 | Model fitting, climatological baseline estimation |
-| Validation | 2017–2020 | Hyperparameter selection, post-hoc calibration fitting |
-| Test | 2021–2025 | Final evaluation (60 independent monthly maps, frozen) |
-
-All splits are strict temporal — no shuffling, no future leakage.
-
----
-
-## Models
-
-Five forecasters were trained and compared at the same feature set:
-
-| Model | Architecture | Notes |
-|-------|-------------|-------|
-| **Logistic Regression** | Linear, `liblinear` solver | Linear baseline |
-| **Random Forest** | 300 trees, balanced class weights | Ensemble, interpretable feature ranking |
-| **XGBoost** | Gradient boosting, GPU, balanced weights | Primary model |
-| **XGBoost-Spatial** | XGBoost + 3×3 neighbourhood mean features | Adds local spatial context |
-| **ConvLSTM** | Spatiotemporal deep learning (2D+time) | Spatial architecture baseline |
-
-Three naive baselines are included as the scientific lower bound:
-1. **Climatological** — per-calendar-month class frequencies from training (1991–2016)
-2. **Persistence** — predict next month = current month's SPI-1 class
-3. **SPI-1 heuristic** — convert current SPI-1 continuously to class probabilities (linear mapping)
-
----
-
-## Evaluation Methodology
-
-All **primary** metrics are computed at the **monthly level** (60 independent test months, 2021–2025), not the pixel level. Each monthly map contains ~7,200 spatially autocorrelated pixels; treating them as independent samples would inflate significance by a factor of ~100× relative to the true degrees of freedom.
-
-**Metrics:**
-- **Brier Score (BS)** — mean squared probability error; lower is better
-- **Brier Skill Score (BSS)** — relative improvement over climatological BS; BSS > 0 means the model beats climatology
-- **Heidke Skill Score (HSS)** — categorical skill accounting for class frequency
-- **ROC-AUC** — ranking skill for dry vs. not-dry (supplementary)
-- **Murphy BS decomposition** — splits BS into *reliability* + *resolution* − *uncertainty* to distinguish over-confidence from discriminating power
-- **Bootstrap 95% CI** (2000 resamples, monthly block) for all BS/BSS/HSS scores
-- **Paired bootstrap significance** — two-sided p-value for model vs. climatology and XGB-Spatial vs. XGB
-
-**Post-hoc calibration study** (no test leakage):
-- Three calibrators (*uncalibrated*, *Platt scaling*, *isotonic regression*) are fitted on validation pixels only
-- Best method is selected by validation monthly BS, then applied to the frozen test set
-- Calibration improves probability sharpness (reliability); the calibrated test results are reported alongside raw skill scores
-
----
-
-## Primary Skill Results (test set 2021–2025, 60 months)
-
-> Run `scripts/evaluate_forecast_skill.py` after training all models to populate this table.
-> BSS > 0 means the model beats the climatological baseline on the dry class.
-
-| Forecaster | BS (dry) | BSS (dry) | BSS 95% CI | HSS (3-class) | ROC-AUC |
-|------------|----------|-----------|------------|----------------|---------|
-| Climatological baseline | — | 0.000 (ref) | — | — | — |
-| Persistence baseline | *(run scripts)* | *(run scripts)* | *(run scripts)* | *(run scripts)* | *(run scripts)* |
-| SPI-1 heuristic | *(run scripts)* | *(run scripts)* | *(run scripts)* | *(run scripts)* | *(run scripts)* |
-| Logistic Regression | *(run scripts)* | *(run scripts)* | *(run scripts)* | *(run scripts)* | *(run scripts)* |
-| Random Forest | *(run scripts)* | *(run scripts)* | *(run scripts)* | *(run scripts)* | *(run scripts)* |
-| **XGBoost** | *(run scripts)* | *(run scripts)* | *(run scripts)* | *(run scripts)* | *(run scripts)* |
-| **XGBoost-Spatial** | *(run scripts)* | *(run scripts)* | *(run scripts)* | *(run scripts)* | *(run scripts)* |
-
-Additional calibration-study outputs (selection by validation-set BS, decomposition, significance tests) are written to `outputs/calib_study_results.csv`.
-
----
-
-## What the Model Learned (SHAP Interpretation)
-
-SHAP TreeExplainer was applied to the XGBoost model to attribute the dry-class probability to each feature.
-
-**Key findings:**
-- `spi1_lag1` and `spi3_lag1` jointly dominate — the model relies heavily on recent and medium-term drought memory, which is hydrologically intuitive (soil moisture has multi-month persistence).
-- `pr_lag1` and `pr_lag2` contribute a secondary signal: raw precipitation reinforces the SPI signal but adds complementary information on absolute moisture supply.
-- Seasonal features (`month_sin`, `month_cos`) modulate drought probability near climatological dry/wet transitions (late autumn, early spring).
-- The SPI→drought-probability relationship is strongly non-linear near SPI ≈ −1: small additional deficits sharply push the model into high-confidence dry predictions. This matches the known threshold behaviour of SPI-based drought classification.
-- `spi6_lag1` contributes mainly for extended dry events (2021–2022), where long-term accumulation deficit reinforced near-term signals — consistent with the multi-year character of that drought.
-
----
-
-## Limitations and Honest Assessment
-
-- **BSS context:** At 1-month ahead, SPI-1 predictability from precipitation persistence is inherently limited. The bootstrap CI around BSS quantifies whether any positive skill is distinguishable from sampling noise given 60 test months.
-- **Small test sample:** 60 months is a small sample for tight confidence intervals. Any claim of statistical significance should be interpreted cautiously.
-- **USDM comparison** (`validate_usdm.py`) is a qualitative plausibility check only — USDM integrates soil moisture, streamflow, and observer reports, making it incommensurable with SPI-1.
-- **ERA5-Land cross-validation** (`validate_era5_spi.py`) uses the same gamma-SPI methodology over the same domain with an independent precipitation source, giving the closest available out-of-source generalisation estimate.
-- Spatial features (XGBoost-Spatial) and the ConvLSTM add neighbourhood information but do not introduce external predictors (sea-surface temperatures, soil moisture, snow cover). Adding such predictors is the highest-value next step for genuine skill improvement.
-
----
-
-## Recommended Next Steps (ranked)
-
-| Priority | Action | Scientific Benefit | Feasibility |
-|----------|--------|-------------------|-------------|
-| 1 | Add SST / PDO / ENSO index as external predictors | Likely main source of monthly-scale skill beyond persistence | Medium — public NOAA indices |
-| 2 | Increase test window (rolling origin or leave-one-year-out CV) | More stable BSS CI, detects inter-annual skill variation | Medium |
-| 3 | Forecast SPI-3 target at 3-month lead | More predictable target; directly useful for seasonal outlook | Low — straightforward feature reuse |
-| 4 | Platt-calibrated ensemble (LogReg + RF + XGB) | Reduces model-uncertainty contribution to BS | Low |
-| 5 | Spatial deep learning with attention over grid domain | Captures non-local teleconnection signals | High — needs GPU + more data |
-
----
-
-## Reproducing Results
-
-### Prerequisites
-
-```bash
-conda env create -f environment.yml
-conda activate chirps-drought
+```mermaid
+graph TD;
+    A["CHIRPS v3.0 Monthly (1991-2025)"] --> B["Clip to Central Valley"];
+    B --> C["Gamma-fit SPI per pixel x calendar month"];
+    C --> D["SPI-1 / SPI-3 / SPI-6"];
+    D --> E["Target: SPI-1 drought class at t+1"];
+    D --> F["Features: SPI lags + pr lags + month"];
+    E --> G["Forecast dataset (zero leakage)"];
+    F --> G;
+    G --> H["Model suite: LogReg / RF / XGBoost / XGBoost-Spatial / ConvLSTM"];
+    H --> I["Skill evaluation (monthly BSS/HSS, bootstrap CI)"];
+    H --> J["SHAP explainability"];
+    H --> K["Cross-dataset validation (ERA5-Land)"];
+    H --> L["Spatial skill maps / Case studies"];
 ```
 
-### Pipeline (in order)
+**Data:** [CHIRPS v3.0](https://www.chc.ucsb.edu/data/chirps3) — 0.05 deg (~5 km), monthly, 1991-2025
 
-```bash
-# 1. Download and preprocess data
-bash scripts/download_chirps_v3_monthly_1991_2025.sh
-python scripts/clip_to_cvalley_monthly.py
-python scripts/make_spi_labels.py
+**Temporal split (no shuffling):**
+- Train: 1991-2016 (26 years)
+- Validation: 2017-2020 (4 years — used for calibration only)
+- Test: 2021-2025 (60 months — never seen during training or calibration selection)
 
-# 2. Build forecast dataset
-python scripts/build_dataset_forecast.py
+---
 
-# 3. Train models
-python scripts/train_forecast_logreg.py
-python scripts/train_forecast_rf.py
-python scripts/train_forecast_xgboost.py
-python scripts/train_forecast_xgb_spatial.py   # optional; adds spatial features
-python scripts/train_forecast_convlstm.py       # optional; GPU recommended
+## Features and Target
 
-# 4. Evaluate
-python scripts/evaluate_forecast_skill.py       # main skill table + calibration study
-python scripts/xgb_shap_forecast_analysis.py    # SHAP interpretation
-python scripts/validate_era5_spi.py             # cross-dataset validation
-python scripts/plot_spatial_skill.py            # per-pixel skill map
-python scripts/plot_case_study.py               # 2021–2022 drought case study
+| Feature | What it captures |
+|---------|-----------------|
+| `spi1_lag1/2/3` | Recent drought state (1-month memory) |
+| `spi3_lag1` | Medium-term precipitation accumulation |
+| `spi6_lag1` | Longer-term hydrological drought context |
+| `pr_lag1/2/3` | Raw precipitation magnitude (absolute scale) |
+| `month_sin/cos` | Seasonal cycle of the *target* month |
+
+**Target:** `drought_label_spi1[t+1]` — the SPI-1 class of the *next* month. Because SPI-1 depends only on `pr[t+1]`, the feature set at time *t* carries **zero accumulation-window information** about the target. This eliminates the data leakage present in SPI-3-based targets (where 2 of 3 accumulation months overlap with features).
+
+---
+
+## Results
+
+### Skill Scores (monthly level, 60 test months)
+
+| Forecaster | Brier Score (dry) | BSS vs. climatology | HSS (3-class) | ROC-AUC (dry) |
+|---|---|---|---|---|
+| **Climatological baseline** | **0.0646** (ref) | 0.0 | 0.00 | — |
+| Persistence | 0.1011 | -0.57 | 0.09 | 0.56 |
+| SPI-1 heuristic | 0.0949 | -0.47 | 0.09 | 0.56 |
+| Logistic Regression | 0.0874 | -0.35 | 0.15 | 0.81 |
+| Random Forest | 0.0820 | -0.27 | 0.11 | 0.60 |
+| XGBoost | 0.0687 | -0.06 | 0.00 | 0.67 |
+| **XGBoost-Spatial** | **0.0666** | **-0.03** | 0.00 | **0.68** |
+| ConvLSTM | 0.0823 | -0.27 | 0.22 | 0.52 |
+
+> **BSS > 0** would mean the model beats climatology. No model crosses this threshold.
+> XGBoost-Spatial comes closest (BSS = -0.03), with 95% CI crossing zero but centered below it.
+
+### What This Tells Us
+
+1. **The models detect drought signal** — ROC-AUC ~0.68 confirms the models rank months by relative drought risk better than chance.
+2. **But they cannot calibrate probabilities better than base rates** — BSS remains negative because the models' predicted probabilities are not more reliable than simply predicting the climatological frequency.
+3. **This is physically expected.** California's monthly precipitation is driven by synoptic events (atmospheric rivers, frontal passages) that are chaotic at 1-month lead. SPI-1 autocorrelation is weak (r ~ 0.1-0.3), which is why persistence fails badly (BSS = -0.57).
+
+### Calibration Study
+
+Post-hoc calibration (isotonic/Platt on validation set, frozen test evaluation) was tested for XGBoost and XGBoost-Spatial. Neither method produced statistically significant improvement over climatology. Brier Score decomposition confirms the bottleneck is **resolution** (inability to distinguish events from non-events), not **reliability** (probability calibration).
+
+### SHAP Explainability
+
+SHAP TreeExplainer confirms the model learned physically consistent relationships:
+- **Negative SPI-1 lag** strongly increases dry-class probability
+- **Nonlinear threshold near SPI-1 ~ 0** — small deficits trigger drought predictions sharply
+- `spi3_lag1` provides medium-term memory; seasonal features refine transitions
+
+These are not statistical artifacts — they match known hydroclimatic dynamics.
+
+---
+
+## Methodological Contributions
+
+This project implements several practices that are **uncommon in the drought ML literature** but essential for scientific rigor:
+
+| Practice | Why it matters |
+|----------|---------------|
+| **SPI-1 target** (not SPI-3) | Eliminates accumulation-window overlap with features — the most common source of inflated accuracy in published drought ML |
+| **Monthly-level evaluation** | Treats the 60 independent months as the effective sample size, not ~400k spatially autocorrelated pixels |
+| **Three naive baselines** | Climatology, persistence, and SPI-1 threshold heuristic — without these, accuracy figures are meaningless |
+| **Bootstrap confidence intervals** | 2000-iteration block bootstrap on monthly metrics |
+| **Calibration study with decomposition** | BS = reliability - resolution + uncertainty (Murphy 1973) identifies *where* models fail |
+| **Cross-dataset validation** | ERA5-Land SPI-1 provides independent precipitation source comparison |
+| **USDM framed as qualitative only** | Correctly avoids treating a composite drought index as equivalent to precipitation-only SPI-1 |
+
+---
+
+## Validation
+
+- **ERA5-Land cross-validation:** `validate_era5_spi.py` computes SPI-1 from ERA5-Land precipitation using the same gamma-fit methodology, then compares model predictions against this independent product.
+- **USDM consistency (qualitative):** `validate_usdm.py` overlays the model's dry fraction against USDM D1+ area. USDM integrates soil moisture and streamflow, so this is a plausibility check — not a skill metric.
+- **Spatial skill maps:** Per-pixel accuracy over 2021-2025, with Sacramento Valley (lat > 38 deg) and San Joaquin Valley (lat < 38 deg) sub-regions annotated.
+- **Case study:** 2021-22 drought and 2023 atmospheric river events, showing model captures the correct directional signal.
+
+---
+
+## Reproducibility
+
+All outputs are fully reproducible from raw CHIRPS data. Scripts run in sequence:
+
+| Step | Script | Purpose |
+|------|--------|---------|
+| 1 | `download_chirps_v3_monthly_1991_2025.sh` | Parallel download of CHIRPS v3 monthly files |
+| 2 | `clip_to_cvalley_monthly.py` | Clip to Central Valley bounding box |
+| 3 | `make_spi_labels.py` | Gamma-fit SPI-1/3/6 + drought labels |
+| 4 | `build_dataset_forecast.py` | Tabular dataset with lag features, target = SPI-1[t+1] |
+| 5 | `train_forecast_{logreg,rf,xgboost}.py` | Train models with temporal split |
+| 6 | `train_forecast_xgb_spatial.py` | XGBoost with 3x3 neighbourhood features |
+| 7 | `train_forecast_convlstm.py` | ConvLSTM spatiotemporal model |
+| 8 | `xgb_shap_forecast_analysis.py` | SHAP TreeExplainer (all 3 classes) |
+| 9 | `evaluate_forecast_skill.py` | BSS/HSS table, calibration study, reliability diagrams |
+| 10 | `validate_era5_spi.py` | ERA5-Land cross-dataset validation |
+| 11 | `plot_spatial_skill.py` / `plot_case_study.py` | Spatial maps and case study figures |
+
+---
+
+## Project Structure
+
+```
+chirps-drought-classifier/
+├── scripts/          # Full pipeline (download -> train -> evaluate)
+├── data/             # raw/ and processed/ (not committed; ~2 GB)
+├── outputs/          # Figures, models, metrics (not committed)
+├── notebooks/        # Exploratory analysis
+├── ANALYSIS.md       # Full research assessment and strategic roadmap
+└── README.md
 ```
 
-### Output files
+---
 
-| File | Description |
-|------|-------------|
-| `outputs/forecast_skill_bss_hss_table.csv` | Main skill table (all models, with 95% CI) |
-| `outputs/forecast_skill_scores.txt` | Human-readable summary |
-| `outputs/calib_study_results.csv` | Calibration study: BS decomposition, CI, p-values |
-| `outputs/calib_study_reliability_diagram.png` | Reliability diagram (calibrated models) |
-| `outputs/calib_study_decomposition_barplot.png` | Murphy BS decomposition barplot |
-| `outputs/forecast_reliability_diagram.png` | Raw vs. isotonic-calibrated reliability (pixel level) |
-| `outputs/forecast_monthly_cm.png` | Monthly confusion matrix (XGBoost) |
-| `outputs/spatial_skill_accuracy.png` | Per-pixel accuracy map |
-| `outputs/case_study_2021_2025.png` | Temporal case study 2021–2025 |
+## Limitations and Next Steps
+
+**Current limitations:**
+- Single region (Central Valley) — results may not generalize across hydroclimates
+- Feature set is purely endogenous (all derived from CHIRPS precipitation)
+- Test period (2021-2025) coincidentally includes extreme drought + extreme wet reversal
+
+**Highest-impact next steps** (see [`ANALYSIS.md`](ANALYSIS.md) for full analysis):
+1. **Add ENSO (Nino 3.4) as a feature** — tests whether large-scale climate state can break the predictability barrier
+2. **Expand to 1-2 additional regions** (Murray-Darling Basin, Great Plains) — tests generalizability of the "no skill" finding
+3. **Stratified BSS analysis** by season and ENSO phase — may reveal conditional skill masked in overall averages
+4. **Seasonal target (SPI-3 at 3-month lead)** — tests whether longer aggregation windows improve predictability
 
 ---
 
 ## Acknowledgement
 
-AI tools (ChatGPT, Gemini) were used to assist in code development and documentation.
+Ethically used AI tools (ChatGPT, Gemini, GitHub Copilot) for project design, code development, and documentation refinement.
 
 ---
 
 ## Author
 
-Md Ishtiaque Hossain
-MSc Candidate, Computer and Information Sciences, University of Delaware
-[LinkedIn](https://linkedin.com/in/ishtiaque-h) | [GitHub](https://github.com/Ishtiaque-h)
+Md Ishtiaque Hossain \
+MSc, Computer and Information Sciences \
+University of Delaware \
+[LinkedIn](https://linkedin.com/in/ishtiaque-h) · [GitHub](https://github.com/Ishtiaque-h)
