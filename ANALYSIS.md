@@ -27,7 +27,7 @@ The project implements a complete, reproducible pipeline for **1-month-ahead dro
 
 > **No model substantially outperforms climatology in monthly BSS for the dry class.**
 >
-> Best performer: **XGBoost-Spatial** (BSS = −0.031, BS = 0.067 vs. climatology BS = 0.065).
+> Closest to climatology: **XGBoost-Spatial** (BSS = −0.031, BS = 0.067 vs. climatology BS = 0.065).
 > ROC-AUC shows ranking signal (~0.68), confirming that models detect *relative* drought likelihood but cannot translate this into calibrated probability improvement at the monthly level.
 
 This is a scientifically valid and publishable finding — but only if the analysis is sufficiently thorough to explain **why** the predictability barrier exists and **whether it generalizes** beyond this specific region and feature set.
