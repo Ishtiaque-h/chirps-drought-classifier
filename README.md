@@ -78,7 +78,7 @@ graph TD;
 | ConvLSTM | 0.0823 | -0.27 | 0.22 | 0.52 |
 
 > **BSS > 0** would mean the model beats climatology. No model crosses this threshold.
-> XGBoost-Spatial comes closest (BSS = -0.03), with 95% CI crossing zero but centered below it.
+> XGBoost-Spatial comes closest (BSS = -0.03), with 95% CI spanning zero — indicating the difference from climatology is not statistically significant.
 
 ### What This Tells Us
 
