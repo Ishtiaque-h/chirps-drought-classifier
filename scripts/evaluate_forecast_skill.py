@@ -558,6 +558,43 @@ hss_ci_xgb = bootstrap_metric(lambda i: heidke_skill_score(
     y_true_monthly[i], monthly["xgb_pred_mode"].values[i], CLASSES
 ), n_months, n_boot=N_BOOTSTRAP_ITERATIONS, seed=114)
 
+# Bootstrap CIs for optional models (computed only when the model was loaded)
+if HAS_XGB_SPATIAL:
+    bss_ci_sp = bootstrap_metric(lambda i: bss(
+        brier_score(obs_dry_frac[i], monthly["xgb_spatial_dry_frac"].values[i]),
+        brier_score(obs_dry_frac[i], monthly["clim_dry_frac"].values[i])
+    ), n_months, n_boot=N_BOOTSTRAP_ITERATIONS, seed=104)
+    hss_ci_sp = bootstrap_metric(lambda i: heidke_skill_score(
+        y_true_monthly[i], monthly["xgb_spatial_pred_mode"].values[i], CLASSES
+    ), n_months, n_boot=N_BOOTSTRAP_ITERATIONS, seed=115)
+
+if HAS_LOGREG:
+    bss_ci_lr = bootstrap_metric(lambda i: bss(
+        brier_score(obs_dry_frac[i], monthly["lr_dry_frac"].values[i]),
+        brier_score(obs_dry_frac[i], monthly["clim_dry_frac"].values[i])
+    ), n_months, n_boot=N_BOOTSTRAP_ITERATIONS, seed=105)
+    hss_ci_lr = bootstrap_metric(lambda i: heidke_skill_score(
+        y_true_monthly[i], monthly["lr_pred_mode"].values[i], CLASSES
+    ), n_months, n_boot=N_BOOTSTRAP_ITERATIONS, seed=116)
+
+if HAS_RF:
+    bss_ci_rf = bootstrap_metric(lambda i: bss(
+        brier_score(obs_dry_frac[i], monthly["rf_dry_frac"].values[i]),
+        brier_score(obs_dry_frac[i], monthly["clim_dry_frac"].values[i])
+    ), n_months, n_boot=N_BOOTSTRAP_ITERATIONS, seed=106)
+    hss_ci_rf = bootstrap_metric(lambda i: heidke_skill_score(
+        y_true_monthly[i], monthly["rf_pred_mode"].values[i], CLASSES
+    ), n_months, n_boot=N_BOOTSTRAP_ITERATIONS, seed=117)
+
+if HAS_CONVLSTM:
+    bss_ci_cl = bootstrap_metric(lambda i: bss(
+        brier_score(obs_dry_frac[i], monthly["convlstm_dry_frac"].values[i]),
+        brier_score(obs_dry_frac[i], monthly["clim_dry_frac"].values[i])
+    ), n_months, n_boot=N_BOOTSTRAP_ITERATIONS, seed=107)
+    hss_ci_cl = bootstrap_metric(lambda i: heidke_skill_score(
+        y_true_monthly[i], monthly["convlstm_pred_mode"].values[i], CLASSES
+    ), n_months, n_boot=N_BOOTSTRAP_ITERATIONS, seed=118)
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # CALIBRATION STUDY — XGBoost and XGBoost-Spatial                (NEW SECTION)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1007,26 +1044,26 @@ rows = [
 if HAS_XGB_SPATIAL:
     rows.append(
         {"Forecaster": "XGBoost-Spatial",     "BS_dry": f"{bs_sp:.4f}",
-         "BSS_dry": f"{bss_sp:.4f}", "BSS_dry_95CI": "—",
-         "HSS": f"{hss_sp:.4f}", "HSS_95CI": "—", "ROC-AUC_dry": f"{auc_sp:.4f}"}
+         "BSS_dry": f"{bss_sp:.4f}", "BSS_dry_95CI": fmt_ci(bss_ci_sp),
+         "HSS": f"{hss_sp:.4f}", "HSS_95CI": fmt_ci(hss_ci_sp), "ROC-AUC_dry": f"{auc_sp:.4f}"}
     )
 if HAS_CONVLSTM:
     rows.append(
         {"Forecaster": "ConvLSTM",            "BS_dry": f"{bs_cl:.4f}",
-         "BSS_dry": f"{bss_cl:.4f}", "BSS_dry_95CI": "—",
-         "HSS": f"{hss_cl:.4f}", "HSS_95CI": "—", "ROC-AUC_dry": f"{auc_cl:.4f}"}
+         "BSS_dry": f"{bss_cl:.4f}", "BSS_dry_95CI": fmt_ci(bss_ci_cl),
+         "HSS": f"{hss_cl:.4f}", "HSS_95CI": fmt_ci(hss_ci_cl), "ROC-AUC_dry": f"{auc_cl:.4f}"}
     )
 if HAS_LOGREG:
     rows.append(
         {"Forecaster": "Logistic Regression", "BS_dry": f"{bs_lr:.4f}",
-         "BSS_dry": f"{bss_lr:.4f}", "BSS_dry_95CI": "—",
-         "HSS": f"{hss_lr:.4f}", "HSS_95CI": "—", "ROC-AUC_dry": f"{auc_lr:.4f}"}
+         "BSS_dry": f"{bss_lr:.4f}", "BSS_dry_95CI": fmt_ci(bss_ci_lr),
+         "HSS": f"{hss_lr:.4f}", "HSS_95CI": fmt_ci(hss_ci_lr), "ROC-AUC_dry": f"{auc_lr:.4f}"}
     )
 if HAS_RF:
     rows.append(
         {"Forecaster": "Random Forest",       "BS_dry": f"{bs_rf:.4f}",
-         "BSS_dry": f"{bss_rf:.4f}", "BSS_dry_95CI": "—",
-         "HSS": f"{hss_rf:.4f}", "HSS_95CI": "—", "ROC-AUC_dry": f"{auc_rf:.4f}"}
+         "BSS_dry": f"{bss_rf:.4f}", "BSS_dry_95CI": fmt_ci(bss_ci_rf),
+         "HSS": f"{hss_rf:.4f}", "HSS_95CI": fmt_ci(hss_ci_rf), "ROC-AUC_dry": f"{auc_rf:.4f}"}
     )
 table_df = pd.DataFrame(rows)
 csv_path = OUT_DIR / "forecast_skill_bss_hss_table.csv"
@@ -1062,19 +1099,19 @@ summary = (
     f"  Persistence         : {bss_pers:.4f}  (95% CI {fmt_ci(bss_ci_pers)})\n"
     f"  SPI-1 threshold     : {bss_thr:.4f}  (95% CI {fmt_ci(bss_ci_thr)})\n"
     f"  XGBoost (no spatial): {bss_xgb:.4f}  (95% CI {fmt_ci(bss_ci_xgb)})\n"
-    + (f"  XGBoost-Spatial     : {bss_sp:.4f}\n" if HAS_XGB_SPATIAL else "")
-    + (f"  ConvLSTM            : {bss_cl:.4f}\n" if HAS_CONVLSTM   else "")
-    + (f"  Logistic Regression : {bss_lr:.4f}\n" if HAS_LOGREG     else "")
-    + (f"  Random Forest       : {bss_rf:.4f}\n" if HAS_RF         else "")
+    + (f"  XGBoost-Spatial     : {bss_sp:.4f}  (95% CI {fmt_ci(bss_ci_sp)})\n" if HAS_XGB_SPATIAL else "")
+    + (f"  ConvLSTM            : {bss_cl:.4f}  (95% CI {fmt_ci(bss_ci_cl)})\n" if HAS_CONVLSTM   else "")
+    + (f"  Logistic Regression : {bss_lr:.4f}  (95% CI {fmt_ci(bss_ci_lr)})\n" if HAS_LOGREG     else "")
+    + (f"  Random Forest       : {bss_rf:.4f}  (95% CI {fmt_ci(bss_ci_rf)})\n" if HAS_RF         else "")
     + "\n── Heidke Skill Score (HSS, 3-class, monthly dominant class) ──\n"
     f"  Climatological      : {hss_clim:.4f}  (95% CI {fmt_ci(hss_ci_clim)})\n"
     f"  Persistence         : {hss_pers:.4f}  (95% CI {fmt_ci(hss_ci_pers)})\n"
     f"  SPI-1 threshold     : {hss_thr:.4f}  (95% CI {fmt_ci(hss_ci_thr)})\n"
     f"  XGBoost (no spatial): {hss_xgb:.4f}  (95% CI {fmt_ci(hss_ci_xgb)})\n"
-    + (f"  XGBoost-Spatial     : {hss_sp:.4f}\n" if HAS_XGB_SPATIAL else "")
-    + (f"  ConvLSTM            : {hss_cl:.4f}\n" if HAS_CONVLSTM   else "")
-    + (f"  Logistic Regression : {hss_lr:.4f}\n" if HAS_LOGREG     else "")
-    + (f"  Random Forest       : {hss_rf:.4f}\n" if HAS_RF         else "")
+    + (f"  XGBoost-Spatial     : {hss_sp:.4f}  (95% CI {fmt_ci(hss_ci_sp)})\n" if HAS_XGB_SPATIAL else "")
+    + (f"  ConvLSTM            : {hss_cl:.4f}  (95% CI {fmt_ci(hss_ci_cl)})\n" if HAS_CONVLSTM   else "")
+    + (f"  Logistic Regression : {hss_lr:.4f}  (95% CI {fmt_ci(hss_ci_lr)})\n" if HAS_LOGREG     else "")
+    + (f"  Random Forest       : {hss_rf:.4f}  (95% CI {fmt_ci(hss_ci_rf)})\n" if HAS_RF         else "")
     + "\n── ROC-AUC (dry vs. not-dry, monthly mean probability) ──\n"
     f"  Persistence         : {auc_pers:.4f}\n"
     f"  SPI-1 threshold     : {auc_thr:.4f}\n"
