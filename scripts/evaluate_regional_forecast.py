@@ -78,7 +78,7 @@ print(f"  Correct months: {match.sum()} / {len(match)}")
 
 # ---- full metrics text ----
 metrics_lines = [
-    "Regional Forecast Evaluation — Central Valley 2021–2025",
+    "Regional Forecast Evaluation — Central Valley 2021–2026",
     "=" * 55,
     f"Test months                    : {len(pred_monthly)}",
     f"Dominant-class accuracy        : {dominant_acc:.1%}",
@@ -112,7 +112,7 @@ for ax, (data, title) in zip(axes, [(pred_monthly, "Predicted"), (truth_monthly,
         alpha=0.85,
     )
     ax.set_ylabel("Fraction of region")
-    ax.set_title(f"{title} drought class shares — Central Valley 2021–2025")
+    ax.set_title(f"{title} drought class shares — Central Valley 2021–2026")
     ax.set_ylim(0, 1)
     ax.legend(loc="upper right", fontsize=9)
 
