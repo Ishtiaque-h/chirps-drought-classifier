@@ -1,0 +1,21 @@
+# Core Data Science & Geospatial
+numpy==2.4.4
+pandas==3.0.2
+xarray==2026.2.0
+netCDF4==1.7.4
+h5netcdf==1.8.1
+scipy==1.17.1
+matplotlib==3.10.8
+
+# Machine Learning & Optimization
+scikit-learn==1.8.0
+xgboost==3.2.0
+torch==2.11.0
+joblib==1.5.3
+shap
+
+# Data Access & Utilities
+cdsapi
+fsspec==2026.3.0
+pyarrow==23.0.1
+fastparquet==2026.3.0
