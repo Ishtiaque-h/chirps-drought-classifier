@@ -23,8 +23,8 @@ Features:
   year                              — calendar year of the TARGET month
 
 Input:
-  data/processed/chirps_v3_monthly_cvalley_1991_2025.nc
-  data/processed/chirps_v3_monthly_cvalley_spi_1991_2025.nc
+  data/processed/chirps_v3_monthly_cvalley_1991_2026.nc
+  data/processed/chirps_v3_monthly_cvalley_spi_1991_2026.nc
 
 Output:
   data/processed/dataset_forecast.parquet
@@ -36,8 +36,8 @@ import pandas as pd
 import xarray as xr
 
 PROCESSED   = Path("data/processed")
-PR_FILE     = PROCESSED / "chirps_v3_monthly_cvalley_1991_2025.nc"
-SPI_FILE    = PROCESSED / "chirps_v3_monthly_cvalley_spi_1991_2025.nc"
+PR_FILE     = PROCESSED / "chirps_v3_monthly_cvalley_1991_2026.nc"
+SPI_FILE    = PROCESSED / "chirps_v3_monthly_cvalley_spi_1991_2026.nc"
 OUT_PARQUET = PROCESSED / "dataset_forecast.parquet"
 OUT_SAMPLE  = PROCESSED / "dataset_forecast_sample.csv"
 

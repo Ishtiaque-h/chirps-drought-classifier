@@ -12,10 +12,10 @@ WMO thresholds:
   otherwise    →  normal ( 0)
 
 Input:
-  data/processed/chirps_v3_monthly_cvalley_1991_2025.nc
+  data/processed/chirps_v3_monthly_cvalley_1991_2026.nc
 
 Output:
-  data/processed/chirps_v3_monthly_cvalley_spi_1991_2025.nc
+  data/processed/chirps_v3_monthly_cvalley_spi_1991_2026.nc
     Variables: spi1, spi3, spi6, drought_label_spi1, drought_label_spi3
 
 Note on drought_label_spi1:
@@ -30,10 +30,10 @@ import numpy as np
 import xarray as xr
 from scipy.stats import gamma as gamma_dist, norm
 
-IN_FILE = Path("data/processed/chirps_v3_monthly_cvalley_1991_2025.nc")
+IN_FILE = Path("data/processed/chirps_v3_monthly_cvalley_1991_2026.nc")
 OUT_DIR = Path("data/processed")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
-OUT_FILE = OUT_DIR / "chirps_v3_monthly_cvalley_spi_1991_2025.nc"
+OUT_FILE = OUT_DIR / "chirps_v3_monthly_cvalley_spi_1991_2026.nc"
 
 BASELINE_START = "1991-01-01"
 BASELINE_END   = "2020-12-31"

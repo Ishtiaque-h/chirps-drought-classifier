@@ -32,8 +32,8 @@ Outputs (written to data/processed/)
   convlstm_meta.npz     — lat, lon, pr_scale, split_years, test_feature_times
 
 Inputs
-  data/processed/chirps_v3_monthly_cvalley_1991_2025.nc
-  data/processed/chirps_v3_monthly_cvalley_spi_1991_2025.nc
+  data/processed/chirps_v3_monthly_cvalley_1991_2026.nc
+  data/processed/chirps_v3_monthly_cvalley_spi_1991_2026.nc
 """
 from pathlib import Path
 import numpy as np
@@ -41,8 +41,8 @@ import xarray as xr
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 PROC     = BASE_DIR / "data" / "processed"
-PR_FILE  = PROC / "chirps_v3_monthly_cvalley_1991_2025.nc"
-SPI_FILE = PROC / "chirps_v3_monthly_cvalley_spi_1991_2025.nc"
+PR_FILE  = PROC / "chirps_v3_monthly_cvalley_1991_2026.nc"
+SPI_FILE = PROC / "chirps_v3_monthly_cvalley_spi_1991_2026.nc"
 
 SEQ_LEN    = 3          # number of lag months in each input window
 LABEL_MAP  = {-1: 0, 0: 1, 1: 2}
