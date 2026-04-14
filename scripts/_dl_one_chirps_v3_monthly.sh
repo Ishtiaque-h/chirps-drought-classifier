@@ -16,5 +16,4 @@ echo "Downloading ${YEAR} ..."
 curl -s -S -fL --retry 3 --continue-at - -o "$OUT" "$URL"
 
 # quick sanity check
-file "$OUT" | grep -qi "NetCDF" || echo "Warning: $OUT not recognized as NetCDF"
-
+file "$OUT" | grep -qiE "NetCDF|Hierarchical Data Format|HDF" || echo "Warning: $OUT not recognized as NetCDF or HDF5"
