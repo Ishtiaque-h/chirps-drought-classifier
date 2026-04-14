@@ -62,6 +62,39 @@ graph TD;
 
 ---
 
+## Model Selection Rationale
+
+The five-model progression is not a "model zoo" — each step tests a specific hypothesis about what limits drought predictability in this hydroclimate setting:
+
+### 1. Logistic Regression — *Is the relationship linear?*
+
+A linear baseline is the correct starting point for any predictive modelling study. In this pipeline, multinomial logistic regression with balanced class weights and L-BFGS optimisation establishes whether SPI/precipitation lags have a *detectable linear association* with next-month drought class. If a linear model already saturates skill, no further complexity is justified. Here, logistic regression achieves the highest ROC-AUC (0.81) of all models — confirming that it captures ranking signal well — but the worst Brier Skill Score (BSS = −0.35), revealing that linear probability estimates are poorly calibrated for this class-imbalanced, base-rate-dominated target.
+
+### 2. Random Forest — *Do nonlinear feature interactions matter?*
+
+Drought risk arises from complex, nonlinear interactions between precipitation accumulation windows, seasonal timing, and antecedent conditions. Random Forest (500 trees, balanced-subsample weighting) is the hydrology community's standard tool for testing whether flexible, nonlinear decision boundaries improve upon linear assumptions. Crucially, RF also provides model-agnostic feature importance rankings (mean decrease in impurity), which inform subsequent feature engineering. RF improves BSS to −0.27 and maintains discrimination, but does not approach the climatological baseline — indicating that the bottleneck is not model linearity vs. nonlinearity, but rather the information content of the feature set.
+
+### 3. XGBoost — *Can boosting extract weak signals from noisy tabular data?*
+
+Gradient-boosted trees are the state-of-the-art for structured/tabular prediction problems, consistently outperforming other methods in benchmarks (Grinsztajn et al. 2022) and increasingly adopted in operational hydroclimate forecasting. XGBoost's sequential boosting with L1/L2 regularisation, subsampling, and early stopping is specifically designed to extract marginal predictive signal from high-noise, low-sample-size datasets — exactly the regime of monthly drought classification. Here, XGBoost achieves the best BSS among non-spatial models (−0.06), substantially closing the gap to climatology. The XGBoost-Spatial variant adds 3×3 neighbourhood means of SPI and precipitation, testing whether local spatial coherence provides additional discriminative information. It achieves BSS = −0.03, with a 95% bootstrap CI spanning zero — the closest any model comes to matching climatology.
+
+### 4. ConvLSTM — *Are there spatial–temporal dependencies beyond local features?*
+
+Finally, a Convolutional LSTM (Shi et al. 2015) tests whether *learned* spatial and temporal representations — as opposed to hand-crafted lag and neighbourhood features — can capture dependencies not accessible to the tabular models. ConvLSTM processes gridded SPI/precipitation fields as image sequences (3 time-steps × 4 channels), jointly learning spatial convolutions and temporal dynamics. This addresses a specific scientific question: do spatially coherent phenomena (e.g., atmospheric river tracks, propagating dry anomalies) carry predictive information that pixel-level tabular features discard? The result (BSS = −0.27) shows that with ~400 gridded training samples, the deep model overfits rather than extracts additional signal — confirming that the predictability barrier is informational, not architectural.
+
+### What the progression reveals
+
+| Model step | What it tests | Finding |
+|---|---|---|
+| Logistic Regression | Linear feature–outcome relationships | Ranking signal exists (AUC 0.81), but linear calibration fails |
+| Random Forest | Nonlinear interactions / thresholds | Marginal BSS gain; feature importance matches known physics |
+| XGBoost (± Spatial) | Boosted weak-signal extraction | Closest to climatology (BSS ≈ −0.03); spatial coherence adds marginal value |
+| ConvLSTM | Learned spatial–temporal representations | Overfits with limited gridded samples; no gain over tabular boosting |
+
+**Conclusion:** The systematic progression isolates the bottleneck as **information content of the feature set** (endogenous precipitation-only predictors), not model complexity. This directly motivates the next research step: adding exogenous climate drivers (ENSO, PDO) to test whether the predictability barrier is due to missing information or intrinsic chaos in monthly-scale precipitation.
+
+---
+
 ## Results
 
 ### Skill Scores (monthly level, 60 test months)
