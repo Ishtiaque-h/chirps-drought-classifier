@@ -17,7 +17,7 @@ NOTE — methodological framing:
 The USDM provides weekly county-level drought statistics for the contiguous US.
 This script downloads the county-level time series for the Central Valley
 counties directly from the USDM public API, aggregates to monthly, and
-overlays the model's regional dry-fraction predictions over 2021–2025.
+overlays the model's regional dry-fraction predictions over 2021–2026.
 
 Central Valley counties (FIPS):
   Fresno      06019
@@ -88,7 +88,7 @@ def fetch_usdm_county(fips: str) -> pd.DataFrame:
     params = urllib.parse.urlencode({
         "aoi": fips,
         "StartDate": "2021-01-01T00:00:00Z",
-        "EndDate": "2025-12-31T00:00:00Z",
+        "EndDate": "2026-03-01T00:00:00Z",
         "statisticsType": 1,
     })
     url = (
@@ -271,7 +271,7 @@ ax.set_xlabel("Month")
 ax.set_ylabel("Fraction of region")
 ax.set_title(
     "Qualitative consistency check: Model dry fraction vs. USDM D1+ extent\n"
-    "Central Valley 2021–2025  (different data sources — not a skill validation)",
+    "Central Valley 2021–2026 (different data sources — not a skill validation)",
     fontsize=10,
 )
 ax.legend()
@@ -281,7 +281,7 @@ fig.savefig(OUT_DIR / "usdm_consistency.png", dpi=150, bbox_inches="tight")
 plt.close()
 
 metrics_txt = (
-    f"USDM Consistency Check — Central Valley 2021–2025\n"
+    f"USDM Consistency Check — Central Valley 2021–2026\n"
     f"{'='*55}\n"
     f"METHODOLOGICAL NOTE:\n"
     f"  This is a qualitative plausibility check, NOT a skill validation.\n"
