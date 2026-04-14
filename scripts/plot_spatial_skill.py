@@ -3,7 +3,7 @@
 Spatial skill maps for the 1-month-ahead drought forecast.
 
 For each 0.05° pixel in the Central Valley, compute the fraction of test
-months (2021–2025) where the dominant predicted class matches the true
+months (2021–2026) where the dominant predicted class matches the true
 drought class.  Save the result as a NetCDF (for GIS use) and a heatmap PNG.
 
 The spatial skill map reveals which sub-regions the model forecasts well
@@ -87,7 +87,7 @@ da = xr.DataArray(
     dims=["latitude", "longitude"],
     name="forecast_accuracy",
     attrs={
-        "long_name": "Per-pixel 1-month-ahead forecast accuracy (2021–2025)",
+        "long_name": "Per-pixel 1-month-ahead forecast accuracy (2021–2026)",
         "units":     "fraction",
         "note":      "Fraction of test months where XGBoost dominant class == SPI-1 truth",
     },
@@ -121,7 +121,7 @@ ax.set_xlabel("Longitude (°E)")
 ax.set_ylabel("Latitude (°N)")
 ax.set_title(
     "Per-pixel 1-month-ahead drought forecast accuracy\n"
-    "Central Valley, California (2021–2025 test period)\n"
+    "Central Valley, California (2021–2026 test period)\n"
     "Target: SPI-1 drought class (dry / normal / wet)",
     fontsize=9,
 )

@@ -2,7 +2,7 @@
 """
 Case study: 2021–2022 multi-year drought and 2023 atmospheric river events.
 
-The test period (2021–2025) contains two climatically notable sequences:
+The test period (2021–2026) contains two climatically notable sequences:
   1. 2021–2022: one of California's most severe multi-year droughts on record,
      driven by consecutive La Niña winters and below-normal Sierra snowpack.
   2. 2023 Jan–Mar: a series of atmospheric rivers that reversed the drought,
@@ -15,11 +15,11 @@ events demonstrates that the model captures the physically correct signal
 
 Inputs:
   data/processed/dataset_forecast.parquet
-  data/processed/chirps_v3_monthly_cvalley_spi_1991_2025.nc
+  data/processed/chirps_v3_monthly_cvalley_spi_1991_2026.nc
   outputs/forecast_xgb_model.json
 
 Outputs:
-  outputs/case_study_2021_2025.png
+  outputs/case_study_2021_2026.png
 """
 from pathlib import Path
 import numpy as np
@@ -158,7 +158,7 @@ fig.legend(handles=[drought_patch, ar_patch], loc="lower center",
            ncol=2, fontsize=9, bbox_to_anchor=(0.5, -0.02))
 
 fig.tight_layout(rect=[0, 0.03, 1, 1])
-out_path = OUT_DIR / "case_study_2021_2025.png"
+out_path = OUT_DIR / "case_study_2021_2026.png"
 fig.savefig(out_path, dpi=150, bbox_inches="tight")
 plt.close()
 print("Wrote:", out_path)

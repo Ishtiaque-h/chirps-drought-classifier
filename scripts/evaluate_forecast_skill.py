@@ -390,7 +390,7 @@ thr_argmax = np.vstack([thr_prob_dry, thr_prob_normal, thr_prob_wet]).T.argmax(a
 test["thr_pred"] = np.array([CLASSES[i] for i in thr_argmax], dtype=int)
 
 # ── monthly aggregation ───────────────────────────────────────────────────────
-print("Aggregating to monthly level (60 independent test months)...")
+print(f"Aggregating to monthly level...")
 
 monthly = test.groupby("month_dt").agg(
     y_true_mode     = (TARGET, lambda s: int(s.mode()[0])),
@@ -709,8 +709,8 @@ _val_obs_mo  = (
 # Requires the saved spatial model and the same gridded NetCDF files used during
 # training (train_forecast_xgb_spatial.py).
 _XGB_SP_MDL_PATH = Path("outputs/xgb_spatial_model.json")
-_SPI_NC_PATH     = Path("data/processed/chirps_v3_monthly_cvalley_spi_1991_2025.nc")
-_PR_NC_PATH      = Path("data/processed/chirps_v3_monthly_cvalley_1991_2025.nc")
+_SPI_NC_PATH     = Path("data/processed/chirps_v3_monthly_cvalley_spi_1991_2026.nc")
+_PR_NC_PATH      = Path("data/processed/chirps_v3_monthly_cvalley_1991_2026.nc")
 _SPATIAL_FEAT    = ["spi1_nbr_mean", "spi3_nbr_mean", "spi6_nbr_mean", "pr_nbr_mean"]
 _FEAT_WITH_SP    = FEATURES + _SPATIAL_FEAT  # full feature list including spatial
 
@@ -985,7 +985,7 @@ disp = ConfusionMatrixDisplay(confusion_matrix=cm_monthly,
 fig_cm, ax_cm = plt.subplots(figsize=(5, 4))
 disp.plot(ax=ax_cm, cmap="Blues", values_format=".2f", colorbar=False)
 ax_cm.set_title("XGBoost — Monthly-level confusion matrix\n"
-                f"(n = {n_months} independent test months; 2021–2025)")
+                f"(n = {n_months} independent test months; 2021–2026)")
 fig_cm.tight_layout()
 cm_path = OUT_DIR / "forecast_monthly_cm.png"
 fig_cm.savefig(cm_path, dpi=150, bbox_inches="tight")
@@ -1072,7 +1072,7 @@ print("Wrote:", csv_path)
 
 # ── text summary ──────────────────────────────────────────────────────────────
 summary = (
-    "Forecast Skill Evaluation — Central Valley 2021–2025\n"
+    "Forecast Skill Evaluation — Central Valley 2021–2026\n"
     + "=" * 60 + "\n"
     f"Test months (independent temporal units): {n_months}\n"
     f"Pixels per month (spatially autocorrelated, secondary): "
