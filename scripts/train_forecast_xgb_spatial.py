@@ -30,8 +30,8 @@ Outputs
 
 Inputs
   data/processed/dataset_forecast.parquet
-  data/processed/chirps_v3_monthly_cvalley_1991_2025.nc
-  data/processed/chirps_v3_monthly_cvalley_spi_1991_2025.nc
+  data/processed/chirps_v3_monthly_cvalley_1991_2026.nc
+  data/processed/chirps_v3_monthly_cvalley_spi_1991_2026.nc
 """
 from pathlib import Path
 import numpy as np
@@ -50,8 +50,8 @@ PROC       = BASE_DIR / "data" / "processed"
 OUT_DIR    = BASE_DIR / "outputs"; OUT_DIR.mkdir(exist_ok=True)
 
 PARQUET    = PROC / "dataset_forecast.parquet"
-PR_FILE    = PROC / "chirps_v3_monthly_cvalley_1991_2025.nc"
-SPI_FILE   = PROC / "chirps_v3_monthly_cvalley_spi_1991_2025.nc"
+PR_FILE    = PROC / "chirps_v3_monthly_cvalley_1991_2026.nc"
+SPI_FILE   = PROC / "chirps_v3_monthly_cvalley_spi_1991_2026.nc"
 
 FEATURES_BASE = [
     "spi1_lag1", "spi1_lag2", "spi1_lag3",
