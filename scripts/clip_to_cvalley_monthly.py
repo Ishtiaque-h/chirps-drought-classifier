@@ -5,7 +5,7 @@ from dask.diagnostics import ProgressBar
 
 IN_DIR = Path("data/raw/chirps_v3/monthly")
 OUT_DIR = Path("data/processed"); OUT_DIR.mkdir(parents=True, exist_ok=True)
-OUT_FILE = OUT_DIR / "chirps_v3_monthly_cvalley_1991_2025.nc"
+OUT_FILE = OUT_DIR / "chirps_v3_monthly_cvalley_1991_2026.nc"
 
 # Central Valley bbox
 lat_min, lat_max = 35.4, 40.6
