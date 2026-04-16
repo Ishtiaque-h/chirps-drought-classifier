@@ -17,7 +17,7 @@ Methodological rationale:
 
 Workflow:
   1. Load ERA5-Land monthly total precipitation over Central Valley bbox.
-     (Expected file: data/processed/era5_land_monthly_cvalley_1991_2026.nc
+     (Expected file: data/processed/era5_land_monthly_cvalley_<START_YEAR>_<CURRENT_YEAR>.nc
       with variable 'tp', units m/month → converted to mm/month)
   2. Compute SPI-1 using the same gamma-fit methodology as make_spi_labels.py
      (1991–2020 baseline, per-calendar-month gamma fit, zero-probability handling).
@@ -28,7 +28,7 @@ Workflow:
   7. Report BSS and HSS; save comparison plot and metrics text.
 
 Inputs:
-  data/processed/era5_land_monthly_cvalley_1991_2026.nc
+  data/processed/era5_land_monthly_cvalley_<START_YEAR>_<CURRENT_YEAR>.nc
   data/processed/dataset_forecast.parquet
   outputs/forecast_xgb_model.json
 
@@ -37,7 +37,9 @@ Outputs:
   outputs/era5_validation_comparison.png
 """
 from pathlib import Path
+from datetime import datetime, timezone
 import sys
+import subprocess
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -45,11 +47,18 @@ import xgboost as xgb
 import matplotlib.pyplot as plt
 from scipy.stats import gamma as gamma_dist, norm
 
-ERA5_FILE  = Path("data/processed/era5_land_monthly_cvalley_1991_2026.nc")
-DATA       = Path("data/processed/dataset_forecast.parquet")
-MODEL_PATH = Path("outputs/forecast_xgb_model.json")
-OUT_DIR    = Path("outputs")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+START_YEAR = 1991
+CURRENT_YEAR = datetime.now(timezone.utc).year
+
+ERA5_FILE = PROJECT_ROOT / "data" / "processed" / f"era5_land_monthly_cvalley_{START_YEAR}_{CURRENT_YEAR}.nc"
+DATA = PROJECT_ROOT / "data" / "processed" / "dataset_forecast.parquet"
+MODEL_PATH = PROJECT_ROOT / "outputs" / "forecast_xgb_model.json"
+OUT_DIR = PROJECT_ROOT / "outputs"
 OUT_DIR.mkdir(exist_ok=True)
+
+DOWNLOAD_SCRIPT = PROJECT_ROOT / "scripts" / "download_era5_land_monthly.py"
 
 BASELINE_START = 1991
 BASELINE_END   = 2020
@@ -65,6 +74,42 @@ TARGET = "target_label"
 LABEL_MAP     = {-1: 0, 0: 1, 1: 2}
 INV_LABEL_MAP = {v: k for k, v in LABEL_MAP.items()}
 CLASSES       = [-1, 0, 1]
+
+def ensure_era5_file() -> None:
+    """
+    Ensure the ERA5 file exists.
+    If missing, automatically run the download script.
+    """
+    if ERA5_FILE.exists():
+        return
+
+    print(f"ERA5-Land file not found: {ERA5_FILE}")
+    print("Running download script automatically...")
+
+    if not DOWNLOAD_SCRIPT.exists():
+        raise FileNotFoundError(
+            f"Download script not found: {DOWNLOAD_SCRIPT}"
+        )
+
+    try:
+        subprocess.run(
+            [sys.executable, str(DOWNLOAD_SCRIPT)],
+            cwd=PROJECT_ROOT,
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(
+            "Automatic ERA5 download failed. "
+            "Please check the download script output above."
+        ) from e
+
+    if not ERA5_FILE.exists():
+        raise FileNotFoundError(
+            "Download script finished, but the ERA5 file was still not created:\n"
+            f"{ERA5_FILE}"
+        )
+
+    print("ERA5-Land file downloaded successfully.")
 
 
 def choose_precip_var(ds: xr.Dataset) -> str:
@@ -220,12 +265,7 @@ def hss(y_true: np.ndarray, y_pred: np.ndarray, classes: list[int]) -> float:
 
 
 # ── check ERA5 file ───────────────────────────────────────────────────────────
-if not ERA5_FILE.exists():
-    print(
-        f"ERA5-Land file not found: {ERA5_FILE}\n\n"
-        "Generate it first, place it at the path above, then re-run this script.\n"
-    )
-    sys.exit(1)
+ensure_era5_file()
 
 # ── load ERA5-Land ────────────────────────────────────────────────────────────
 print("Loading ERA5-Land precipitation...")
@@ -378,7 +418,7 @@ ax.set_xlabel("Month (target)")
 ax.set_ylabel("Fraction / indicator")
 ax.set_title(
     "Cross-dataset validation: CHIRPS-based model vs. ERA5-Land SPI-1\n"
-    f"Central Valley 2021–2026  |  BSS={bss_era5:.3f}  HSS={hss_val:.3f}",
+    f"Central Valley {TEST_START}–{CURRENT_YEAR}  |  BSS={bss_era5:.3f}  HSS={hss_val:.3f}",
     fontsize=10,
 )
 ax.legend()
@@ -392,7 +432,7 @@ print("Wrote:", plot_path)
 
 # ── text metrics ──────────────────────────────────────────────────────────────
 metrics_txt = (
-    "ERA5-Land Cross-Dataset Validation — Central Valley 2021–2026\n"
+    f"ERA5-Land Cross-Dataset Validation — Central Valley {TEST_START}–{CURRENT_YEAR}\n"
     + "=" * 60 + "\n"
     + "Methodology: SPI-1 computed from ERA5-Land monthly precipitation using\n"
     + "  the same gamma-fit / WMO-threshold approach as the CHIRPS training data.\n"
