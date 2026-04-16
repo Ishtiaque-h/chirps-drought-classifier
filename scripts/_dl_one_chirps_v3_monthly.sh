@@ -6,14 +6,32 @@ YEAR="$2"
 
 URL="https://data.chc.ucsb.edu/products/CHIRPS/v3.0/monthly/global/netcdf/by_year/chirps-v3.0.${YEAR}.monthly.nc"
 OUT="${OUTDIR}/chirps-v3.0.${YEAR}.monthly.nc"
+TMP="${OUT}.part"
 
-if [[ -f "$OUT" ]]; then
-  echo "Skip ${YEAR} (already exists)"
+is_valid_netcdf() {
+  local f="$1"
+  file "$f" | grep -qiE "NetCDF|Hierarchical Data Format|HDF"
+}
+
+if [[ -f "$OUT" ]] && is_valid_netcdf "$OUT"; then
+  echo "Skip ${YEAR} (already valid)"
   exit 0
 fi
 
 echo "Downloading ${YEAR} ..."
-curl -s -S -fL --retry 3 --continue-at - -o "$OUT" "$URL"
+curl -sS -fL \
+  --retry 5 \
+  --retry-delay 2 \
+  --connect-timeout 30 \
+  --max-time 1800 \
+  --continue-at - \
+  -o "$TMP" \
+  "$URL"
 
-# quick sanity check
-file "$OUT" | grep -qiE "NetCDF|Hierarchical Data Format|HDF" || echo "Warning: $OUT not recognized as NetCDF or HDF5"
+mv "$TMP" "$OUT"
+
+if ! is_valid_netcdf "$OUT"; then
+  rm -f "$OUT"
+  echo "ERROR: ${OUT} is not a valid NetCDF/HDF file" >&2
+  exit 1
+fi
