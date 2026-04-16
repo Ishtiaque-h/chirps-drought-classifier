@@ -190,7 +190,7 @@ Highest-impact next steps (see [`ANALYSIS.md`](ANALYSIS.md) for the full strateg
 
 ```bash
 conda env create -f environment.yml
-conda activate chirps-drought
+conda activate drought-classifier
 ```
 
 ### Pipeline (in order)
