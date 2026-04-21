@@ -231,6 +231,8 @@ python scripts/plot_case_study.py                # 2021-2026 case study
 | `outputs/spatial_skill_accuracy.png` | Per-pixel accuracy map |
 | `outputs/case_study_2021_2026.png` | Temporal case study 2021–2026 |
 
+For a prioritised guide to which outputs are significant and worth sharing (including model artifacts, SHAP plots, and cross-dataset validation), see [`docs/KEY_RESULTS.md`](docs/KEY_RESULTS.md).
+
 ---
 
 ## Acknowledgement
