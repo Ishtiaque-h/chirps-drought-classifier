@@ -27,7 +27,7 @@ Predicting drought 1 month ahead using only past precipitation is a hard problem
 
 ```mermaid
 graph TD;
-    A["CHIRPS v3.0 Monthly (1991-2025)"] --> B["Clip to Central Valley"];
+    A["CHIRPS v3.0 Monthly (1991-2026)"] --> B["Clip to Central Valley"];
     B --> C["Gamma-fit SPI per pixel × calendar month"];
     C --> D["SPI-1 / SPI-3 / SPI-6"];
     D --> E["Target: SPI-1 drought class at t+1"];
@@ -197,7 +197,7 @@ conda activate drought-classifier
 
 ```bash
 # 1. Download and preprocess
-bash scripts/download_chirps_v3_monthly_1991_2025.sh
+bash scripts/download_chirps_v3_monthly_1991_2026.sh
 python scripts/clip_to_cvalley_monthly.py
 python scripts/make_spi_labels.py
 
@@ -217,7 +217,7 @@ python scripts/xgb_shap_forecast_analysis.py     # SHAP interpretation
 python scripts/validate_era5_spi.py              # cross-dataset validation
 python scripts/validate_usdm.py                  # USDM plausibility check
 python scripts/plot_spatial_skill.py             # per-pixel skill map
-python scripts/plot_case_study.py                # 2021-2025 case study
+python scripts/plot_case_study.py                # 2021-2026 case study
 ```
 
 ### Key output files

@@ -30,7 +30,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 
 DATA       = Path("data/processed/dataset_forecast.parquet")
-SPI_FILE   = Path("data/processed/chirps_v3_monthly_cvalley_spi_1991_2025.nc")
+SPI_FILE   = Path("data/processed/chirps_v3_monthly_cvalley_spi_1991_2026.nc")
 MODEL_PATH = Path("outputs/forecast_xgb_model.json")
 OUT_DIR    = Path("outputs"); OUT_DIR.mkdir(exist_ok=True)
 
@@ -127,7 +127,7 @@ if "spi1_target" in monthly.columns and not monthly["spi1_target"].isna().all():
 ax1.set_ylabel("P(dry) — model probability")
 ax1.set_ylim(-0.05, 1.05)
 ax1.set_title(
-    "Case study: 2021–2025 drought forecast — Central Valley\n"
+    "Case study: 2021–2026 drought forecast — Central Valley\n"
     "1-month-ahead XGBoost model (target: SPI-1 class)",
     fontsize=10,
 )

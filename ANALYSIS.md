@@ -9,7 +9,7 @@
 
 ### What has been accomplished
 
-The project implements a complete, reproducible pipeline for **1-month-ahead drought class prediction** in California's Central Valley (1991–2025) using CHIRPS v3.0 satellite precipitation:
+The project implements a complete, reproducible pipeline for **1-month-ahead drought class prediction** in California's Central Valley (1991–2026) using CHIRPS v3.0 satellite precipitation:
 
 | Component | Status | Assessment |
 |-----------|--------|------------|
@@ -53,13 +53,13 @@ This is a scientifically valid and publishable finding — but only if the analy
 ### 2.2 Temporal design
 
 **Strengths:**
-- Train (1991–2016) / val (2017–2020) / test (2021–2025) split is temporal, non-shuffled — gold standard
+- Train (1991–2016) / val (2017–2020) / test (2021–2026) split is temporal, non-shuffled — gold standard
 - 60 independent test months is adequate for bootstrap-based inference
 - No target leakage: SPI-1[t+1] depends only on pr[t+1], which is unknown from features at t
 
 **Limitations:**
-- Test period (2021–2025) coincidentally includes an extreme drought (2021–22) followed by an extreme wet reversal (2023). This is good for case-study value but means the test set is not climatologically representative — it over-represents extreme events relative to the training distribution.
-- The 30-year gamma-fit baseline (1991–2020) may not capture non-stationarity driven by climate change, potentially biasing SPI values in the 2021–2025 test period.
+- Test period (2021–2026) coincidentally includes an extreme drought (2021–22) followed by an extreme wet reversal (2023). This is good for case-study value but means the test set is not climatologically representative — it over-represents extreme events relative to the training distribution.
+- The 30-year gamma-fit baseline (1991–2020) may not capture non-stationarity driven by climate change, potentially biasing SPI values in the 2021–2026 test period.
 
 ### 2.3 What expanding to additional regions would offer
 
@@ -219,7 +219,7 @@ The finding that ML does not outperform climatology at 1-month lead is consisten
 >
 > We build a rigorous, leakage-free pipeline using CHIRPS v3.0 satellite precipitation and WMO-standard SPI-1. All metrics are computed at the monthly level (60 independent test months) with bootstrap uncertainty, using three naive baselines for reference. We test shallow (logistic regression, random forest), gradient-boosted (XGBoost ± spatial features), and deep learning (ConvLSTM) models.
 >
-> **Key finding:** In California's Central Valley (2021–2025), no model substantially outperforms climatology in Brier Skill Score, despite showing discrimination signal (ROC-AUC ~0.68). Brier Score decomposition reveals that models achieve negligible resolution improvement over the climatological base rate, consistent with the theoretical expectation that single-month precipitation in this Mediterranean regime is largely chaotic at 1-month lead.
+> **Key finding:** In California's Central Valley (2021–2026), no model substantially outperforms climatology in Brier Skill Score, despite showing discrimination signal (ROC-AUC ~0.68). Brier Score decomposition reveals that models achieve negligible resolution improvement over the climatological base rate, consistent with the theoretical expectation that single-month precipitation in this Mediterranean regime is largely chaotic at 1-month lead.
 >
 > **Implications:** (1) ML model accuracy reported without baseline comparison systematically overstates forecast utility. (2) The predictability barrier suggests that improving drought prediction at monthly scale requires either exogenous climate drivers (ENSO, teleconnections) or longer accumulation windows (seasonal SPI-3). (3) The methodology presented here provides a template for rigorous drought ML evaluation that correctly accounts for spatial autocorrelation and class frequency.
 
