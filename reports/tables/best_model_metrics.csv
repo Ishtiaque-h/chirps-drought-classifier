@@ -1,0 +1,13 @@
+Metric,Value,Notes
+Model,XGBoost-Spatial,Best model by Brier Score on test set
+Test period,2021-01 to 2026-03,63 independent monthly test steps
+Region,California Central Valley,35.4°–40.6°N / 122.5°–119.0°W
+Spatial resolution,0.05° (~5 km),~7200 pixels per monthly map
+Target variable,SPI-1 class at t+1,Dry (SPI-1≤−1) / Normal / Wet (SPI-1≥+1)
+Brier Score (dry class),0.0666,Lower is better; climatology reference = 0.0646
+Brier Skill Score (BSS),-0.030,BSS>0 = beats climatology; 95% CI spans zero
+Heidke Skill Score (HSS),0.00,Categorical skill across 3 classes
+ROC-AUC (dry vs. not-dry),0.68,Ranking discrimination; 0.5 = random; 1.0 = perfect
+Climatology Brier Score,0.0646,Hard-to-beat reference for this Mediterranean regime
+95% CI note,BSS 95% CI spans zero,Difference from climatology is not statistically significant
+Key finding,Predictability barrier detected,No model beats climatology in BSS; ROC-AUC~0.68 confirms learnable ranking signal exists

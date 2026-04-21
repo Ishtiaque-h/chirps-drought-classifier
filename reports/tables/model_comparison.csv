@@ -1,0 +1,9 @@
+Rank,Forecaster,Type,Brier_Score_dry,BSS_vs_climatology,HSS_3class,ROC_AUC_dry,Notes
+0,Climatological baseline,Naive baseline,0.0646,0.000,0.00,,Per-calendar-month class frequencies from training; reference for BSS
+1,Persistence,Naive baseline,0.1011,-0.570,0.09,0.56,Predict next month = current SPI-1 class
+2,SPI-1 heuristic,Naive baseline,0.0949,-0.470,0.09,0.56,Map current SPI-1 continuously to class probabilities
+3,Logistic Regression,ML model,0.0874,-0.350,0.15,0.81,Linear; StandardScaler + balanced class weights
+4,Random Forest,ML model,0.0820,-0.270,0.11,0.60,500 trees max_depth=20; balanced_subsample weighting
+5,XGBoost,ML model,0.0687,-0.060,0.00,0.67,Gradient boosted; hist; early-stopped; balanced sample weights
+6,XGBoost-Spatial,ML model (best),0.0666,-0.030,0.00,0.68,XGBoost + 3×3 neighbourhood mean features; closest to climatology
+7,ConvLSTM,Deep learning,0.0823,-0.270,0.22,0.52,2-layer ConvLSTM; 4 channels × 3 months; GPU recommended
