@@ -3,9 +3,9 @@
 Primary skill evaluation for the 1-month-ahead drought forecast.
 
 Methodological approach (Q1/Q2 journal standard):
-  - All PRIMARY metrics are computed at the MONTHLY level (60 independent test
+  - All PRIMARY metrics are computed at the MONTHLY level (63 independent test
     months) rather than the pixel level (~400k rows).  Pixel rows within the
-    same month are spatially autocorrelated (effective df ≈ 60, not 400k), so
+    same month are spatially autocorrelated (effective df ≈ 63, not 400k), so
     pixel-level accuracy inflates apparent significance.  Monthly aggregation
     matches the effective degrees of freedom available in the test set.
   - Proper probabilistic skill scores (BSS, HSS) are reported.  Accuracy alone
@@ -933,7 +933,7 @@ for _rlbl, _rmo in _best_test_mo.items():
 
 _ax_rel2.set_xlabel("Mean predicted probability (dry)")
 _ax_rel2.set_ylabel("Observed dry-area fraction")
-_ax_rel2.set_title("Reliability diagram — calibrated models\n(60 independent test months)")
+_ax_rel2.set_title("Reliability diagram — calibrated models\n(63 independent test months)")
 _ax_rel2.legend(fontsize=9)
 _ax_rel2.set_xlim(0, 1)
 _ax_rel2.set_ylim(0, 1)
@@ -1073,7 +1073,7 @@ print("Wrote:", csv_path)
 # ── text summary ──────────────────────────────────────────────────────────────
 summary = (
     "Forecast Skill Evaluation — Central Valley 2021–2026\n"
-    + "=" * 60 + "\n"
+    + "=" * 63 + "\n"
     f"Test months (independent temporal units): {n_months}\n"
     f"Pixels per month (spatially autocorrelated, secondary): "
     f"{len(test) // n_months:,}\n\n"

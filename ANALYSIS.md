@@ -54,7 +54,7 @@ This is a scientifically valid and publishable finding — but only if the analy
 
 **Strengths:**
 - Train (1991–2016) / val (2017–2020) / test (2021–2026) split is temporal, non-shuffled — gold standard
-- 60 independent test months is adequate for bootstrap-based inference
+- 63 independent test months is adequate for bootstrap-based inference
 - No target leakage: SPI-1[t+1] depends only on pr[t+1], which is unknown from features at t
 
 **Limitations:**
@@ -217,7 +217,7 @@ The finding that ML does not outperform climatology at 1-month lead is consisten
 
 > **"We systematically evaluate whether machine learning can improve 1-month-ahead drought prediction beyond climatological baselines."**
 >
-> We build a rigorous, leakage-free pipeline using CHIRPS v3.0 satellite precipitation and WMO-standard SPI-1. All metrics are computed at the monthly level (60 independent test months) with bootstrap uncertainty, using three naive baselines for reference. We test shallow (logistic regression, random forest), gradient-boosted (XGBoost ± spatial features), and deep learning (ConvLSTM) models.
+> We build a rigorous, leakage-free pipeline using CHIRPS v3.0 satellite precipitation and WMO-standard SPI-1. All metrics are computed at the monthly level (63 independent test months) with bootstrap uncertainty, using three naive baselines for reference. We test shallow (logistic regression, random forest), gradient-boosted (XGBoost ± spatial features), and deep learning (ConvLSTM) models.
 >
 > **Key finding:** In California's Central Valley (2021–2026), no model substantially outperforms climatology in Brier Skill Score, despite showing discrimination signal (ROC-AUC ~0.68). Brier Score decomposition reveals that models achieve negligible resolution improvement over the climatological base rate, consistent with the theoretical expectation that single-month precipitation in this Mediterranean regime is largely chaotic at 1-month lead.
 >

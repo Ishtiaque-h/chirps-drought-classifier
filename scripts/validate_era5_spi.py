@@ -433,7 +433,7 @@ print("Wrote:", plot_path)
 # ── text metrics ──────────────────────────────────────────────────────────────
 metrics_txt = (
     f"ERA5-Land Cross-Dataset Validation — Central Valley {TEST_START}–{CURRENT_YEAR}\n"
-    + "=" * 60 + "\n"
+    + "=" * 63 + "\n"
     + "Methodology: SPI-1 computed from ERA5-Land monthly precipitation using\n"
     + "  the same gamma-fit / WMO-threshold approach as the CHIRPS training data.\n"
     + "  Both products are precipitation-based → skill scores are directly comparable.\n\n"
