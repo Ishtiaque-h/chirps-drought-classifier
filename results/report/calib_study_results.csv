@@ -1,0 +1,3 @@
+model,best_calibration,val_BS_selected,test_BS,test_BSS,reliability,resolution,uncertainty,test_BS_95CI,test_BSS_95CI,p_vs_clim,p_vs_XGB
+XGB,,inf,,,,0.0,0.071,"[nan, nan]","[nan, nan]",0.0,
+XGB-Spatial,,inf,,,,0.0,0.071,"[nan, nan]","[nan, nan]",0.0,0.0

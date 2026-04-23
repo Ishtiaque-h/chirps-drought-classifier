@@ -1,0 +1,62 @@
+Forecast Skill Evaluation — Central Valley 2021–2026
+===============================================================
+Test months (independent temporal units): 63
+Pixels per month (spatially autocorrelated, secondary): 6,815
+
+METHODOLOGICAL NOTE:
+  All PRIMARY metrics below are computed at the monthly level.
+  Pixel-level metrics inflate significance due to spatial autocorrelation.
+  BSS reference = climatological class frequency from training set (1991–2016).
+
+  Dry-event Brier target = observed monthly dry-area fraction (not a majority threshold).
+  ROC-AUC uses binary 'dry-dominant month' event for ranking diagnostics only.
+
+Spatial complexity ladder:
+  Climatology → Persistence → SPI-1 threshold heuristic → XGBoost (no spatial)
+    → XGBoost-Spatial (spatial features) → ConvLSTM (spatial architecture)
+
+── Monthly-level Brier Scores (dry class) ──
+  Climatological (reference) : 0.0643
+  Persistence baseline       : 0.1018
+  SPI-1 threshold baseline   : 0.0960
+  XGBoost (no spatial)       : 0.0836
+  XGBoost-Spatial            : 0.0667
+  ConvLSTM                   : 0.1023
+  Logistic Regression        : 0.0895
+  Random Forest              : 0.0807
+
+── Brier Skill Score (BSS, dry class, ref = climatology) ──
+  Persistence         : -0.5836  (95% CI [-1.5913, 0.0150])
+  SPI-1 threshold     : -0.4937  (95% CI [-1.3286, 0.0306])
+  XGBoost (no spatial): -0.3011  (95% CI [-1.1434, 0.0790])
+  XGBoost-Spatial     : -0.0375  (95% CI [-0.1073, 0.0120])
+  ConvLSTM            : -0.5911  (95% CI [-1.7591, -0.1239])
+  Logistic Regression : -0.3920  (95% CI [-1.6319, 0.0807])
+  Random Forest       : -0.2552  (95% CI [-0.7173, -0.0108])
+
+── Heidke Skill Score (HSS, 3-class, monthly dominant class) ──
+  Climatological      : 0.0000  (95% CI [0.0000, 0.0000])
+  Persistence         : 0.0833  (95% CI [-0.1330, 0.2984])
+  SPI-1 threshold     : 0.0833  (95% CI [-0.1162, 0.3000])
+  XGBoost (no spatial): 0.1391  (95% CI [-0.0288, 0.2984])
+  XGBoost-Spatial     : 0.0000  (95% CI [0.0000, 0.0000])
+  ConvLSTM            : 0.0589  (95% CI [-0.0995, 0.2289])
+  Logistic Regression : 0.1516  (95% CI [0.0180, 0.2898])
+  Random Forest       : 0.0992  (95% CI [-0.0992, 0.3445])
+
+── ROC-AUC (dry vs. not-dry, monthly mean probability) ──
+  Persistence         : 0.5057
+  SPI-1 threshold     : 0.5091
+  XGBoost (no spatial): 0.7227
+  XGBoost-Spatial     : 0.6955
+  ConvLSTM            : 0.4136
+  Logistic Regression : 0.8000
+  Random Forest       : 0.6068
+
+Outputs:
+  outputs/forecast_monthly_cm.png
+  outputs/forecast_reliability_diagram.png
+  outputs/forecast_skill_bss_hss_table.csv
+  outputs/calib_study_results.csv (calibration study)
+  outputs/calib_study_reliability_diagram.png (calibration study)
+  outputs/calib_study_decomposition_barplot.png (calibration study)

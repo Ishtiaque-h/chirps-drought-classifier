@@ -1,0 +1,11 @@
+ERA5-Land Cross-Dataset Validation — Central Valley 2021–2026
+===============================================================
+Methodology: SPI-1 computed from ERA5-Land monthly precipitation using
+  the same gamma-fit / WMO-threshold approach as the CHIRPS training data.
+  Both products are precipitation-based → skill scores are directly comparable.
+
+Overlapping test months       : 63
+Brier Score (model, dry)      : 0.1754
+Brier Score (climatology ref) : 0.1459
+Brier Skill Score (BSS)       : -0.2024  (>0 = better than climatology)
+Heidke Skill Score (HSS)      : 0.0916  (>0 = better than random)

@@ -1,0 +1,13 @@
+USDM Consistency Check — Central Valley 2021–2026
+=======================================================
+METHODOLOGICAL NOTE:
+  This is a qualitative plausibility check, NOT a skill validation.
+  USDM D1+ integrates soil moisture, streamflow, Palmer PDSI, and
+  expert reports — fundamentally different from SPI-1 (precipitation only).
+  Any correlation is confounded by data-source differences.
+  For quantitative validation use validate_era5_spi.py (ERA5-Land SPI-1).
+=======================================================
+Comparison months : 62
+Pearson r         : 0.1889
+Model dry frac    : mean=0.246  std=0.261
+USDM D1+ frac     : mean=0.473  std=0.461
