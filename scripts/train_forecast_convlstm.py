@@ -65,7 +65,12 @@ IGNORE_IDX  = -99         # label for masked / out-of-domain pixels
 # --------------------------------------------------------------------------
 # Device
 # --------------------------------------------------------------------------
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+    device = torch.device("mps")
+else:
+    device = torch.device("cpu")
 print(f"Device: {device}")
 
 # --------------------------------------------------------------------------
@@ -78,6 +83,7 @@ X_val   = torch.from_numpy(np.load(PROC / "convlstm_X_val.npy"))
 y_val   = torch.from_numpy(np.load(PROC / "convlstm_y_val.npy"))
 X_test  = torch.from_numpy(np.load(PROC / "convlstm_X_test.npy"))
 y_test  = torch.from_numpy(np.load(PROC / "convlstm_y_test.npy"))
+meta    = np.load(PROC / "convlstm_meta.npz", allow_pickle=True)
 
 print(f"  X_train {tuple(X_train.shape)}  y_train {tuple(y_train.shape)}")
 print(f"  X_val   {tuple(X_val.shape)}    y_val   {tuple(y_val.shape)}")
@@ -380,12 +386,18 @@ torch.save(
 np.savez(
     OUT_DIR / "convlstm_test_probs.npz",
     proba=prob_arr,    # (N_test, 3, lat, lon); class axis: [dry(-1), normal(0), wet(+1)]
+    test_feature_times=meta["test_feature_times"],
+    test_target_times=meta["test_target_times"],
+    target_alignment_version=meta["target_alignment_version"],
 )
 
 np.savez(
     OUT_DIR / "convlstm_test_preds.npz",
     pred_enc=pred_enc.astype("int8"),
     true_enc=true_enc.astype("int8"),
+    test_feature_times=meta["test_feature_times"],
+    test_target_times=meta["test_target_times"],
+    target_alignment_version=meta["target_alignment_version"],
 )
 
 print("Saved outputs to", OUT_DIR)
