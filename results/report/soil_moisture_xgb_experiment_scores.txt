@@ -1,0 +1,43 @@
+ERA5-Land Soil-Moisture Feature Experiment
+============================================================
+Design: canonical SPI-1[t+1] target; regional ERA5-Land soil-water layer and root-zone monthly anomaly lags at t and t-1.
+Test months: 63
+Best iteration: 166
+Validation monthly BS by calibration: {'none': 0.088390997630538, 'isotonic': 0.06697687363530601, 'platt': 0.07006436008599407}
+Selected calibration: isotonic
+Features: ['spi1_lag1', 'spi1_lag2', 'spi1_lag3', 'spi3_lag1', 'spi6_lag1', 'pr_lag1', 'pr_lag2', 'pr_lag3', 'month_sin', 'month_cos', 'nino34_lag1', 'nino34_lag2', 'swvl1_anom_lag1', 'swvl1_anom_lag2', 'swvl2_anom_lag1', 'swvl2_anom_lag2', 'swvl3_anom_lag1', 'swvl3_anom_lag2', 'rootzone_sm_anom_lag1', 'rootzone_sm_anom_lag2']
+
+Monthly dry-fraction Brier Scores
+  Climatology              : 0.06428
+  XGBoost + soil raw         : 0.10184
+  XGBoost + soil isotonic    : 0.07444
+  XGBoost + soil platt       : 0.07200
+  XGBoost + soil selected    : 0.07444
+
+Brier Skill Score vs monthly climatology
+  XGBoost + soil raw         : -0.58431 (95% CI [-1.41972, -0.25733])
+  XGBoost + soil isotonic    : -0.15801 (95% CI [-0.37426, -0.04884])
+  XGBoost + soil platt       : -0.12012 (95% CI [-0.21919, -0.05756])
+  XGBoost + soil selected    : -0.15801 (95% CI [-0.37426, -0.04884])
+
+Pixel-level classification report (secondary diagnostic)
+              precision    recall  f1-score   support
+
+     dry(-1)      0.061     0.036     0.045     74453
+   normal(0)      0.712     0.752     0.732    298750
+     wet(+1)      0.179     0.223     0.198     56175
+
+    accuracy                          0.559    429378
+   macro avg      0.317     0.337     0.325    429378
+weighted avg      0.529     0.559     0.543    429378
+
+Pixel-level confusion matrix labels [-1, 0, 1]
+[[  2649  58215  13589]
+ [ 30088 224668  43994]
+ [ 11026  32623  12526]]
+
+Outputs:
+  /Users/ishtisdream/chirps-drought-classifier/outputs/soil_moisture_xgb_monthly_scores.csv
+  /Users/ishtisdream/chirps-drought-classifier/outputs/soil_moisture_xgb_model.json
+  /Users/ishtisdream/chirps-drought-classifier/outputs/soil_moisture_xgb_test_probs.npz
+  /Users/ishtisdream/chirps-drought-classifier/outputs/soil_moisture_xgb_feature_importance.png
