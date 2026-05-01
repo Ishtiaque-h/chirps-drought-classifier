@@ -51,8 +51,8 @@ df = pd.read_parquet(DATA)
 df["year"] = df["year"].astype(int)
 FEATURES = get_feature_columns(df.columns)
 
-train = df[df["year"] <= 2016]
-val   = df[(df["year"] >= 2017) & (df["year"] <= 2020)]
+train = df[df["year"] <= 2016].copy()
+val   = df[(df["year"] >= 2017) & (df["year"] <= 2020)].copy()
 test  = df[df["year"] >= 2021].copy()
 
 test["month_dt"] = (
@@ -62,6 +62,19 @@ test["month_dt"] = (
 assert MODEL_PATH.exists(), f"Model not found at {MODEL_PATH}. Run train_forecast_xgboost.py first."
 model = xgb.Booster()
 model.load_model(MODEL_PATH.as_posix())
+best_iteration_attr = model.attr("best_iteration")
+iteration_range = (
+    (0, int(best_iteration_attr) + 1)
+    if best_iteration_attr is not None else None
+)
+if iteration_range is not None:
+    print(f"Using XGBoost best_iteration={iteration_range[1] - 1}")
+
+
+def predict_probs(dmatrix: xgb.DMatrix) -> np.ndarray:
+    if iteration_range is None:
+        return model.predict(dmatrix)
+    return model.predict(dmatrix, iteration_range=iteration_range)
 
 # ── climatological baseline ───────────────────────────────────────────────────
 train["month_num"] = (
@@ -126,7 +139,7 @@ ALL_GROUPS = {
 # ── all-features baseline ─────────────────────────────────────────────────────
 print("Computing all-features baseline...")
 dtest_full = xgb.DMatrix(test[FEATURES], feature_names=FEATURES)
-probs_full = model.predict(dtest_full)          # (n, 3)
+probs_full = predict_probs(dtest_full)          # (n, 3)
 test["prob_dry_full"] = probs_full[:, 0]
 bss_full = monthly_bss(test, "prob_dry_full")
 print(f"  All features: BSS = {bss_full:.4f}")
@@ -141,7 +154,7 @@ for group_name, feats_to_ablate in ALL_GROUPS.items():
     for f in feats_to_ablate:
         X_abl[f] = float(train_means[f])  # replace with training mean
     dtest_abl = xgb.DMatrix(X_abl, feature_names=FEATURES)
-    probs_abl = model.predict(dtest_abl)
+    probs_abl = predict_probs(dtest_abl)
     col_name  = f"prob_dry_{group_name}"
     test[col_name] = probs_abl[:, 0]
     bss_abl   = monthly_bss(test, col_name)
