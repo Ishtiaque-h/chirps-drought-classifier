@@ -139,14 +139,32 @@ Current corrected checkpoint: Niño3.4 anomaly lags + all tabular baselines retr
 
 ### What the Model Learned
 
-Current corrected XGBoost-Spatial gain importance is dominated by the corrected climate and seasonal terms, with spatial neighborhood features adding secondary information:
+Current corrected XGBoost-Spatial SHAP importance is dominated by the corrected climate and seasonal terms, with spatial neighborhood features adding secondary information:
 
-- **`nino34_lag1/2` and `month_sin/cos` dominate gain** — large-scale climate state and target-month seasonality carry the strongest split signal.
+- **`nino34_lag1/2` and `month_sin/cos` dominate SHAP importance** — large-scale climate state and target-month seasonality carry the strongest split signal.
 - **Spatial neighborhood means add useful ranking information** — `spi1_nbr_mean`, `spi3_nbr_mean`, `spi6_nbr_mean`, and `pr_nbr_mean` improve ROC-AUC and reduce Brier error relative to non-spatial XGBoost.
 - **Precipitation lags remain useful in ablation** — removing `pr_lag1/2/3` worsens raw XGB BSS, even though the tree-gain ranking emphasizes climate/season terms.
 - **Correlated feature groups complicate interpretation** — ablation shows removing ENSO or SPI lags can improve the trained non-spatial XGB BSS, so feature importance should be read as model behavior, not causal attribution.
 
 The model captures real structure, but the structure is not strong enough to produce statistically reliable probability skill over climatology.
+
+### Seasonal SPI-3 Experiment
+
+An initial leakage-free seasonal experiment now tests SPI-3 at a 3-month lead:
+features at month `t`, target SPI-3 class at `t+3`, so the target accumulation
+window is `pr[t+1..t+3]` with no overlap. This first tabular XGBoost experiment
+does **not** improve the headline result:
+
+| Seasonal SPI-3 lead-3 forecaster | Dry BS | BSS vs. climatology | 95% CI |
+|---|---:|---:|---|
+| Climatology | 0.08313 | 0.00000 | — |
+| Persistence SPI-3 | 0.14806 | −0.78101 | [−1.58920, −0.32970] |
+| XGBoost raw | 0.11841 | −0.42434 | [−1.06569, −0.08064] |
+| XGBoost isotonic | 0.09370 | −0.12711 | [−0.26431, −0.01124] |
+
+This is a useful negative control: simply switching from SPI-1 lead-1 to a
+non-overlapping SPI-3 lead-3 target does not create positive probability skill
+in Central Valley with the current tabular feature set.
 
 ### Regional Forecast Evaluation
 
@@ -183,9 +201,9 @@ Beyond pixel-level skill, we evaluate the model's ability to predict the **domin
 Highest-impact directions (see [`ANALYSIS.md`](ANALYSIS.md) for full roadmap):
 
 1. **Expand to other regions** — Does the near-climatology barrier generalize across hydroclimates?
-2. **Seasonal target (SPI-3 / seasonal lead)** — Do longer accumulation windows improve predictability?
-3. **Temperature + VPD / soil moisture** — Does evaporative demand or land-surface memory add information beyond precipitation and ENSO?
-4. **Refresh corrected explainability** — Recompute SHAP or permutation importance for the corrected ENSO-only spatial model if feature attribution will be reported.
+2. **Temperature + VPD / soil moisture** — Does evaporative demand or land-surface memory add information beyond precipitation and ENSO?
+3. **Seasonal target variants** — The first tabular SPI-3 lead-3 experiment is negative; only extend this with spatial features or additional drivers if it serves the paper's scope.
+4. **Transfer or multi-region experiments** — A second hydroclimate is now the clearest way to test generality.
 5. **Region and season-conditioned experiments** — Current MAM/ENSO hints have CIs crossing zero; more independent months or regions are needed before claiming conditional skill.
 
 ---
@@ -221,8 +239,9 @@ python scripts/train_forecast_convlstm.py        # optional, GPU recommended
 
 # 4. Evaluate and interpret
 python scripts/evaluate_forecast_skill.py        # skill table + calibration study
+python scripts/run_spi3_seasonal_experiment.py   # optional leakage-free SPI-3 lead-3 experiment
 python scripts/evaluate_regional_forecast.py     # regional (Central Valley) dominant class accuracy
-python scripts/xgb_shap_forecast_analysis.py     # SHAP interpretation
+python scripts/xgb_shap_forecast_analysis.py --model both  # SHAP interpretation
 python scripts/validate_era5_spi.py              # cross-dataset validation
 python scripts/validate_usdm.py                  # USDM plausibility check
 python scripts/plot_spatial_skill.py             # per-pixel skill map
@@ -233,10 +252,10 @@ python scripts/plot_case_study.py                # 2021-2026 case study
 
 **Key results are saved to the `results/` folder by category:**
 
-- **[results/report/](results/report/)** — Main skill table, calibration study, reliability diagrams, case study
+- **[results/report/](results/report/)** — Main skill table, calibration study, reliability diagrams, SHAP summaries, seasonal SPI-3 experiment
 - **[results/report/](results/report/)** — Includes season/ENSO-stratified BSS CSV tables
 - **[results/spatial/](results/spatial/)** — Per-pixel accuracy maps
-- **[results/xgboost/](results/xgboost/)** — XGBoost feature importance, confusion matrix, SHAP interpretation
+- **[outputs/](outputs/)** — Full model artifacts, probability arrays, feature-importance plots, and detailed SHAP dependence plots
 - **[results/validation/](results/validation/)** — ERA5-Land and USDM cross-dataset validation
 - **[results/regional/](results/regional/)** — Regional (Central Valley) forecast evaluation
 

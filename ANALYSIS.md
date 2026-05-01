@@ -18,7 +18,7 @@ The project implements a complete, reproducible pipeline for **1-month-ahead dro
 | Model suite | ✅ Complete | LogReg, RF, XGBoost, XGBoost-Spatial, and corrected-target ConvLSTM are current on the corrected ENSO-only schema |
 | Evaluation protocol | ✅ Rigorous | Monthly-level BSS/HSS, bootstrap CI, 3 naive baselines, calibration study |
 | Calibration study | ✅ Valid (post-fix) | Isotonic regression selected; calibrated XGB-Spatial is effectively tied with climatology |
-| Explainability | ✅ Partial | SHAP exists for earlier XGB runs; corrected XGB-Spatial currently uses gain importance and should get refreshed SHAP if needed |
+| Explainability | ✅ Current | Corrected SHAP artifacts now exist for both XGBoost and XGBoost-Spatial |
 | Cross-dataset validation | ✅ Complete | ERA5-Land SPI-1 comparison |
 | Qualitative validation | ✅ Complete | USDM D1+ consistency check (correctly framed as non-metric) |
 | Spatial analysis | ✅ Complete | Per-pixel accuracy maps, Sacramento/San Joaquin sub-regions |
@@ -26,6 +26,7 @@ The project implements a complete, reproducible pipeline for **1-month-ahead dro
 | Season-conditional skill | ✅ Quantified | Raw MAM skill is positive, but bootstrap CI crosses zero and calibration removes the signal |
 | ENSO stratification | ✅ Fixed | Niño3.4 is now converted from absolute SST to anomalies; stratified rows populate correctly |
 | Feature ablation | ✅ Complete | `scripts/run_feature_ablation.py` uses early-stopped XGBoost predictions and current features |
+| Seasonal SPI-3 experiment | ✅ Initial test complete | Leakage-free SPI-3 lead-3 tabular XGBoost remains below climatology after isotonic calibration |
 
 ### Key results (corrected ENSO + spatial checkpoint — 2026-05-01)
 
@@ -50,6 +51,11 @@ The project implements a complete, reproducible pipeline for **1-month-ahead dro
 > Raw MAM BSS is positive, but the monthly bootstrap CI crosses zero. Global
 > calibration removes most of the MAM gain, and season-specific calibration
 > overfits badly with only 12 validation months per season.
+>
+> **The first seasonal target experiment is also negative.** A leakage-free
+> SPI-3 lead-3 setup (features at t, target SPI-3 ending t+3) gives calibrated
+> XGBoost BSS = -0.127 with a 95% CI below zero. Longer accumulation alone is
+> not enough for positive skill in the current Central Valley tabular setup.
 >
 > **XGB-Spatial is the best current ML option** because it has the best ranking
 > skill (ROC-AUC = 0.743) and the best calibrated Brier Score. Current evidence
@@ -222,9 +228,9 @@ The finding that ML does not reliably outperform climatology at 1-month lead is 
 | Rank | Action | Impact | Feasibility | Rationale |
 |------|--------|--------|-------------|-----------|
 | **1** | **Add 1–2 expansion regions** (Murray–Darling + Great Plains or Spain) | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | Transforms the paper from "regional case study" to "generalizable finding." CHIRPS is global — pipeline reuse is straightforward. |
-| **2** | **Seasonal target (SPI-3 at 3-month lead)** | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | Tests whether longer accumulation windows make the problem more predictable. Important for operational utility. |
-| **3** | **Add temperature/VPD or soil moisture** | ⭐⭐⭐ | ⭐⭐⭐ | Tests whether land-surface memory and evaporative demand add information beyond precipitation and ENSO. |
-| **4** | **Refresh corrected explainability** | ⭐⭐ | ⭐⭐⭐⭐ | Existing SHAP artifacts mostly reflect earlier XGBoost runs; feature attribution should be refreshed if reported. |
+| **2** | **Add temperature/VPD or soil moisture** | ⭐⭐⭐⭐ | ⭐⭐⭐ | Tests whether land-surface memory and evaporative demand add information beyond precipitation and ENSO. |
+| **3** | **Seasonal target variants with more information** | ⭐⭐⭐ | ⭐⭐⭐ | The first tabular SPI-3 lead-3 run is negative; revisit with spatial features, extra drivers, or additional regions if needed. |
+| **4** | **Refresh corrected explainability as figures evolve** | ⭐⭐ | ⭐⭐⭐⭐ | Current SHAP artifacts are refreshed; rerun only after model/schema changes. |
 | **5** | **Regional/seasonal stratified diagnostics with more months** | ⭐⭐⭐⭐ | ⭐⭐⭐ | Current MAM/ENSO hints have CIs crossing zero; more independent months or regions are needed. |
 | **6** | **Transfer learning experiment** | ⭐⭐⭐⭐ | ⭐⭐ | High novelty but requires multi-region setup. |
 
@@ -267,6 +273,11 @@ This narrative transforms a "negative result" into a **methodological and scient
    the corrected ENSO-only + XGB-Spatial result set
 7. ✅ **Auxiliary baselines refreshed** — LogReg and RF are retrained on the corrected ENSO-only
    schema and included in the current model-suite table
+8. ✅ **Corrected SHAP refreshed** — `scripts/xgb_shap_forecast_analysis.py` now supports
+   non-spatial and spatial XGBoost and writes current corrected-schema SHAP artifacts
+9. ✅ **Seasonal SPI-3 lead-3 experiment added** — `scripts/run_spi3_seasonal_experiment.py`
+   runs a non-overlapping target experiment without overwriting the canonical SPI-1 checkpoint;
+   calibrated XGBoost remains below climatology (`BSS = -0.127`, CI below zero)
 
 ### Next experiments (priority order)
 
@@ -274,20 +285,19 @@ This narrative transforms a "negative result" into a **methodological and scient
    Murray–Darling Basin, Great Plains, or Mediterranean Spain would test whether the
    near-climatology barrier is Central Valley-specific or general across hydroclimates.
 
-2. **Seasonal target / SPI-3 horizon**
-   Tests whether longer accumulation windows and longer-memory drought definitions are
-   more predictable than next-month SPI-1.
-
-3. **Add temperature/VPD or soil moisture**
+2. **Add temperature/VPD or soil moisture**
    Tests whether land-surface memory or evaporative demand can add information beyond
    precipitation and ENSO.
 
-4. **Refresh corrected explainability artifacts**
+3. **Extend seasonal SPI-3 only if needed**
+   The first leakage-free tabular SPI-3 lead-3 result is negative. A fair next
+   seasonal test would add spatial features or new exogenous drivers rather than
+   simply tuning the same tabular model.
+
+4. **Refresh corrected explainability artifacts after any model/schema change**
    ```bash
-   python scripts/xgb_shap_forecast_analysis.py
+   python scripts/xgb_shap_forecast_analysis.py --model both
    ```
-   Existing SHAP figures should be treated as historical unless regenerated against
-   the corrected ENSO-only feature schema.
 
 5. **Feature ablation / sensitivity checks**
    ```bash
