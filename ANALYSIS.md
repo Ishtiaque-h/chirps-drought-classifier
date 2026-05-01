@@ -14,45 +14,46 @@ The project implements a complete, reproducible pipeline for **1-month-ahead dro
 | Component | Status | Assessment |
 |-----------|--------|------------|
 | Data ingestion & SPI computation | ✅ Complete | WMO-standard gamma-fit SPI-1/3/6; scientifically correct |
-| Feature engineering | ✅ Complete | SPI + precipitation lags + cyclic month encoding (10 features); optional ENSO/PDO lags |
-| Model suite | ✅ Complete | LogReg, RF, XGBoost, XGBoost-Spatial, ConvLSTM |
+| Feature engineering | ✅ Complete | SPI + precipitation lags + cyclic month encoding + corrected Niño3.4 anomaly lags |
+| Model suite | ✅ Complete | LogReg, RF, XGBoost, XGBoost-Spatial, and corrected-target ConvLSTM are current on the corrected ENSO-only schema |
 | Evaluation protocol | ✅ Rigorous | Monthly-level BSS/HSS, bootstrap CI, 3 naive baselines, calibration study |
-| Calibration study | ✅ Valid (post-fix) | Isotonic regression consistently selected; calibrated BS values now well-formed |
-| Explainability | ✅ Complete | SHAP TreeExplainer (dry/normal/wet classes) |
+| Calibration study | ✅ Valid (post-fix) | Isotonic regression selected; calibrated XGB-Spatial is effectively tied with climatology |
+| Explainability | ✅ Partial | SHAP exists for earlier XGB runs; corrected XGB-Spatial currently uses gain importance and should get refreshed SHAP if needed |
 | Cross-dataset validation | ✅ Complete | ERA5-Land SPI-1 comparison |
 | Qualitative validation | ✅ Complete | USDM D1+ consistency check (correctly framed as non-metric) |
 | Spatial analysis | ✅ Complete | Per-pixel accuracy maps, Sacramento/San Joaquin sub-regions |
 | Case study | ✅ Complete | 2021–22 drought / 2023 atmospheric rivers |
-| Season-conditional skill | ✅ Partial | Positive BSS in MAM for several models; other seasons negative |
-| ENSO stratification | 🔧 Fixed | Was empty due to code bug; now loads from climate_indices_monthly.csv |
-| Feature ablation | 🆕 New | `scripts/run_feature_ablation.py` quantifies marginal contribution per feature group |
+| Season-conditional skill | ✅ Quantified | Raw MAM skill is positive, but bootstrap CI crosses zero and calibration removes the signal |
+| ENSO stratification | ✅ Fixed | Niño3.4 is now converted from absolute SST to anomalies; stratified rows populate correctly |
+| Feature ablation | ✅ Complete | `scripts/run_feature_ablation.py` uses early-stopped XGBoost predictions and current features |
 
-### Key results (canonical post-fix baseline — 2026-04-27)
+### Key results (corrected ENSO + spatial checkpoint — 2026-05-01)
 
-> **Calibration is now sane and well-formed.** Isotonic regression is consistently
-> selected over Platt scaling for both XGB and XGB-Spatial on the validation set.
-> Calibration rows previously showed `inf` values due to a timestamp-alignment bug;
-> that bug is fixed and results are now valid.
+> **Climate-index preprocessing is now sane.** PDO `-9.9` sentinels are masked,
+> recent missing PDO values are not forward-filled, and Niño3.4 absolute SST is
+> converted to monthly anomalies using the 1991–2020 climatology. The active
+> corrected checkpoint uses Niño3.4 anomaly lags only; PDO is excluded because
+> recent PDO values are missing after August 2025.
 >
-> **All overall BSS scores remain negative vs climatology.** No model outperforms
-> the climatological base rate in aggregate monthly Brier Skill Score.
+> **The best model is now a practical tie with climatology.** Raw XGB-Spatial
+> remains below climatology, but validation-selected isotonic calibration gives a
+> tiny positive point estimate (BSS = +0.005). The confidence interval crosses
+> zero, so this is not a statistically reliable positive-skill result.
 
 | Model | Best calibration | Test BS | Test BSS vs climatology |
 |-------|-----------------|---------|------------------------|
-| XGB | isotonic | 0.07905 | −0.230 |
-| XGB-Spatial | isotonic | 0.07455 | −0.160 |
+| XGB | isotonic | 0.06839 | −0.064 |
+| XGB-Spatial | isotonic | 0.06394 | +0.005 |
 | Climatology (reference) | — | 0.0643 | 0.000 |
 
-> **Strongest actionable lead: conditional skill.**
-> Season-stratified analysis shows **positive BSS in MAM** (~0.18–0.31) for several
-> models — meaningful conditional skill during the critical wet-to-dry transition.
-> ENSO-stratified analysis was previously empty due to a code bug (now fixed);
-> re-running `evaluate_forecast_skill.py` after `download_climate_indices.py` will
-> populate `forecast_skill_stratified_enso.csv`.
+> **Conditional skill is suggestive but not yet defensible.**
+> Raw MAM BSS is positive, but the monthly bootstrap CI crosses zero. Global
+> calibration removes most of the MAM gain, and season-specific calibration
+> overfits badly with only 12 validation months per season.
 >
-> **XGB-Spatial is the best ML option** (BSS = −0.160 after calibration), but still
-> below climatology in overall monthly BSS. Current evidence points to
-> information-content limits, not model-capacity limits.
+> **XGB-Spatial is the best current ML option** because it has the best ranking
+> skill (ROC-AUC = 0.743) and the best calibrated Brier Score. Current evidence
+> still points to information-content limits, not model-capacity limits.
 
 This is a scientifically valid and publishable finding — but only if the analysis is sufficiently thorough to explain **why** the predictability barrier exists and **whether it generalizes** beyond this specific region and feature set.
 
@@ -113,7 +114,8 @@ This is a scientifically valid and publishable finding — but only if the analy
 | SPI indices | spi1_lag1–3, spi3_lag1, spi6_lag1 | ✅ Core — captures multi-scale drought memory |
 | Raw precipitation | pr_lag1–3 | ✅ Useful — provides absolute magnitude information |
 | Seasonality | month_sin, month_cos | ✅ Standard cyclic encoding |
-| **Total** | **10 features** | Narrow but defensible for a pure-precipitation study |
+| ENSO | nino34_lag1–2 | ✅ Active corrected exogenous anomaly features |
+| **Total** | **12 active features** | Narrow but defensible for the corrected ENSO checkpoint |
 
 ### 3.2 What is missing and likely limiting model skill
 
@@ -121,7 +123,7 @@ This is a scientifically valid and publishable finding — but only if the analy
 
 | Feature | Source | Rationale | Feasibility |
 |---------|--------|-----------|-------------|
-| **ENSO index (Niño 3.4)** | NOAA | Central Valley precipitation has a well-documented ENSO teleconnection; La Niña winters are consistently drier. This is the single most promising predictor for improving monthly-scale skill. | High — freely available monthly time series |
+| **ENSO index (Niño 3.4)** | NOAA | Implemented as monthly anomalies. It improves calibrated XGB-Spatial to a near-tie with climatology but does not produce statistically reliable positive skill. | Complete |
 | **Temperature / VPD anomalies** | ERA5-Land or CPC | Temperature modulates drought severity through evapotranspiration; VPD amplifies agricultural drought even when precipitation is near-normal. | Medium — requires downloading ERA5-Land temperature grid |
 | **Pacific Decadal Oscillation (PDO)** | NOAA | Low-frequency modulation of California precipitation on decadal timescales. | High — freely available monthly time series |
 | **Atmospheric River count/intensity** | e.g., Gershunov et al. catalog | Central Valley precipitation extremes are driven by atmospheric rivers; their frequency and intensity are potentially predictable at sub-seasonal lead times. | Medium — requires catalog preprocessing |
@@ -134,13 +136,13 @@ This is a scientifically valid and publishable finding — but only if the analy
 | **Soil moisture** | SMAP or ERA5-Land | Direct measure of hydrological drought; provides memory that SPI does not capture | Medium |
 | **Topographic features** | SRTM DEM | Elevation, slope, and aspect modulate precipitation and drought susceptibility at sub-regional scales | High (static) |
 
-**Key insight:** The current feature set is **purely endogenous** (all features are derived from the same CHIRPS precipitation dataset used to define the target). Adding **exogenous climate drivers** (ENSO, PDO) would test a fundamentally different hypothesis: can large-scale climate state improve local drought prediction beyond what local precipitation history provides?
+**Key insight:** The current active feature set is no longer purely endogenous: it includes corrected Niño3.4 anomaly lags. That exogenous climate signal improves ranking and brings calibrated XGB-Spatial to a near-tie with climatology, but still does not produce statistically reliable positive BSS.
 
 ### 3.3 Feature engineering recommendations
 
-1. **Add ENSO Niño 3.4 index as a first experiment.** This is the lowest-effort, highest-potential-impact addition. If ENSO does not improve BSS in Central Valley, it strongly supports the "intrinsic predictability barrier" interpretation.
+1. **Treat the corrected ENSO experiment as the current checkpoint.** ENSO helps ranking and nearly closes the calibrated BSS gap, but the positive point estimate is not statistically reliable.
 2. **Add temperature/VPD** to test whether drought predictability improves when evaporative demand is included (transition from meteorological to agricultural drought framing).
-3. **Conduct a formal ablation study** on the current 10 features to quantify which provide marginal information gain.
+3. **Treat ablation cautiously.** Current ablation shows precipitation lags and seasonality help, while removing ENSO/SPI lags improves this trained XGB model. Because these features are correlated, this should be read as a trained-model diagnostic, not a causal feature-importance statement.
 
 ---
 
@@ -155,10 +157,10 @@ This is a scientifically valid and publishable finding — but only if the analy
 
 ### 4.2 Weaknesses
 
-- **Calibration is the bottleneck, not model architecture.** The gap between XGBoost-Spatial (BS = 0.067) and climatology (BS = 0.065) is tiny. Isotonic/Platt calibration has been tried but cannot create skill where discrimination is marginal. This is correct behavior — calibration cannot improve a model that does not resolve events.
-- **Model zoo without feature diversity.** Trying LR, RF, XGBoost, ConvLSTM on the same 10 features tests model architecture, not information content. If features lack predictive signal for next month's SPI-1, no architecture will help.
-- **ConvLSTM underperforms XGBoost.** This is expected when the spatial neighborhood is already captured by the 3×3 mean features in XGBoost-Spatial. The ConvLSTM's overhead (complexity, training cost) is not justified.
-- **HSS = 0 for XGBoost variants** means the model always predicts "normal" at the monthly dominant-class level — the model has learned that the safe bet is always the majority class. This is a common failure mode when class imbalance meets weak signal.
+- **Calibration is not enough by itself.** The gap between calibrated XGBoost-Spatial (BS = 0.06394) and climatology (BS = 0.0643) is tiny and statistically indistinguishable from zero. Calibration can align probabilities, but it cannot create robust resolution where monthly predictability is weak.
+- **Model zoo without feature diversity.** Trying LR, RF, XGBoost, and spatial variants on the same narrow feature family tests model architecture more than information content. If features lack predictive signal for next month's SPI-1, no architecture will help.
+- **ConvLSTM remains weaker than XGBoost-Spatial.** After fixing the target alignment and retraining, ConvLSTM improves over the stale artifact but still has negative BSS and lower ranking skill than XGBoost-Spatial.
+- **Monthly categorical skill remains weak.** LogReg, XGBoost, XGBoost-Spatial, and ConvLSTM have only small positive HSS, while RF is slightly negative. This is a common failure mode when class imbalance meets weak signal.
 
 ### 4.3 The predictability question
 
@@ -180,7 +182,7 @@ This is a **publishable scientific finding** — but only if framed correctly an
 | # | Research Question | Impact | Feasibility |
 |---|-------------------|--------|-------------|
 | 1 | **Does the predictability barrier generalize across hydroclimatic regimes?** Train and evaluate the exact same pipeline in 2–3 additional regions. If the barrier holds, this is a strong negative result with broad implications. If it breaks in some regimes, characterize what makes them different. | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
-| 2 | **Do exogenous climate drivers (ENSO, PDO) improve skill?** Add Niño 3.4 and PDO as features; measure BSS change. This directly tests whether the barrier is due to missing information vs. intrinsic chaos. | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
+| 2 | **Do additional exogenous drivers improve skill beyond corrected ENSO?** Add temperature/VPD, soil moisture, or a carefully handled PDO subset; measure whether BSS moves reliably above climatology. | ⭐⭐⭐⭐ | ⭐⭐⭐ |
 | 3 | **How does skill vary with lead time and temporal aggregation?** Evaluate at seasonal (3-month) and quarterly horizons. SPI-3 as target may be more predictable at seasonal lead. | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
 | 4 | **Is there conditional skill?** Do models outperform climatology specifically during ENSO warm/cold phases, or during winter (wet season) vs. summer? Stratified BSS analysis. | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
 | 5 | **Transfer learning: can a model trained on one region predict drought in an analogous region?** Train on Central Valley, test on Ebro Basin (or vice versa). | ⭐⭐⭐⭐ | ⭐⭐⭐ |
@@ -200,7 +202,7 @@ The project addresses a well-studied problem (ML-based drought prediction) but w
 - **Target leakage from SPI accumulation windows** — v3 correctly uses SPI-1[t+1]
 - **No uncertainty quantification** — this project includes bootstrap CI and calibration analysis
 
-The finding that ML does not outperform climatology at 1-month lead is consistent with:
+The finding that ML does not reliably outperform climatology at 1-month lead is consistent with:
 - Luo et al. (2024, *J. Hydrol.*) — found marginal ML skill for short-lead drought forecasting in China
 - AghaKouchak et al. (2023, *Rev. Geophys.*) — argued that precipitation-only indices have limited predictability at sub-seasonal scales
 - Dikshit et al. (2021, *Sci. Total Environ.*) — found that additional predictors (ENSO, soil moisture) are needed to exceed climatological baselines
@@ -219,13 +221,12 @@ The finding that ML does not outperform climatology at 1-month lead is consisten
 
 | Rank | Action | Impact | Feasibility | Rationale |
 |------|--------|--------|-------------|-----------|
-| **1** | **Add ENSO (Niño 3.4) and PDO as features** | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | Lowest effort, directly tests the key hypothesis. If it works, you have a positive skill result. If not, you strengthen the negative finding. |
-| **2** | **Add 1–2 expansion regions** (Murray–Darling + Great Plains or Spain) | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | Transforms the paper from "regional case study" to "generalizable finding." CHIRPS is global — pipeline reuse is straightforward. |
-| **3** | **Stratified skill analysis** (by ENSO phase, season, drought severity) | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | Can be done with existing data. May reveal conditional skill that is masked in overall BSS. |
-| **4** | **Seasonal target (SPI-3 at 3-month lead)** | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | Tests whether longer accumulation windows make the problem more predictable. Important for operational utility. |
-| **5** | **Ablation study on features** | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | Quick to implement; provides formal feature contribution analysis. |
-| **6** | **Add temperature/VPD features** | ⭐⭐⭐ | ⭐⭐⭐ | Tests agricultural drought framing. Requires ERA5-Land download. |
-| **7** | **Transfer learning experiment** | ⭐⭐⭐⭐ | ⭐⭐ | High novelty but requires multi-region setup (depends on #2). |
+| **1** | **Add 1–2 expansion regions** (Murray–Darling + Great Plains or Spain) | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | Transforms the paper from "regional case study" to "generalizable finding." CHIRPS is global — pipeline reuse is straightforward. |
+| **2** | **Seasonal target (SPI-3 at 3-month lead)** | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | Tests whether longer accumulation windows make the problem more predictable. Important for operational utility. |
+| **3** | **Add temperature/VPD or soil moisture** | ⭐⭐⭐ | ⭐⭐⭐ | Tests whether land-surface memory and evaporative demand add information beyond precipitation and ENSO. |
+| **4** | **Refresh corrected explainability** | ⭐⭐ | ⭐⭐⭐⭐ | Existing SHAP artifacts mostly reflect earlier XGBoost runs; feature attribution should be refreshed if reported. |
+| **5** | **Regional/seasonal stratified diagnostics with more months** | ⭐⭐⭐⭐ | ⭐⭐⭐ | Current MAM/ENSO hints have CIs crossing zero; more independent months or regions are needed. |
+| **6** | **Transfer learning experiment** | ⭐⭐⭐⭐ | ⭐⭐ | High novelty but requires multi-region setup. |
 
 ### What NOT to prioritize:
 
@@ -241,11 +242,11 @@ The finding that ML does not outperform climatology at 1-month lead is consisten
 
 > **"We systematically evaluate whether machine learning can improve 1-month-ahead drought prediction beyond climatological baselines."**
 >
-> We build a rigorous, leakage-free pipeline using CHIRPS v3.0 satellite precipitation and WMO-standard SPI-1. All metrics are computed at the monthly level (63 independent test months) with bootstrap uncertainty, using three naive baselines for reference. We test shallow (logistic regression, random forest), gradient-boosted (XGBoost ± spatial features), and deep learning (ConvLSTM) models.
+> We build a rigorous, leakage-free pipeline using CHIRPS v3.0 satellite precipitation, WMO-standard SPI-1, corrected Niño3.4 anomaly lags, and local spatial context. All metrics are computed at the monthly level (63 independent test months) with bootstrap uncertainty, using three naive baselines for reference.
 >
-> **Key finding:** In California's Central Valley (2021–2026), no model substantially outperforms climatology in Brier Skill Score, despite showing discrimination signal (ROC-AUC ~0.68). Brier Score decomposition reveals that models achieve negligible resolution improvement over the climatological base rate, consistent with the theoretical expectation that single-month precipitation in this Mediterranean regime is largely chaotic at 1-month lead.
+> **Key finding:** In California's Central Valley (2021–2026), corrected ENSO + XGBoost-Spatial nearly ties climatology in calibrated Brier Skill Score (BSS = +0.005, CI crossing zero), despite showing useful discrimination signal (ROC-AUC = 0.743). Brier Score decomposition still shows only marginal resolution improvement over the climatological base rate, consistent with the theoretical expectation that single-month precipitation in this Mediterranean regime is largely chaotic at 1-month lead.
 >
-> **Implications:** (1) ML model accuracy reported without baseline comparison systematically overstates forecast utility. (2) The predictability barrier suggests that improving drought prediction at monthly scale requires either exogenous climate drivers (ENSO, teleconnections) or longer accumulation windows (seasonal SPI-3). (3) The methodology presented here provides a template for rigorous drought ML evaluation that correctly accounts for spatial autocorrelation and class frequency.
+> **Implications:** (1) ML model accuracy reported without baseline comparison systematically overstates forecast utility. (2) ENSO and spatial context add information, but not enough for statistically reliable positive probability skill at this horizon. (3) The methodology presented here provides a template for rigorous drought ML evaluation that correctly accounts for spatial autocorrelation, class frequency, calibration, and uncertainty.
 
 This narrative transforms a "negative result" into a **methodological and scientific contribution**.
 
@@ -256,35 +257,39 @@ This narrative transforms a "negative result" into a **methodological and scient
 ### Already implemented
 1. ✅ **Rewritten README** to reflect the mature project state and ML insights
 2. ✅ **Calibration study fixed** — isotonic consistently selected; valid BS values now produced
-3. ✅ **ENSO stratification fixed** — `evaluate_forecast_skill.py` now loads `climate_indices_monthly.csv`
-   for ENSO-phase labeling even when Niño 3.4 was not a training feature
-4. ✅ **Feature ablation script** — `scripts/run_feature_ablation.py` quantifies marginal BSS
-   contribution per feature group (SPI lags, precip lags, seasonality, ENSO, PDO)
-5. ✅ **Baseline checkpoint documented** — `results/baseline_checkpoint/README.md` freezes the
-   canonical post-fix result set for comparison against future experiments
+3. ✅ **Climate-index preprocessing fixed** — PDO `-9.9` sentinels are masked, trailing missing
+   PDO is not stale-filled, and Niño3.4 absolute SST is converted to 1991–2020 monthly anomalies
+4. ✅ **ENSO stratification fixed** — stratified BSS tables now have El Niño / La Niña / Neutral rows
+   with monthly bootstrap confidence intervals
+5. ✅ **Feature ablation script fixed** — `scripts/run_feature_ablation.py` uses the early-stopped
+   XGBoost best iteration and current feature schema
+6. ✅ **Corrected checkpoint documented** — `results/corrected_enso_spatial_checkpoint/` freezes
+   the corrected ENSO-only + XGB-Spatial result set
+7. ✅ **Auxiliary baselines refreshed** — LogReg and RF are retrained on the corrected ENSO-only
+   schema and included in the current model-suite table
 
 ### Next experiments (priority order)
 
-1. **ENSO/PDO-enhanced training** *(highest priority)*
-   ```bash
-   python scripts/download_climate_indices.py
-   python scripts/build_dataset_forecast.py          # adds nino34_lag1/2, pdo_lag1/2
-   python scripts/train_forecast_xgboost.py
-   python scripts/train_forecast_xgb_spatial.py
-   python scripts/evaluate_forecast_skill.py         # ENSO-stratified output now populated
-   ```
-   *Hypothesis:* Do exogenous climate drivers move monthly dry-class BSS above climatology?
+1. **Expand to additional regions** *(highest priority)*
+   Murray–Darling Basin, Great Plains, or Mediterranean Spain would test whether the
+   near-climatology barrier is Central Valley-specific or general across hydroclimates.
 
-2. **Feature ablation** *(run against both baseline and ENSO-enhanced models)*
+2. **Seasonal target / SPI-3 horizon**
+   Tests whether longer accumulation windows and longer-memory drought definitions are
+   more predictable than next-month SPI-1.
+
+3. **Add temperature/VPD or soil moisture**
+   Tests whether land-surface memory or evaporative demand can add information beyond
+   precipitation and ENSO.
+
+4. **Refresh corrected explainability artifacts**
+   ```bash
+   python scripts/xgb_shap_forecast_analysis.py
+   ```
+   Existing SHAP figures should be treated as historical unless regenerated against
+   the corrected ENSO-only feature schema.
+
+5. **Feature ablation / sensitivity checks**
    ```bash
    python scripts/run_feature_ablation.py
    ```
-
-3. **ENSO-stratified diagnostics** — after step 1, the stratified CSV will have all three
-   ENSO-phase groups (El Niño / La Niña / Neutral) with sufficient counts for BSS comparison
-
-4. **Expand to additional regions** — Murray–Darling Basin or Great Plains to test whether
-   the predictability barrier is Central Valley-specific or universal
-
-5. **Seasonal target (SPI-3 at 3-month lead)** — tests whether longer accumulation windows
-   make the problem more predictable
