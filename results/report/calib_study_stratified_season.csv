@@ -1,0 +1,6 @@
+season,n_val_months,n_test_months,best_calibration,val_BS_selected,test_BS,test_BSS
+DJF,12,17,isotonic,0.15086,0.12221,0.0938
+MAM,12,16,isotonic,0.00227,0.13834,-0.6301
+JJA,12,15,isotonic,0.0003,0.02493,-2.48491
+SON,12,15,isotonic,0.03769,0.05461,-1.80826
+ALL_season_specific,48,63,per-season,,0.08705,-0.35429
