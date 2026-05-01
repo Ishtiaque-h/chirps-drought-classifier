@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from pathlib import Path
 from urllib.request import urlopen
+from urllib.error import URLError, HTTPError
+import socket
 import numpy as np
 import pandas as pd
 
@@ -37,7 +39,7 @@ def _fetch_text(urls: list[str]) -> str:
         try:
             with urlopen(u, timeout=30) as r:
                 return r.read().decode("utf-8", errors="replace")
-        except Exception as e:  # noqa: BLE001
+        except (URLError, HTTPError, TimeoutError, socket.timeout) as e:
             last_err = e
             continue
     raise RuntimeError(f"Failed to download from all mirrors: {urls}. Last error: {last_err}")

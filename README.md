@@ -17,7 +17,7 @@ Predicting drought 1 month ahead using only past precipitation is a hard problem
 
 ## Why This Matters
 
-- **Agricultural stakes are real.** Central Valley (35.4°–40.6°N, 122.5°–119.0°W) produces roughly 25% of the U.S. food supply; drought losses reach billions per year. [`[USGS]`](https://ca.water.usgs.gov/projects/central-valley/about-central-valley.html#:~:text=Using%20fewer%20than%201%25%20of,nuts%2C%20and%20other%20table%20foods.) One-month-ahead early warning enables pre-season irrigation scheduling and crop-stress mitigation.
+- **Agricultural stakes are real.** Central Valley (35.4°–40.6°N, 122.5°–119.0°W) produces roughly 25% of the U.S. food supply; drought losses reach billions per year. [`[USGS]`](https://ca.water.usgs.gov/projects/central-valley/about-central-valley.html) One-month-ahead early warning enables pre-season irrigation scheduling and crop-stress mitigation.
 - **Most published drought ML overstates skill.** Label leakage through SPI accumulation windows, spatial pseudo-replication, and missing baselines inflate reported accuracy. This project eliminates all three — and shows what remains. 
 - **Negative results have scientific value.** Demonstrating a predictability ceiling with rigorous evidence helps the community redirect effort toward problems where ML *can* add value (e.g., seasonal horizons, exogenous climate drivers). Operational drought early-warning relies on understanding what is and isn't predictable.
 

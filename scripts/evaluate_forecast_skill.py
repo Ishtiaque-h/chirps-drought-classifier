@@ -372,7 +372,9 @@ for ci, c in enumerate(CLASSES):
 # - normal receives residual probability near neutral conditions
 spi_now = test["spi1_lag1"].values.astype(float)
 # SPI_HEURISTIC_SCALE controls linear SPI→probability mapping:
-# prob ≈ |SPI| / SPI_HEURISTIC_SCALE before clipping (SPI=±1 → 0.5, SPI=±2 → 1.0).
+#   dry_prob_raw = clip((-SPI) / scale, 0, 1)
+#   wet_prob_raw = clip((+SPI) / scale, 0, 1)
+# so with scale=2, SPI=±1 maps to 0.5 and SPI=±2 maps to 1.0 before renormalization.
 thr_prob_dry = np.clip((-spi_now) / SPI_HEURISTIC_SCALE, 0.0, 1.0)
 thr_prob_wet = np.clip((spi_now) / SPI_HEURISTIC_SCALE, 0.0, 1.0)
 thr_prob_normal = np.clip(1.0 - thr_prob_dry - thr_prob_wet, 0.0, 1.0)
