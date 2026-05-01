@@ -166,6 +166,30 @@ This is a useful negative control: simply switching from SPI-1 lead-1 to a
 non-overlapping SPI-3 lead-3 target does not create positive probability skill
 in Central Valley with the current tabular feature set.
 
+### Temperature / VPD Experiment
+
+A separate ERA5-Land experiment adds regional 2m temperature and VPD monthly
+anomaly lags at `t` and `t-1` to the canonical SPI-1 lead-1 target. These
+features are leakage-safe because they are known at the feature month, not the
+target month.
+
+| ERA5-Land met-feature forecaster | Dry BS | BSS vs. climatology | 95% CI |
+|---|---:|---:|---|
+| Climatology | 0.06428 | 0.00000 | — |
+| XGBoost + met raw | 0.06622 | −0.03017 | [−0.45397, 0.21753] |
+| XGBoost + met isotonic | 0.07020 | −0.09217 | [−0.17743, −0.03138] |
+| XGBoost + met Platt | 0.07284 | −0.13322 | [−0.24330, −0.06439] |
+| XGBoost + met selected | 0.07020 | −0.09217 | [−0.17743, −0.03138] |
+| XGBoost-Spatial + gridded met selected | 0.06729 | −0.04678 | [−0.13215, 0.02511] |
+
+Regional VPD/temperature anomalies are highly used by the model and improve
+raw non-spatial XGBoost substantially relative to the corrected ENSO-only XGB
+run, but they still do not establish positive BSS. Spatialized ERA5-Land
+temperature/VPD anomalies also remain below climatology when added to the
+XGBoost-Spatial feature set. Validation-selected calibration chose isotonic in
+both met-feature experiments and degraded test-period skill, which is another
+sign of distribution shift in the 2021-2026 test period.
+
 ### Regional Forecast Evaluation
 
 Beyond pixel-level skill, we evaluate the model's ability to predict the **dominant drought class at the Central Valley scale**. For each month, we compute the fraction of pixels predicted as dry/normal/wet and compare the dominant class to observations. See [results/regional/](results/regional/) for dominant-class accuracy and class fraction time series.
@@ -191,7 +215,7 @@ Beyond pixel-level skill, we evaluate the model's ability to predict the **domin
 - **1-month lead is fundamentally hard:** Monthly precipitation is dominated by chaotic synoptic weather; SPI-1 autocorrelation is weak.
 - **Small test set:** 63 months yields wide confidence intervals; positive skill claims require CI spanning zero.
 - **Single region:** Cannot generalize to other hydroclimates without regional expansion.
-- **Limited exogenous drivers:** Corrected Niño3.4 anomaly lags are included; PDO is excluded from the active checkpoint because recent PDO values are missing, and temperature/VPD/soil moisture are not yet included.
+- **Limited exogenous drivers:** Corrected Niño3.4 anomaly lags are included; PDO is excluded from the active checkpoint because recent PDO values are missing. Regional and gridded ERA5-Land temperature/VPD anomalies have been tested separately, but soil moisture is not yet included.
 - **Test period non-representative:** 2021–2026 is extreme (historic drought → extreme wet).
 
 ---
@@ -201,7 +225,7 @@ Beyond pixel-level skill, we evaluate the model's ability to predict the **domin
 Highest-impact directions (see [`ANALYSIS.md`](ANALYSIS.md) for full roadmap):
 
 1. **Expand to other regions** — Does the near-climatology barrier generalize across hydroclimates?
-2. **Temperature + VPD / soil moisture** — Does evaporative demand or land-surface memory add information beyond precipitation and ENSO?
+2. **Expand land-surface drivers carefully** — Regional and gridded temperature/VPD did not beat climatology; next test should be soil moisture or a broader multi-region setup, not more tuning of the same met lags.
 3. **Seasonal target variants** — The first tabular SPI-3 lead-3 experiment is negative; only extend this with spatial features or additional drivers if it serves the paper's scope.
 4. **Transfer or multi-region experiments** — A second hydroclimate is now the clearest way to test generality.
 5. **Region and season-conditioned experiments** — Current MAM/ENSO hints have CIs crossing zero; more independent months or regions are needed before claiming conditional skill.
@@ -225,6 +249,7 @@ bash scripts/download_chirps_v3_monthly.sh
 python scripts/clip_to_cvalley_monthly.py
 python scripts/make_spi_labels.py
 python scripts/download_climate_indices.py   # optional: creates ENSO/PDO monthly file
+python scripts/download_era5_land_met_monthly.py  # optional: t2m/d2m for VPD experiment
 
 # 2. Build forecast dataset
 python scripts/build_dataset_forecast.py --climate-features nino34
@@ -240,6 +265,8 @@ python scripts/train_forecast_convlstm.py        # optional, GPU recommended
 # 4. Evaluate and interpret
 python scripts/evaluate_forecast_skill.py        # skill table + calibration study
 python scripts/run_spi3_seasonal_experiment.py   # optional leakage-free SPI-3 lead-3 experiment
+python scripts/run_met_feature_experiment.py      # optional ERA5-Land temperature/VPD experiment
+python scripts/run_met_spatial_feature_experiment.py  # optional gridded met + spatial XGB experiment
 python scripts/evaluate_regional_forecast.py     # regional (Central Valley) dominant class accuracy
 python scripts/xgb_shap_forecast_analysis.py --model both  # SHAP interpretation
 python scripts/validate_era5_spi.py              # cross-dataset validation
@@ -252,7 +279,7 @@ python scripts/plot_case_study.py                # 2021-2026 case study
 
 **Key results are saved to the `results/` folder by category:**
 
-- **[results/report/](results/report/)** — Main skill table, calibration study, reliability diagrams, SHAP summaries, seasonal SPI-3 experiment
+- **[results/report/](results/report/)** — Main skill table, calibration study, reliability diagrams, SHAP summaries, seasonal SPI-3 and met-feature experiments
 - **[results/report/](results/report/)** — Includes season/ENSO-stratified BSS CSV tables
 - **[results/spatial/](results/spatial/)** — Per-pixel accuracy maps
 - **[outputs/](outputs/)** — Full model artifacts, probability arrays, feature-importance plots, and detailed SHAP dependence plots
