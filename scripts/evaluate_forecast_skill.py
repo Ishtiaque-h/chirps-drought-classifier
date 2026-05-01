@@ -702,7 +702,7 @@ _val_mo_keys = (
 _val_obs_bin = (val[TARGET] == -1).astype(int).values
 _val_obs_mo  = (
     pd.Series((val[TARGET] == -1).astype(float).values, index=_val_mo_keys)
-    .groupby(_val_mo_keys).mean()
+    .groupby(level=0).mean()
 )  # monthly dry-area fraction, validation set
 
 # ── Optional: build XGB-Spatial validation probabilities ──────────────────────
@@ -812,12 +812,18 @@ for _mlbl, _vdp, _tdp in _calib_targets:
             _vdp_c = _apply_isotonic_cal(_fitted["isotonic"], _vdp)
 
         # --- aggregate to validation months and score ---
-        _vmo  = pd.Series(_vdp_c, index=_val_mo_keys).groupby(_val_mo_keys).mean()
+        _vmo  = pd.Series(_vdp_c, index=_val_mo_keys).groupby(level=0).mean()
         _cidx = _vmo.index.intersection(_val_obs_mo.index)
+        if len(_cidx) == 0:
+            continue
         _vbs  = brier_score(_val_obs_mo.loc[_cidx].values, _vmo.loc[_cidx].values)
-        if _vbs < _best_val_bs:
+        if np.isfinite(_vbs) and _vbs < _best_val_bs:
             _best_val_bs = _vbs
             _best_mname  = _mname
+
+    if _best_mname is None:
+        print(f"  WARNING: {_mlbl} calibration selection skipped (no valid validation monthly overlap).")
+        continue
 
     # --- apply best calibrator to test pixels ---
     if _best_mname == "none":
@@ -830,7 +836,7 @@ for _mlbl, _vdp, _tdp in _calib_targets:
     # --- aggregate to test months (aligned to the monthly DataFrame index) ---
     _tmo = (
         pd.Series(_tdp_c, index=_test_mo_keys)
-        .groupby(_test_mo_keys).mean()
+        .groupby(level=0).mean()
         .reindex(monthly["month_dt"]).values
     )
     _best_test_mo[_mlbl] = _tmo
