@@ -1107,7 +1107,7 @@ elif _CI_FILE.exists():
         _ci_raw.set_index("time")["nino34"]
         .reindex(pd.DatetimeIndex(monthly["month_dt"]))
     )
-    _ci_nino = _ci_nino.ffill().bfill()
+    _ci_nino = _ci_nino.ffill(limit=3).bfill(limit=3)
     monthly["nino34_lag1_mean"] = _ci_nino.values
     monthly["enso_phase"] = np.where(
         monthly["nino34_lag1_mean"] >= 0.5, "ElNino",
