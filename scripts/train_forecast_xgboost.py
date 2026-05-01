@@ -131,6 +131,8 @@ np.savez_compressed(
     times=test_times,
     latitude=test["latitude"].values,
     longitude=test["longitude"].values,
+    features=np.array(FEATURES),
+    best_iteration=model.best_iteration,
 )
 
 print("Wrote:", metrics_path)
