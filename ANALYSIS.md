@@ -28,6 +28,7 @@ The project implements a complete, reproducible pipeline for **1-month-ahead dro
 | Feature ablation | ✅ Complete | `scripts/run_feature_ablation.py` uses early-stopped XGBoost predictions and current features |
 | Seasonal SPI-3 experiment | ✅ Initial test complete | Leakage-free SPI-3 lead-3 tabular XGBoost remains below climatology after isotonic calibration |
 | Temperature/VPD experiment | ✅ Initial test complete | Regional ERA5-Land t2m/VPD anomalies improve raw XGB but still do not beat climatology |
+| Soil-moisture experiment | ✅ Initial test complete | Regional ERA5-Land soil-water/root-zone anomaly lags overfit and remain below climatology |
 
 ### Key results (corrected ENSO + spatial checkpoint — 2026-05-01)
 
@@ -64,6 +65,13 @@ The project implements a complete, reproducible pipeline for **1-month-ahead dro
 > temperature/VPD + XGBoost-Spatial experiment also remains below climatology
 > after validation-selected isotonic calibration (BSS = -0.047, CI crossing
 > zero). This is signal, not robust probability skill.
+>
+> **Regional soil moisture is not the missing ingredient.** ERA5-Land
+> soil-water/root-zone anomaly lags dominate split gain in a separate XGBoost
+> experiment (~68% gain share), but selected calibrated test BSS is -0.158 with
+> the CI below zero. Monthly dry-probability correlation is near zero or
+> negative on the test period, so this is overfit land-surface memory rather
+> than usable 1-month-ahead SPI-1 skill.
 >
 > **XGB-Spatial is the best current ML option** because it has the best ranking
 > skill (ROC-AUC = 0.743) and the best calibrated Brier Score. Current evidence
@@ -133,12 +141,12 @@ This is a scientifically valid and publishable finding — but only if the analy
 
 ### 3.2 What is missing and likely limiting model skill
 
-**High-priority additions (likely to improve skill):**
+**Candidate and tested additions:**
 
 | Feature | Source | Rationale | Feasibility |
 |---------|--------|-----------|-------------|
 | **ENSO index (Niño 3.4)** | NOAA | Implemented as monthly anomalies. It improves calibrated XGB-Spatial to a near-tie with climatology but does not produce statistically reliable positive skill. | Complete |
-| **Temperature / VPD anomalies** | ERA5-Land or CPC | Temperature modulates drought severity through evapotranspiration; VPD amplifies agricultural drought even when precipitation is near-normal. | Medium — requires downloading ERA5-Land temperature grid |
+| **Temperature / VPD anomalies** | ERA5-Land or CPC | Temperature modulates drought severity through evapotranspiration; VPD amplifies agricultural drought even when precipitation is near-normal. Regional and gridded initial tests add signal but do not beat climatology. | Complete initial tests |
 | **Pacific Decadal Oscillation (PDO)** | NOAA | Low-frequency modulation of California precipitation on decadal timescales. | High — freely available monthly time series |
 | **Atmospheric River count/intensity** | e.g., Gershunov et al. catalog | Central Valley precipitation extremes are driven by atmospheric rivers; their frequency and intensity are potentially predictable at sub-seasonal lead times. | Medium — requires catalog preprocessing |
 
@@ -147,7 +155,7 @@ This is a scientifically valid and publishable finding — but only if the analy
 | Feature | Source | Rationale | Feasibility |
 |---------|--------|-----------|-------------|
 | **NDVI/EVI anomalies** | MODIS (MOD13A3) | Vegetation response lags precipitation; can serve as an integrated drought indicator | Medium |
-| **Soil moisture** | SMAP or ERA5-Land | Direct measure of hydrological drought; provides memory that SPI does not capture | Medium |
+| **Soil moisture** | SMAP or ERA5-Land | Direct measure of hydrological drought; regional ERA5-Land anomaly lags overfit and do not improve SPI-1 lead-1 BSS. A gridded or SMAP variant is now secondary, not the main next step. | Initial regional test complete |
 | **Topographic features** | SRTM DEM | Elevation, slope, and aspect modulate precipitation and drought susceptibility at sub-regional scales | High (static) |
 
 **Key insight:** The current active feature set is no longer purely endogenous: it includes corrected Niño3.4 anomaly lags. That exogenous climate signal improves ranking and brings calibrated XGB-Spatial to a near-tie with climatology, but still does not produce statistically reliable positive BSS.
@@ -155,8 +163,9 @@ This is a scientifically valid and publishable finding — but only if the analy
 ### 3.3 Feature engineering recommendations
 
 1. **Treat the corrected ENSO experiment as the current checkpoint.** ENSO helps ranking and nearly closes the calibrated BSS gap, but the positive point estimate is not statistically reliable.
-2. **Add temperature/VPD** to test whether drought predictability improves when evaporative demand is included (transition from meteorological to agricultural drought framing).
+2. **Treat temperature/VPD and regional soil moisture as completed negative land-surface tests.** They add model fit, but not reliable probability skill over climatology.
 3. **Treat ablation cautiously.** Current ablation shows precipitation lags and seasonality help, while removing ENSO/SPI lags improves this trained XGB model. Because these features are correlated, this should be read as a trained-model diagnostic, not a causal feature-importance statement.
+4. **Prioritize new independent information or new regions.** For Central Valley, atmospheric-river/subseasonal predictors are more defensible than more tuning of the same lagged land-surface fields. For the paper, multi-region generalization is higher value.
 
 ---
 
@@ -196,7 +205,7 @@ This is a **publishable scientific finding** — but only if framed correctly an
 | # | Research Question | Impact | Feasibility |
 |---|-------------------|--------|-------------|
 | 1 | **Does the predictability barrier generalize across hydroclimatic regimes?** Train and evaluate the exact same pipeline in 2–3 additional regions. If the barrier holds, this is a strong negative result with broad implications. If it breaks in some regimes, characterize what makes them different. | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
-| 2 | **Do additional exogenous drivers improve skill beyond corrected ENSO?** Add temperature/VPD, soil moisture, or a carefully handled PDO subset; measure whether BSS moves reliably above climatology. | ⭐⭐⭐⭐ | ⭐⭐⭐ |
+| 2 | **Do additional exogenous drivers improve skill beyond corrected ENSO?** Temperature/VPD and regional soil moisture are now negative initial tests; remaining Central Valley candidates include atmospheric-river/circulation predictors, vegetation indices, or a carefully handled historical PDO subset. | ⭐⭐⭐⭐ | ⭐⭐ |
 | 3 | **How does skill vary with lead time and temporal aggregation?** Evaluate at seasonal (3-month) and quarterly horizons. SPI-3 as target may be more predictable at seasonal lead. | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
 | 4 | **Is there conditional skill?** Do models outperform climatology specifically during ENSO warm/cold phases, or during winter (wet season) vs. summer? Stratified BSS analysis. | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
 | 5 | **Transfer learning: can a model trained on one region predict drought in an analogous region?** Train on Central Valley, test on Ebro Basin (or vice versa). | ⭐⭐⭐⭐ | ⭐⭐⭐ |
@@ -236,11 +245,12 @@ The finding that ML does not reliably outperform climatology at 1-month lead is 
 | Rank | Action | Impact | Feasibility | Rationale |
 |------|--------|--------|-------------|-----------|
 | **1** | **Add 1–2 expansion regions** (Murray–Darling + Great Plains or Spain) | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | Transforms the paper from "regional case study" to "generalizable finding." CHIRPS is global — pipeline reuse is straightforward. |
-| **2** | **Soil moisture / land-surface memory** | ⭐⭐⭐⭐ | ⭐⭐⭐ | Regional and gridded temperature/VPD help model fit but not enough; soil moisture may better capture drought persistence. |
+| **2** | **Atmospheric-river or subseasonal circulation predictors** | ⭐⭐⭐⭐ | ⭐⭐ | Central Valley monthly extremes are event-driven; AR/circulation predictors are more physically targeted than more lagged land-surface tuning. |
 | **3** | **Seasonal target variants with more information** | ⭐⭐⭐ | ⭐⭐⭐ | The first tabular SPI-3 lead-3 run is negative; revisit with spatial features, extra drivers, or additional regions if needed. |
-| **4** | **Refresh corrected explainability as figures evolve** | ⭐⭐ | ⭐⭐⭐⭐ | Current SHAP artifacts are refreshed; rerun only after model/schema changes. |
-| **5** | **Regional/seasonal stratified diagnostics with more months** | ⭐⭐⭐⭐ | ⭐⭐⭐ | Current MAM/ENSO hints have CIs crossing zero; more independent months or regions are needed. |
-| **6** | **Transfer learning experiment** | ⭐⭐⭐⭐ | ⭐⭐ | High novelty but requires multi-region setup. |
+| **4** | **Gridded/SMAP soil-moisture sensitivity** | ⭐⭐ | ⭐⭐ | Regional ERA5-Land soil moisture overfits; only pursue this if a spatial or independent-observation formulation is needed for completeness. |
+| **5** | **Refresh corrected explainability as figures evolve** | ⭐⭐ | ⭐⭐⭐⭐ | Current SHAP artifacts are refreshed; rerun only after model/schema changes. |
+| **6** | **Regional/seasonal stratified diagnostics with more months** | ⭐⭐⭐⭐ | ⭐⭐⭐ | Current MAM/ENSO hints have CIs crossing zero; more independent months or regions are needed. |
+| **7** | **Transfer learning experiment** | ⭐⭐⭐⭐ | ⭐⭐ | High novelty but requires multi-region setup. |
 
 ### What NOT to prioritize:
 
@@ -294,6 +304,11 @@ This narrative transforms a "negative result" into a **methodological and scient
    `scripts/run_met_spatial_feature_experiment.py` interpolates gridded t2m/VPD anomaly lags
    to the CHIRPS grid and combines them with XGBoost-Spatial features; selected BSS remains
    negative (`BSS = -0.047`, CI crossing zero)
+12. ✅ **ERA5-Land soil-moisture experiment added** —
+   `scripts/download_era5_land_soil_moisture_monthly.py` downloads volumetric soil-water
+   layers, and `scripts/run_soil_moisture_feature_experiment.py` tests regional layer/root-zone
+   anomaly lags without overwriting the canonical checkpoint; validation-selected BSS remains
+   negative (`BSS = -0.158`, CI below zero)
 
 ### Next experiments (priority order)
 
@@ -301,10 +316,10 @@ This narrative transforms a "negative result" into a **methodological and scient
    Murray–Darling Basin, Great Plains, or Mediterranean Spain would test whether the
    near-climatology barrier is Central Valley-specific or general across hydroclimates.
 
-2. **Soil moisture or multi-region expansion**
-   Regional and gridded temperature/VPD anomalies help model fit but do not beat climatology.
-   A better next test is soil moisture or a broader multi-region setup rather than more
-   tuning of the same met lag features.
+2. **Build the multi-region evaluation path**
+   The Central Valley result is now robust across ENSO, spatial context, seasonal SPI-3,
+   temperature/VPD, and regional soil moisture. A second hydroclimate is the highest-value
+   next test.
 
 3. **Extend seasonal SPI-3 only if needed**
    The first leakage-free tabular SPI-3 lead-3 result is negative. A fair next
