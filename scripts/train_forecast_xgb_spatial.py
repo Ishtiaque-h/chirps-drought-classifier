@@ -188,13 +188,15 @@ model = xgb.train(
     early_stopping_rounds=50,
     verbose_eval=200,
 )
+print(f"Best iteration: {model.best_iteration}")
+iteration_range = (0, model.best_iteration + 1)
 
 # --------------------------------------------------------------------------
 # 5. Calibrate probabilities (isotonic on validation set)
 # --------------------------------------------------------------------------
 print("Calibrating XGBoost-Spatial probabilities (validation-set isotonic) ...")
-proba_val = model.predict(dval).reshape(-1, 3)
-proba_test_raw = model.predict(dtest).reshape(-1, 3)
+proba_val = model.predict(dval, iteration_range=iteration_range).reshape(-1, 3)
+proba_test_raw = model.predict(dtest, iteration_range=iteration_range).reshape(-1, 3)
 
 iso_models = []
 proba_test_cal = np.zeros_like(proba_test_raw, dtype="float32")
@@ -288,7 +290,11 @@ np.savez(
     proba=proba_test.astype("float32"),
     proba_raw=proba_test_raw.astype("float32"),
     y_true=y_true,
+    times=test["time"].values,
+    latitude=test["latitude"].values,
+    longitude=test["longitude"].values,
     features=FEATURES,
+    best_iteration=model.best_iteration,
 )
 
 # Save raw validation probabilities so that evaluate_forecast_skill.py can
@@ -298,6 +304,11 @@ np.savez(
     OUT_DIR / "xgb_spatial_val_probs.npz",
     proba_raw=proba_val.astype("float32"),
     y_val_enc=y_val_enc,
+    times=val["time"].values,
+    latitude=val["latitude"].values,
+    longitude=val["longitude"].values,
+    features=FEATURES,
+    best_iteration=model.best_iteration,
 )
 
 print("Saved outputs to", OUT_DIR)
