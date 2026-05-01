@@ -80,9 +80,13 @@ def main() -> None:
     pdo_df = _parse_psl_data(pdo_txt, "pdo")
 
     df = nino_df.merge(pdo_df, on="time", how="outer").sort_values("time")
+    # time interpolation requires a DatetimeIndex (not a plain "time" column)
+    df["time"] = pd.to_datetime(df["time"])
+    df = df.set_index("time")
     df[["nino34", "pdo"]] = df[["nino34", "pdo"]].interpolate(
         method="time", limit_direction="both"
     )
+    df = df.reset_index()
 
     OUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(OUT_FILE, index=False)
