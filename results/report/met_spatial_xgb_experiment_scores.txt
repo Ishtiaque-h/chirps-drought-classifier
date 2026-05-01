@@ -1,0 +1,43 @@
+XGBoost-Spatial + Gridded ERA5-Land Temperature/VPD Experiment
+========================================================================
+Design: canonical SPI-1[t+1] target; CHIRPS 3x3 neighborhood features; ERA5-Land t2m/VPD per-grid-cell anomaly lags interpolated to CHIRPS at t and t-1.
+Test months: 63
+Best iteration: 53
+Validation monthly BS by calibration: {'none': 0.09508427451132817, 'isotonic': 0.0679034431398098, 'platt': 0.06983571809048471}
+Selected calibration: isotonic
+Features: ['spi1_lag1', 'spi1_lag2', 'spi1_lag3', 'spi3_lag1', 'spi6_lag1', 'pr_lag1', 'pr_lag2', 'pr_lag3', 'month_sin', 'month_cos', 'nino34_lag1', 'nino34_lag2', 'spi1_nbr_mean', 'spi3_nbr_mean', 'spi6_nbr_mean', 'pr_nbr_mean', 't2m_anom_grid_lag1', 't2m_anom_grid_lag2', 'vpd_anom_grid_lag1', 'vpd_anom_grid_lag2']
+
+Monthly dry-fraction Brier Scores
+  Climatology              : 0.06428
+  XGB-Spatial + met raw      : 0.07465
+  XGB-Spatial + met isotonic : 0.06729
+  XGB-Spatial + met platt    : 0.06943
+  XGB-Spatial + met selected : 0.06729
+
+Brier Skill Score vs monthly climatology
+  XGB-Spatial + met raw      : -0.16131 (95% CI [-0.79780, 0.11952])
+  XGB-Spatial + met isotonic : -0.04678 (95% CI [-0.13215, 0.02511])
+  XGB-Spatial + met platt    : -0.08022 (95% CI [-0.15374, -0.02245])
+  XGB-Spatial + met selected : -0.04678 (95% CI [-0.13215, 0.02511])
+
+Pixel-level classification report (secondary diagnostic)
+              precision    recall  f1-score   support
+
+     dry(-1)      0.281     0.286     0.284     74453
+   normal(0)      0.677     0.604     0.639    298750
+     wet(+1)      0.191     0.297     0.232     56175
+
+    accuracy                          0.509    429378
+   macro avg      0.383     0.396     0.385    429378
+weighted avg      0.545     0.509     0.524    429378
+
+Pixel-level confusion matrix labels [-1, 0, 1]
+[[ 21278  50257   2918]
+ [ 50502 180516  67732]
+ [  3810  35706  16659]]
+
+Outputs:
+  /Users/ishtisdream/chirps-drought-classifier/outputs/met_spatial_xgb_monthly_scores.csv
+  /Users/ishtisdream/chirps-drought-classifier/outputs/met_spatial_xgb_model.json
+  /Users/ishtisdream/chirps-drought-classifier/outputs/met_spatial_xgb_test_probs.npz
+  /Users/ishtisdream/chirps-drought-classifier/outputs/met_spatial_xgb_feature_importance.png
