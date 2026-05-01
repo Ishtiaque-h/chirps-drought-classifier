@@ -46,6 +46,7 @@ import xarray as xr
 import xgboost as xgb
 import matplotlib.pyplot as plt
 from scipy.stats import gamma as gamma_dist, norm
+from feature_config import get_feature_columns
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -64,12 +65,6 @@ BASELINE_START = 1991
 BASELINE_END   = 2020
 TEST_START     = 2021
 
-FEATURES = [
-    "spi1_lag1", "spi1_lag2", "spi1_lag3",
-    "spi3_lag1", "spi6_lag1",
-    "pr_lag1", "pr_lag2", "pr_lag3",
-    "month_sin", "month_cos",
-]
 TARGET = "target_label"
 LABEL_MAP     = {-1: 0, 0: 1, 1: 2}
 INV_LABEL_MAP = {v: k for k, v in LABEL_MAP.items()}
@@ -344,6 +339,7 @@ era5_series = pd.Series(era5_monthly, name="era5_dominant")
 print("Loading XGBoost model and CHIRPS test predictions...")
 df = pd.read_parquet(DATA)
 df["year"] = df["year"].astype(int)
+FEATURES = get_feature_columns(df.columns)
 test = df[df["year"] >= TEST_START].copy()
 
 if not MODEL_PATH.exists():

@@ -62,10 +62,13 @@ graph TD;
 | `spi6_lag1` | Longer-term hydrological drought context |
 | `pr_lag1/2/3` | Raw precipitation absolute magnitude (SPI is relative to climatology) |
 | `month_sin`, `month_cos` | Cyclic encoding of the *target* month |
+| `nino34_lag1/2` *(optional)* | ENSO Niño3.4 climate-state signal at feature month and previous month |
+| `pdo_lag1/2` *(optional)* | Pacific Decadal Oscillation state at feature month and previous month |
 
 **Leakage-free target design:** The target is `SPI-1[t+1]`, which depends *only* on `pr[t+1]` — unknown at prediction time. All features are derived from time *t* or earlier. There is **zero accumulation-window overlap** between features and target. This eliminates the data leakage present in SPI-3-based targets (where 2 of 3 accumulation months overlap with features).
 
-**However**, the feature set is purely endogenous: every feature derives from the same CHIRPS precipitation used to define the target. No exogenous climate driver (ENSO, PDO), no temperature/VPD, no soil moisture, no teleconnection index is included. This is both a limitation and a controlled experimental choice — it isolates the question: can local precipitation history predict next month's drought class?
+By default the pipeline runs with endogenous CHIRPS-only features.  
+If `data/processed/climate_indices_monthly.csv` exists, ENSO/PDO lag features are added automatically (still leakage-safe because all features are at time *t* or earlier).
 
 ---
 
@@ -157,6 +160,7 @@ Beyond pixel-level skill, we evaluate the model's ability to predict the **domin
 - **Bootstrap confidence intervals** (2,000 iterations) on all skill scores
 - **Brier Score decomposition** (Murphy 1973) — identifies whether failures are due to reliability or resolution
 - **Post-hoc calibration** — Platt scaling and isotonic regression tested on validation set, applied to frozen test set
+- **Stratified skill diagnostics** — season-wise BSS and ENSO-phase BSS tables
 - **Spatial skill maps** — per-pixel accuracy over 2021-2026
 - **Case studies** — 2021–22 drought and 2023 atmospheric rivers
 - **Cross-dataset validation** — ERA5-Land SPI-1 comparison
@@ -202,6 +206,7 @@ conda activate drought-classifier
 bash scripts/download_chirps_v3_monthly.sh
 python scripts/clip_to_cvalley_monthly.py
 python scripts/make_spi_labels.py
+python scripts/download_climate_indices.py   # optional: creates ENSO/PDO monthly file
 
 # 2. Build forecast dataset
 python scripts/build_dataset_forecast.py
@@ -228,6 +233,7 @@ python scripts/plot_case_study.py                # 2021-2026 case study
 **Key results are saved to the `results/` folder by category:**
 
 - **[results/report/](results/report/)** — Main skill table, calibration study, reliability diagrams, case study
+- **[results/report/](results/report/)** — Includes season/ENSO-stratified BSS CSV tables
 - **[results/spatial/](results/spatial/)** — Per-pixel accuracy maps
 - **[results/xgboost/](results/xgboost/)** — XGBoost feature importance, confusion matrix, SHAP interpretation
 - **[results/validation/](results/validation/)** — ERA5-Land and USDM cross-dataset validation

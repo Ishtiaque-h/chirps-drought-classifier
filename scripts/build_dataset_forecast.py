@@ -20,6 +20,8 @@ Features:
   spi6_lag1                         — SPI-6 at t (6-month window ending at t)
   pr_lag1, pr_lag2, pr_lag3         — raw precipitation at t, t-1, t-2
   month_sin, month_cos              — cyclic seasonality of the TARGET month
+  nino34_lag1, nino34_lag2          — optional ENSO Niño3.4 index at t, t-1
+  pdo_lag1, pdo_lag2                — optional PDO index at t, t-1
   year                              — calendar year of the TARGET month
 
 Input:
@@ -29,6 +31,10 @@ Input:
 Output:
   data/processed/dataset_forecast.parquet
   data/processed/dataset_forecast_sample.csv   (first 10 k rows)
+
+Optional input (for exogenous features):
+  data/processed/climate_indices_monthly.csv
+  Required columns: time, nino34, pdo  (monthly rows)
 """
 from pathlib import Path
 import numpy as np
@@ -40,6 +46,7 @@ PR_FILE     = PROCESSED / "chirps_v3_monthly_cvalley_1991_2026.nc"
 SPI_FILE    = PROCESSED / "chirps_v3_monthly_cvalley_spi_1991_2026.nc"
 OUT_PARQUET = PROCESSED / "dataset_forecast.parquet"
 OUT_SAMPLE  = PROCESSED / "dataset_forecast_sample.csv"
+CLIMATE_FILE = PROCESSED / "climate_indices_monthly.csv"
 
 # ---------- load ----------
 print("Loading datasets...")
@@ -97,11 +104,51 @@ df = ds_flat.to_dataframe()
 if "time" not in df.columns:
     df = df.reset_index()
 
+df["time"] = pd.to_datetime(df["time"]).dt.to_period("M").dt.to_timestamp()
+
+# ---------- optional exogenous climate indices (ENSO / PDO) ----------
+exog_cols = []
+if CLIMATE_FILE.exists():
+    print(f"Loading climate indices: {CLIMATE_FILE}")
+    cdf = pd.read_csv(CLIMATE_FILE)
+    required = {"time", "nino34", "pdo"}
+    missing = required.difference(cdf.columns)
+    if missing:
+        raise ValueError(
+            f"{CLIMATE_FILE} is missing required columns: {sorted(missing)}"
+        )
+    cdf["time"] = pd.to_datetime(cdf["time"]).dt.to_period("M").dt.to_timestamp()
+    cdf = (
+        cdf[["time", "nino34", "pdo"]]
+        .sort_values("time")
+        .drop_duplicates(subset=["time"], keep="last")
+        .set_index("time")
+    )
+
+    all_times = pd.DatetimeIndex(sorted(df["time"].unique()))
+    cdf = cdf.reindex(all_times).sort_index()
+    cdf[["nino34", "pdo"]] = cdf[["nino34", "pdo"]].interpolate(
+        method="time", limit_direction="both"
+    )
+
+    cdf["nino34_lag1"] = cdf["nino34"]
+    cdf["nino34_lag2"] = cdf["nino34"].shift(1)
+    cdf["pdo_lag1"] = cdf["pdo"]
+    cdf["pdo_lag2"] = cdf["pdo"].shift(1)
+    cdf = cdf.drop(columns=["nino34", "pdo"])
+
+    exog_cols = ["nino34_lag1", "nino34_lag2", "pdo_lag1", "pdo_lag2"]
+    map_df = cdf.reset_index().rename(columns={"index": "time"})
+    df = df.merge(map_df[["time"] + exog_cols], on="time", how="left")
+    print(f"Added optional exogenous features: {exog_cols}")
+else:
+    print(f"Climate file not found, proceeding without exogenous features: {CLIMATE_FILE}")
+
 # ---------- drop rows where target is NaN (last time step after shift, or masked) ----------
 feat_cols = ["spi1_lag1", "spi1_lag2", "spi1_lag3",
              "spi3_lag1", "spi6_lag1",
              "pr_lag1", "pr_lag2", "pr_lag3"]
-df = df.dropna(subset=["target_label"] + feat_cols).copy()
+df = df.dropna(subset=["target_label"] + feat_cols + exog_cols).copy()
 
 # ---------- time features of the TARGET month ----------
 target_time = pd.to_datetime(df["time"]) + pd.DateOffset(months=1)
@@ -120,6 +167,7 @@ df["target_label"] = df["target_label"].astype(np.int8)
 cols = (
     ["time", "year", "month", "month_sin", "month_cos", "latitude", "longitude"]
     + feat_cols
+    + exog_cols
     + ["target_label"]
 )
 df = df[cols]

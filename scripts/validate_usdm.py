@@ -49,18 +49,13 @@ import matplotlib.pyplot as plt
 import urllib.error
 import urllib.parse
 import urllib.request
+from feature_config import get_feature_columns
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 OUT_DIR = BASE_DIR / "outputs"; OUT_DIR.mkdir(exist_ok=True)
 DATA    = BASE_DIR / "data/processed/dataset_forecast.parquet"
 MODEL   = BASE_DIR / "outputs/forecast_xgb_model.json"
 
-FEATURES = [
-    "spi1_lag1", "spi1_lag2", "spi1_lag3",
-    "spi3_lag1", "spi6_lag1",
-    "pr_lag1", "pr_lag2", "pr_lag3",
-    "month_sin", "month_cos",
-]
 TARGET = "target_label"
 label_map = {-1: 0, 0: 1, 1: 2}
 
@@ -217,6 +212,7 @@ print(f"USDM monthly records: {len(monthly_usdm)}")
 print("Loading forecast model and dataset...")
 df = pd.read_parquet(DATA)
 df["year"] = df["year"].astype(int)
+FEATURES = get_feature_columns(df.columns)
 test = df[df["year"] >= 2021].copy()
 
 model = xgb.Booster()

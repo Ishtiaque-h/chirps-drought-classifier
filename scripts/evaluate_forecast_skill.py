@@ -50,6 +50,8 @@ Inputs:
 Outputs:
   outputs/forecast_skill_scores.txt
   outputs/forecast_skill_bss_hss_table.csv
+  outputs/forecast_skill_stratified_season.csv
+  outputs/forecast_skill_stratified_enso.csv
   outputs/forecast_reliability_diagram.png
   outputs/forecast_monthly_cm.png
   outputs/calib_study_results.csv         (calibration study, new)
@@ -67,6 +69,7 @@ from sklearn.calibration import calibration_curve
 from sklearn.isotonic import IsotonicRegression
 from sklearn.linear_model import LogisticRegression as _LogisticReg  # Platt scaling
 from sklearn.metrics import roc_auc_score, confusion_matrix, ConfusionMatrixDisplay
+from feature_config import get_feature_columns
 
 DATA          = Path("data/processed/dataset_forecast.parquet")
 PROBS_NPZ     = Path("outputs/forecast_xgb_test_probs.npz")
@@ -78,12 +81,6 @@ CONVLSTM_NPZ     = Path("outputs/convlstm_test_probs.npz")
 CONVLSTM_META    = Path("data/processed/convlstm_meta.npz")
 OUT_DIR       = Path("outputs"); OUT_DIR.mkdir(exist_ok=True)
 
-FEATURES = [
-    "spi1_lag1", "spi1_lag2", "spi1_lag3",
-    "spi3_lag1", "spi6_lag1",
-    "pr_lag1", "pr_lag2", "pr_lag3",
-    "month_sin", "month_cos",
-]
 TARGET = "target_label"
 LABEL_MAP     = {-1: 0, 0: 1, 1: 2}   # XGBoost internal → class index
 INV_LABEL_MAP = {v: k for k, v in LABEL_MAP.items()}
@@ -96,6 +93,7 @@ N_BOOTSTRAP_ITERATIONS = 2000  # Standard bootstrap count for stable percentile 
 print("Loading dataset...")
 df = pd.read_parquet(DATA)
 df["year"] = df["year"].astype(int)
+FEATURES = get_feature_columns(df.columns)
 
 train = df[df["year"] <= 2016]
 val   = df[(df["year"] >= 2017) & (df["year"] <= 2020)]
@@ -1070,6 +1068,75 @@ csv_path = OUT_DIR / "forecast_skill_bss_hss_table.csv"
 table_df.to_csv(csv_path, index=False)
 print("Wrote:", csv_path)
 
+# ── Stratified monthly skill diagnostics (season + ENSO phase) ─────────────────
+monthly["season"] = monthly["month_dt"].dt.month.map({
+    12: "DJF", 1: "DJF", 2: "DJF",
+    3: "MAM", 4: "MAM", 5: "MAM",
+    6: "JJA", 7: "JJA", 8: "JJA",
+    9: "SON", 10: "SON", 11: "SON",
+})
+
+if "nino34_lag1" in test.columns:
+    monthly_nino = (
+        test.groupby("month_dt")["nino34_lag1"]
+        .mean()
+        .reindex(monthly["month_dt"])
+        .values
+    )
+    monthly["nino34_lag1_mean"] = monthly_nino
+    monthly["enso_phase"] = np.where(
+        monthly["nino34_lag1_mean"] >= 0.5, "ElNino",
+        np.where(monthly["nino34_lag1_mean"] <= -0.5, "LaNina", "Neutral"),
+    )
+else:
+    monthly["enso_phase"] = "Unavailable"
+
+def _stratified_bss(dfm: pd.DataFrame, group_col: str) -> pd.DataFrame:
+    rows = []
+    for g, grp in dfm.groupby(group_col):
+        if len(grp) < 3:
+            continue
+        obs = grp["y_true_dry_frac"].values.astype(float)
+        ref = grp["clim_dry_frac"].values.astype(float)
+        row = {
+            "stratifier": group_col,
+            "group": g,
+            "n_months": int(len(grp)),
+            "bss_xgb": bss(brier_score(obs, grp["xgb_dry_frac"].values), brier_score(obs, ref)),
+            "bss_persistence": bss(brier_score(obs, grp["persist_dry_frac"].values), brier_score(obs, ref)),
+            "bss_spi_threshold": bss(brier_score(obs, grp["thr_dry_frac"].values), brier_score(obs, ref)),
+        }
+        if HAS_XGB_SPATIAL and "xgb_spatial_dry_frac" in grp.columns:
+            row["bss_xgb_spatial"] = bss(
+                brier_score(obs, grp["xgb_spatial_dry_frac"].values),
+                brier_score(obs, ref),
+            )
+        if HAS_LOGREG and "lr_dry_frac" in grp.columns:
+            row["bss_logreg"] = bss(brier_score(obs, grp["lr_dry_frac"].values), brier_score(obs, ref))
+        if HAS_RF and "rf_dry_frac" in grp.columns:
+            row["bss_rf"] = bss(brier_score(obs, grp["rf_dry_frac"].values), brier_score(obs, ref))
+        if HAS_CONVLSTM and "convlstm_dry_frac" in grp.columns:
+            row["bss_convlstm"] = bss(
+                brier_score(obs, grp["convlstm_dry_frac"].values),
+                brier_score(obs, ref),
+            )
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+season_df = _stratified_bss(monthly, "season")
+season_csv = OUT_DIR / "forecast_skill_stratified_season.csv"
+season_df.to_csv(season_csv, index=False)
+print("Wrote:", season_csv)
+
+enso_csv = OUT_DIR / "forecast_skill_stratified_enso.csv"
+if monthly["enso_phase"].nunique() > 1:
+    enso_df = _stratified_bss(monthly, "enso_phase")
+    enso_df.to_csv(enso_csv, index=False)
+    print("Wrote:", enso_csv)
+else:
+    pd.DataFrame(columns=["stratifier", "group", "n_months"]).to_csv(enso_csv, index=False)
+    print("Wrote (placeholder):", enso_csv)
+
 # ── text summary ──────────────────────────────────────────────────────────────
 summary = (
     "Forecast Skill Evaluation — Central Valley 2021–2026\n"
@@ -1127,6 +1194,8 @@ summary = (
     f"  {calib_csv_path} (calibration study)\n"
     f"  {_rel2_path} (calibration study)\n"
     f"  {_dc_path} (calibration study)\n"
+    f"  {season_csv} (season-stratified BSS)\n"
+    f"  {enso_csv} (ENSO-phase-stratified BSS)\n"
 )
 print(summary)
 (OUT_DIR / "forecast_skill_scores.txt").write_text(summary)

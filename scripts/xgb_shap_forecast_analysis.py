@@ -21,17 +21,12 @@ import pandas as pd
 import xgboost as xgb
 import shap
 import matplotlib.pyplot as plt
+from feature_config import get_feature_columns
 
 DATA       = Path("data/processed/dataset_forecast.parquet")
 MODEL_PATH = Path("outputs/forecast_xgb_model.json")
 OUT_DIR    = Path("outputs"); OUT_DIR.mkdir(exist_ok=True)
 
-FEATURES = [
-    "spi1_lag1", "spi1_lag2", "spi1_lag3",
-    "spi3_lag1", "spi6_lag1",
-    "pr_lag1", "pr_lag2", "pr_lag3",
-    "month_sin", "month_cos",
-]
 TARGET = "target_label"
 
 label_map = {-1: 0, 0: 1, 1: 2}
@@ -41,6 +36,7 @@ DRY_IDX   = label_map[-1]   # 0
 print("Loading dataset...")
 df = pd.read_parquet(DATA)
 df["year"] = df["year"].astype(int)
+FEATURES = get_feature_columns(df.columns)
 test = df[df["year"] >= 2021]
 
 print("Loading model from:", MODEL_PATH)

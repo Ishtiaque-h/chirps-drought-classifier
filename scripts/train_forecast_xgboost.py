@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 import xgboost as xgb
 from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
 from sklearn.utils.class_weight import compute_sample_weight
+from feature_config import get_feature_columns
 
 DATA    = Path("data/processed/dataset_forecast.parquet")
 OUT_DIR = Path("outputs"); OUT_DIR.mkdir(exist_ok=True)
@@ -31,12 +32,7 @@ train = df[df["year"] <= 2016]
 val   = df[(df["year"] >= 2017) & (df["year"] <= 2020)]
 test  = df[df["year"] >= 2021]
 
-FEATURES = [
-    "spi1_lag1", "spi1_lag2", "spi1_lag3",
-    "spi3_lag1", "spi6_lag1",
-    "pr_lag1", "pr_lag2", "pr_lag3",
-    "month_sin", "month_cos",
-]
+FEATURES = get_feature_columns(df.columns)
 TARGET = "target_label"
 
 X_train, y_train = train[FEATURES], train[TARGET]

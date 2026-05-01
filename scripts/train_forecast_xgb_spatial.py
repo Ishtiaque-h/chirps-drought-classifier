@@ -44,6 +44,7 @@ from sklearn.metrics import (
     classification_report, confusion_matrix, ConfusionMatrixDisplay,
 )
 from sklearn.utils.class_weight import compute_sample_weight
+from feature_config import get_feature_columns
 
 BASE_DIR   = Path(__file__).resolve().parents[1]
 PROC       = BASE_DIR / "data" / "processed"
@@ -53,19 +54,12 @@ PARQUET    = PROC / "dataset_forecast.parquet"
 PR_FILE    = PROC / "chirps_v3_monthly_cvalley_1991_2026.nc"
 SPI_FILE   = PROC / "chirps_v3_monthly_cvalley_spi_1991_2026.nc"
 
-FEATURES_BASE = [
-    "spi1_lag1", "spi1_lag2", "spi1_lag3",
-    "spi3_lag1", "spi6_lag1",
-    "pr_lag1", "pr_lag2", "pr_lag3",
-    "month_sin", "month_cos",
-]
 FEATURES_SPATIAL = [
     "spi1_nbr_mean",
     "spi3_nbr_mean",
     "spi6_nbr_mean",
     "pr_nbr_mean",
 ]
-FEATURES = FEATURES_BASE + FEATURES_SPATIAL
 TARGET    = "target_label"
 LABEL_MAP = {-1: 0, 0: 1, 1: 2}
 
@@ -142,6 +136,7 @@ if missing > 0:
     df[FEATURES_SPATIAL] = df[FEATURES_SPATIAL].fillna(0.0)
 
 print(f"  Merged dataset shape: {df.shape}")
+FEATURES = get_feature_columns(df.columns) + FEATURES_SPATIAL
 
 # --------------------------------------------------------------------------
 # 3. Train / val / test split
