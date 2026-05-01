@@ -34,8 +34,12 @@ Output:
 
 Optional input (for exogenous features):
   data/processed/climate_indices_monthly.csv
-  Required columns: time, nino34, pdo  (monthly rows)
+  Required columns depend on --climate-features:
+    nino34 -> time, nino34
+    pdo    -> time, pdo
+    all    -> time, nino34, pdo
 """
+from argparse import ArgumentParser
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -47,6 +51,26 @@ SPI_FILE    = PROCESSED / "chirps_v3_monthly_cvalley_spi_1991_2026.nc"
 OUT_PARQUET = PROCESSED / "dataset_forecast.parquet"
 OUT_SAMPLE  = PROCESSED / "dataset_forecast_sample.csv"
 CLIMATE_FILE = PROCESSED / "climate_indices_monthly.csv"
+MISSING_SENTINELS = (-9.9, -99.99, -999.0)
+
+parser = ArgumentParser(description=__doc__)
+parser.add_argument(
+    "--no-climate-indices",
+    action="store_true",
+    help="Build the dataset with CHIRPS/SPI features only, ignoring ENSO/PDO columns.",
+)
+parser.add_argument(
+    "--climate-features",
+    choices=["all", "nino34", "pdo", "none"],
+    default="all",
+    help=(
+        "Optional climate features to merge when climate_indices_monthly.csv exists. "
+        "Use 'nino34' for ENSO-only, 'pdo' for PDO-only, or 'none' for CHIRPS/SPI only."
+    ),
+)
+args = parser.parse_args()
+if args.no_climate_indices:
+    args.climate_features = "none"
 
 # ---------- load ----------
 print("Loading datasets...")
@@ -108,10 +132,18 @@ df["time"] = pd.to_datetime(df["time"]).dt.to_period("M").dt.to_timestamp()
 
 # ---------- optional exogenous climate indices (ENSO / PDO) ----------
 exog_cols = []
-if CLIMATE_FILE.exists():
+if args.climate_features == "none":
+    print("Skipping optional ENSO/PDO features.")
+elif CLIMATE_FILE.exists():
     print(f"Loading climate indices: {CLIMATE_FILE}")
     cdf = pd.read_csv(CLIMATE_FILE)
-    required = {"time", "nino34", "pdo"}
+    selected_climate_cols = []
+    if args.climate_features in {"all", "nino34"}:
+        selected_climate_cols.append("nino34")
+    if args.climate_features in {"all", "pdo"}:
+        selected_climate_cols.append("pdo")
+
+    required = {"time", *selected_climate_cols}
     missing = required.difference(cdf.columns)
     if missing:
         raise ValueError(
@@ -119,28 +151,40 @@ if CLIMATE_FILE.exists():
         )
     cdf["time"] = pd.to_datetime(cdf["time"]).dt.to_period("M").dt.to_timestamp()
     cdf = (
-        cdf[["time", "nino34", "pdo"]]
+        cdf[["time"] + selected_climate_cols]
         .sort_values("time")
         .drop_duplicates(subset=["time"], keep="last")
         .set_index("time")
     )
+    cdf[selected_climate_cols] = cdf[selected_climate_cols].replace(
+        list(MISSING_SENTINELS), np.nan
+    )
 
     all_times = pd.DatetimeIndex(sorted(df["time"].unique()))
     cdf = cdf.reindex(all_times).sort_index()
-    cdf[["nino34", "pdo"]] = cdf[["nino34", "pdo"]].interpolate(
-        method="time", limit_direction="both"
+    cdf[selected_climate_cols] = cdf[selected_climate_cols].interpolate(
+        method="time", limit_area="inside"
     )
 
-    cdf["nino34_lag1"] = cdf["nino34"]
-    cdf["nino34_lag2"] = cdf["nino34"].shift(1)
-    cdf["pdo_lag1"] = cdf["pdo"]
-    cdf["pdo_lag2"] = cdf["pdo"].shift(1)
-    cdf = cdf.drop(columns=["nino34", "pdo"])
+    if "nino34" in selected_climate_cols:
+        cdf["nino34_lag1"] = cdf["nino34"]
+        cdf["nino34_lag2"] = cdf["nino34"].shift(1)
+        exog_cols.extend(["nino34_lag1", "nino34_lag2"])
+    if "pdo" in selected_climate_cols:
+        cdf["pdo_lag1"] = cdf["pdo"]
+        cdf["pdo_lag2"] = cdf["pdo"].shift(1)
+        exog_cols.extend(["pdo_lag1", "pdo_lag2"])
+    cdf = cdf.drop(columns=selected_climate_cols)
 
-    exog_cols = ["nino34_lag1", "nino34_lag2", "pdo_lag1", "pdo_lag2"]
     map_df = cdf.reset_index().rename(columns={"index": "time"})
     df = df.merge(map_df[["time"] + exog_cols], on="time", how="left")
     print(f"Added optional exogenous features: {exog_cols}")
+    missing_exog_rows = int(df[exog_cols].isna().any(axis=1).sum())
+    if missing_exog_rows:
+        print(
+            f"Rows with missing optional exogenous features before dropna: "
+            f"{missing_exog_rows:,}"
+        )
 else:
     print(f"Climate file not found, proceeding without exogenous features: {CLIMATE_FILE}")
 

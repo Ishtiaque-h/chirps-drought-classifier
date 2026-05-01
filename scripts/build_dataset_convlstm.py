@@ -29,7 +29,7 @@ Outputs (written to data/processed/)
   convlstm_y_val.npy
   convlstm_X_test.npy
   convlstm_y_test.npy
-  convlstm_meta.npz     — lat, lon, pr_scale, split_years, test_feature_times
+  convlstm_meta.npz     — lat, lon, pr_scale, split_years, test feature/target times
 
 Inputs
   data/processed/chirps_v3_monthly_cvalley_1991_2026.nc
@@ -48,6 +48,7 @@ SEQ_LEN    = 3          # number of lag months in each input window
 LABEL_MAP  = {-1: 0, 0: 1, 1: 2}
 TRAIN_END  = 2016       # inclusive
 VAL_END    = 2020       # inclusive; test = year >= 2021
+TARGET_ALIGNMENT_VERSION = "t_plus_1_single_shift_v2"
 
 # --------------------------------------------------------------------------
 print("Loading data ...")
@@ -139,7 +140,7 @@ def build_arrays(indices):
             X[i, s, 1] = spi3_np[ts]
             X[i, s, 2] = spi6_np[ts]
             X[i, s, 3] = pr_norm_np[ts]
-        y[i] = label_encoded[t + 1]       # target = label at t+1
+        y[i] = label_encoded[t]           # label_encoded[t] is already shifted to target t+1
     return X, y
 
 print("Building arrays ...")
@@ -174,7 +175,9 @@ np.savez(
     seq_len=SEQ_LEN,
     channels=["spi1", "spi3", "spi6", "pr_norm"],
     label_map=list(LABEL_MAP.items()),
+    target_alignment_version=TARGET_ALIGNMENT_VERSION,
     test_feature_times=np.array([times[t] for t in test_idx]),
+    test_target_times=np.array([times[t + 1] for t in test_idx]),
 )
 
 print("Done.  Files written to", PROC)
