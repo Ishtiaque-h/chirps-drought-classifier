@@ -1084,6 +1084,8 @@ monthly["season"] = monthly["month_dt"].dt.month.map({
     9: "SON", 10: "SON", 11: "SON",
 })
 
+_CI_FILE = Path("data/processed/climate_indices_monthly.csv")
+
 if "nino34_lag1" in test.columns:
     monthly_nino = (
         test.groupby("month_dt")["nino34_lag1"]
@@ -1096,8 +1098,27 @@ if "nino34_lag1" in test.columns:
         monthly["nino34_lag1_mean"] >= 0.5, "ElNino",
         np.where(monthly["nino34_lag1_mean"] <= -0.5, "LaNina", "Neutral"),
     )
+elif _CI_FILE.exists():
+    # nino34 was not a training feature but the climate-indices file is available;
+    # load it to assign ENSO phases for stratified diagnostics only (no test leakage).
+    _ci_raw = pd.read_csv(_CI_FILE)
+    _ci_raw["time"] = pd.to_datetime(_ci_raw["time"]).dt.to_period("M").dt.to_timestamp()
+    _ci_nino = (
+        _ci_raw.set_index("time")["nino34"]
+        .reindex(pd.DatetimeIndex(monthly["month_dt"]))
+    )
+    _ci_nino = _ci_nino.ffill().bfill()
+    monthly["nino34_lag1_mean"] = _ci_nino.values
+    monthly["enso_phase"] = np.where(
+        monthly["nino34_lag1_mean"] >= 0.5, "ElNino",
+        np.where(monthly["nino34_lag1_mean"] <= -0.5, "LaNina", "Neutral"),
+    )
+    print("  ENSO phase assigned from climate_indices_monthly.csv "
+          "(nino34 was not a training feature).")
 else:
     monthly["enso_phase"] = "Unavailable"
+    print("  NOTE: ENSO stratification unavailable — "
+          "run scripts/download_climate_indices.py to enable.")
 
 def _stratified_bss(dfm: pd.DataFrame, group_col: str) -> pd.DataFrame:
     rows = []

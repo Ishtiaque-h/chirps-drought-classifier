@@ -14,21 +14,45 @@ The project implements a complete, reproducible pipeline for **1-month-ahead dro
 | Component | Status | Assessment |
 |-----------|--------|------------|
 | Data ingestion & SPI computation | ✅ Complete | WMO-standard gamma-fit SPI-1/3/6; scientifically correct |
-| Feature engineering | ✅ Complete | SPI + precipitation lags + cyclic month encoding (10 features) |
+| Feature engineering | ✅ Complete | SPI + precipitation lags + cyclic month encoding (10 features); optional ENSO/PDO lags |
 | Model suite | ✅ Complete | LogReg, RF, XGBoost, XGBoost-Spatial, ConvLSTM |
 | Evaluation protocol | ✅ Rigorous | Monthly-level BSS/HSS, bootstrap CI, 3 naive baselines, calibration study |
+| Calibration study | ✅ Valid (post-fix) | Isotonic regression consistently selected; calibrated BS values now well-formed |
 | Explainability | ✅ Complete | SHAP TreeExplainer (dry/normal/wet classes) |
 | Cross-dataset validation | ✅ Complete | ERA5-Land SPI-1 comparison |
 | Qualitative validation | ✅ Complete | USDM D1+ consistency check (correctly framed as non-metric) |
 | Spatial analysis | ✅ Complete | Per-pixel accuracy maps, Sacramento/San Joaquin sub-regions |
 | Case study | ✅ Complete | 2021–22 drought / 2023 atmospheric rivers |
+| Season-conditional skill | ✅ Partial | Positive BSS in MAM for several models; other seasons negative |
+| ENSO stratification | 🔧 Fixed | Was empty due to code bug; now loads from climate_indices_monthly.csv |
+| Feature ablation | 🆕 New | `scripts/run_feature_ablation.py` quantifies marginal contribution per feature group |
 
-### Key result
+### Key results (canonical post-fix baseline — 2026-04-27)
 
-> **No model substantially outperforms climatology in monthly BSS for the dry class.**
+> **Calibration is now sane and well-formed.** Isotonic regression is consistently
+> selected over Platt scaling for both XGB and XGB-Spatial on the validation set.
+> Calibration rows previously showed `inf` values due to a timestamp-alignment bug;
+> that bug is fixed and results are now valid.
 >
-> Closest to climatology: **XGBoost-Spatial** (BSS = −0.031, BS = 0.067 vs. climatology BS = 0.065).
-> ROC-AUC shows ranking signal (~0.68), confirming that models detect *relative* drought likelihood but cannot translate this into calibrated probability improvement at the monthly level.
+> **All overall BSS scores remain negative vs climatology.** No model outperforms
+> the climatological base rate in aggregate monthly Brier Skill Score.
+
+| Model | Best calibration | Test BS | Test BSS vs climatology |
+|-------|-----------------|---------|------------------------|
+| XGB | isotonic | 0.07905 | −0.230 |
+| XGB-Spatial | isotonic | 0.07455 | −0.160 |
+| Climatology (reference) | — | 0.0643 | 0.000 |
+
+> **Strongest actionable lead: conditional skill.**
+> Season-stratified analysis shows **positive BSS in MAM** (~0.18–0.31) for several
+> models — meaningful conditional skill during the critical wet-to-dry transition.
+> ENSO-stratified analysis was previously empty due to a code bug (now fixed);
+> re-running `evaluate_forecast_skill.py` after `download_climate_indices.py` will
+> populate `forecast_skill_stratified_enso.csv`.
+>
+> **XGB-Spatial is the best ML option** (BSS = −0.160 after calibration), but still
+> below climatology in overall monthly BSS. Current evidence points to
+> information-content limits, not model-capacity limits.
 
 This is a scientifically valid and publishable finding — but only if the analysis is sufficiently thorough to explain **why** the predictability barrier exists and **whether it generalizes** beyond this specific region and feature set.
 
@@ -229,8 +253,38 @@ This narrative transforms a "negative result" into a **methodological and scient
 
 ## 9. Actionable Next Steps (Immediate)
 
-1. ✅ **Rewrite README** to reflect the mature project state and ML insights
-2. **Add Niño 3.4 feature** — download monthly ENSO index, merge into `build_dataset_forecast.py`, retrain, evaluate
-3. **Stratified BSS analysis** — add seasonal and ENSO-phase stratification to `evaluate_forecast_skill.py`
-4. **Expand to Murray–Darling Basin** — clone pipeline with new bounding box, run all stages
-5. **Draft paper outline** using the narrative framework above
+### Already implemented
+1. ✅ **Rewritten README** to reflect the mature project state and ML insights
+2. ✅ **Calibration study fixed** — isotonic consistently selected; valid BS values now produced
+3. ✅ **ENSO stratification fixed** — `evaluate_forecast_skill.py` now loads `climate_indices_monthly.csv`
+   for ENSO-phase labeling even when Niño 3.4 was not a training feature
+4. ✅ **Feature ablation script** — `scripts/run_feature_ablation.py` quantifies marginal BSS
+   contribution per feature group (SPI lags, precip lags, seasonality, ENSO, PDO)
+5. ✅ **Baseline checkpoint documented** — `results/baseline_checkpoint/README.md` freezes the
+   canonical post-fix result set for comparison against future experiments
+
+### Next experiments (priority order)
+
+1. **ENSO/PDO-enhanced training** *(highest priority)*
+   ```bash
+   python scripts/download_climate_indices.py
+   python scripts/build_dataset_forecast.py          # adds nino34_lag1/2, pdo_lag1/2
+   python scripts/train_forecast_xgboost.py
+   python scripts/train_forecast_xgb_spatial.py
+   python scripts/evaluate_forecast_skill.py         # ENSO-stratified output now populated
+   ```
+   *Hypothesis:* Do exogenous climate drivers move monthly dry-class BSS above climatology?
+
+2. **Feature ablation** *(run against both baseline and ENSO-enhanced models)*
+   ```bash
+   python scripts/run_feature_ablation.py
+   ```
+
+3. **ENSO-stratified diagnostics** — after step 1, the stratified CSV will have all three
+   ENSO-phase groups (El Niño / La Niña / Neutral) with sufficient counts for BSS comparison
+
+4. **Expand to additional regions** — Murray–Darling Basin or Great Plains to test whether
+   the predictability barrier is Central Valley-specific or universal
+
+5. **Seasonal target (SPI-3 at 3-month lead)** — tests whether longer accumulation windows
+   make the problem more predictable
