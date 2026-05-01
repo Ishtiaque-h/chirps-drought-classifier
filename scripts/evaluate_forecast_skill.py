@@ -77,6 +77,7 @@ MODEL_PATH    = Path("outputs/forecast_xgb_model.json")
 LOGREG_MODEL  = Path("outputs/forecast_logreg_model.pkl")
 RF_MODEL      = Path("outputs/forecast_rf_model.pkl")
 XGB_SPATIAL_NPZ  = Path("outputs/xgb_spatial_test_probs.npz")
+XGB_SPATIAL_VAL_NPZ = Path("outputs/xgb_spatial_val_probs.npz")
 CONVLSTM_NPZ     = Path("outputs/convlstm_test_probs.npz")
 CONVLSTM_META    = Path("data/processed/convlstm_meta.npz")
 OUT_DIR       = Path("outputs"); OUT_DIR.mkdir(exist_ok=True)
@@ -89,14 +90,73 @@ CLASS_NAMES   = ["dry(-1)", "normal(0)", "wet(+1)"]
 SPI_HEURISTIC_SCALE = 2.0      # Linear scale: SPI=±1 -> 0.5; |SPI|>2 clips to probability 1.0
 N_BOOTSTRAP_ITERATIONS = 2000  # Standard bootstrap count for stable percentile CIs
 
+
+def _best_iteration_range(booster: xgb.Booster) -> tuple[int, int] | None:
+    """Return XGBoost iteration_range for the early-stopped best iteration."""
+    best_iteration = booster.attr("best_iteration")
+    if best_iteration is None:
+        return None
+    return (0, int(best_iteration) + 1)
+
+
+def _predict_booster(booster: xgb.Booster, dmatrix: xgb.DMatrix) -> np.ndarray:
+    iteration_range = _best_iteration_range(booster)
+    if iteration_range is None:
+        return booster.predict(dmatrix)
+    return booster.predict(dmatrix, iteration_range=iteration_range)
+
+
+def _saved_probability_rows_match(
+    loaded,
+    test_df: pd.DataFrame,
+    label: str,
+    require_time_space: bool = True,
+) -> bool:
+    """Validate that saved probability rows align with the current test frame."""
+    ok = True
+
+    if "y_true" not in loaded.files:
+        print(f"WARNING: {label} probability artifact lacks y_true metadata.")
+        return False
+    if not np.array_equal(loaded["y_true"], test_df[TARGET].values):
+        print(f"WARNING: {label} probability artifact y_true metadata is stale.")
+        ok = False
+
+    checks = [
+        ("times", "time", "datetime"),
+        ("latitude", "latitude", "float"),
+        ("longitude", "longitude", "float"),
+    ]
+    for key, col, kind in checks:
+        if key not in loaded.files:
+            level = "WARNING" if require_time_space else "NOTE"
+            print(f"{level}: {label} probability artifact lacks '{key}' row metadata.")
+            if require_time_space:
+                ok = False
+            continue
+
+        if kind == "datetime":
+            saved = pd.to_datetime(loaded[key]).to_numpy(dtype="datetime64[ns]")
+            expected = pd.to_datetime(test_df[col]).to_numpy(dtype="datetime64[ns]")
+            matches = np.array_equal(saved, expected)
+        else:
+            saved = loaded[key].astype(float)
+            expected = test_df[col].to_numpy(dtype=float)
+            matches = np.allclose(saved, expected, rtol=0.0, atol=1e-8, equal_nan=True)
+        if not matches:
+            print(f"WARNING: {label} probability artifact '{key}' row metadata is stale.")
+            ok = False
+
+    return ok
+
 # ── load dataset ──────────────────────────────────────────────────────────────
 print("Loading dataset...")
 df = pd.read_parquet(DATA)
 df["year"] = df["year"].astype(int)
 FEATURES = get_feature_columns(df.columns)
 
-train = df[df["year"] <= 2016]
-val   = df[(df["year"] >= 2017) & (df["year"] <= 2020)]
+train = df[df["year"] <= 2016].copy()
+val   = df[(df["year"] >= 2017) & (df["year"] <= 2020)].copy()
 test  = df[df["year"] >= 2021].copy()
 
 # target month (the month being predicted)
@@ -105,23 +165,34 @@ test["month_dt"] = (
 ).dt.to_period("M").dt.to_timestamp()
 
 # ── load or compute XGBoost probabilities ────────────────────────────────────
+use_saved_xgb_probs = False
 if PROBS_NPZ.exists():
     print("Loading saved probabilities from", PROBS_NPZ)
     loaded      = np.load(PROBS_NPZ, allow_pickle=True)
     xgb_probs   = loaded["probs"]            # (n_rows, 3)  columns: [dry, normal, wet]
-    xgb_y_true  = loaded["y_true"]
-    # verify alignment
-    assert len(xgb_probs) == len(test), (
-        f"Saved probs length ({len(xgb_probs)}) != test rows ({len(test)}). "
-        "Retrain the model and re-run."
+    saved_features = (
+        [str(f) for f in loaded["features"]]
+        if "features" in loaded.files else None
     )
-else:
-    print("Saved probabilities not found; regenerating from model...")
+    if len(xgb_probs) != len(test):
+        print(
+            f"WARNING: Saved XGB probs length ({len(xgb_probs)}) != test rows "
+            f"({len(test)}); regenerating from model."
+        )
+    elif saved_features is not None and saved_features != FEATURES:
+        print("WARNING: Saved XGB probability feature set is stale; regenerating from model.")
+    elif not _saved_probability_rows_match(loaded, test, "XGB", require_time_space=True):
+        print("WARNING: Saved XGB probability rows are stale; regenerating from model.")
+    else:
+        use_saved_xgb_probs = True
+
+if not use_saved_xgb_probs:
+    print("Saved probabilities unavailable or stale; regenerating from model...")
     assert MODEL_PATH.exists(), f"Model not found at {MODEL_PATH}. Run train_forecast_xgboost.py first."
     model = xgb.Booster()
     model.load_model(MODEL_PATH.as_posix())
     dtest     = xgb.DMatrix(test[FEATURES], feature_names=FEATURES)
-    xgb_probs = model.predict(dtest)         # (n_rows, 3)
+    xgb_probs = _predict_booster(model, dtest)         # (n_rows, 3)
 
 # columns: index 0 = dry (-1), 1 = normal (0), 2 = wet (+1)
 test["xgb_prob_dry"]    = xgb_probs[:, 0]
@@ -137,7 +208,7 @@ model_xgb.load_model(MODEL_PATH.as_posix())
 
 val_y_enc   = val[TARGET].map(LABEL_MAP).values
 dval        = xgb.DMatrix(val[FEATURES], feature_names=FEATURES)
-val_probs   = model_xgb.predict(dval)         # (n_val, 3)
+val_probs   = _predict_booster(model_xgb, dval)         # (n_val, 3)
 
 # ── isotonic calibration on validation set (dry class) ───────────────────────
 iso_cal = IsotonicRegression(out_of_bounds="clip")
@@ -148,14 +219,18 @@ test["xgb_prob_dry_cal"] = iso_cal.predict(test["xgb_prob_dry"].values)
 # ── Logistic Regression probabilities (if model available) ───────────────────
 if LOGREG_MODEL.exists():
     print("Loading Logistic Regression model for skill comparison...")
-    logreg_pipe = joblib.load(LOGREG_MODEL)
-    lr_classes  = list(logreg_pipe.classes_)           # e.g. [-1, 0, 1]
-    lr_probs    = logreg_pipe.predict_proba(test[FEATURES])  # (n, 3)
-    for ci, c in enumerate(CLASSES):
-        col_idx = lr_classes.index(c)
-        test[f"lr_prob_{c}"] = lr_probs[:, col_idx]
-    test["lr_pred"] = logreg_pipe.predict(test[FEATURES])
-    HAS_LOGREG = True
+    try:
+        logreg_pipe = joblib.load(LOGREG_MODEL)
+        lr_classes  = list(logreg_pipe.classes_)           # e.g. [-1, 0, 1]
+        lr_probs    = logreg_pipe.predict_proba(test[FEATURES])  # (n, 3)
+        for ci, c in enumerate(CLASSES):
+            col_idx = lr_classes.index(c)
+            test[f"lr_prob_{c}"] = lr_probs[:, col_idx]
+        test["lr_pred"] = logreg_pipe.predict(test[FEATURES])
+        HAS_LOGREG = True
+    except Exception as exc:
+        print(f"WARNING: Logistic Regression model is stale/incompatible; skipping ({exc})")
+        HAS_LOGREG = False
 else:
     print("WARNING: Logistic Regression model not found at", LOGREG_MODEL)
     HAS_LOGREG = False
@@ -163,14 +238,18 @@ else:
 # ── Random Forest probabilities (if model available) ─────────────────────────
 if RF_MODEL.exists():
     print("Loading Random Forest model for skill comparison...")
-    rf_pipe    = joblib.load(RF_MODEL)
-    rf_classes = list(rf_pipe.classes_)
-    rf_probs   = rf_pipe.predict_proba(test[FEATURES])
-    for ci, c in enumerate(CLASSES):
-        col_idx = rf_classes.index(c)
-        test[f"rf_prob_{c}"] = rf_probs[:, col_idx]
-    test["rf_pred"] = rf_pipe.predict(test[FEATURES])
-    HAS_RF = True
+    try:
+        rf_pipe    = joblib.load(RF_MODEL)
+        rf_classes = list(rf_pipe.classes_)
+        rf_probs   = rf_pipe.predict_proba(test[FEATURES])
+        for ci, c in enumerate(CLASSES):
+            col_idx = rf_classes.index(c)
+            test[f"rf_prob_{c}"] = rf_probs[:, col_idx]
+        test["rf_pred"] = rf_pipe.predict(test[FEATURES])
+        HAS_RF = True
+    except Exception as exc:
+        print(f"WARNING: Random Forest model is stale/incompatible; skipping ({exc})")
+        HAS_RF = False
 else:
     print("WARNING: Random Forest model not found at", RF_MODEL)
     HAS_RF = False
@@ -179,18 +258,39 @@ else:
 if XGB_SPATIAL_NPZ.exists():
     print("Loading XGBoost-Spatial probabilities from", XGB_SPATIAL_NPZ)
     sp_loaded    = np.load(XGB_SPATIAL_NPZ, allow_pickle=True)
-    sp_probs     = sp_loaded["proba"]          # (n_rows, 3)  columns: [dry, normal, wet]
-    assert len(sp_probs) == len(test), (
-        f"XGB-Spatial probs length ({len(sp_probs)}) != test rows ({len(test)}). "
-        "Retrain the spatial model and re-run."
+    sp_probs     = (
+        sp_loaded["proba_raw"] if "proba_raw" in sp_loaded.files
+        else sp_loaded["proba"]
+    )  # raw probabilities; calibrated variants are handled by the calibration study
+    expected_spatial_features = FEATURES + [
+        "spi1_nbr_mean", "spi3_nbr_mean", "spi6_nbr_mean", "pr_nbr_mean",
+    ]
+    saved_features = (
+        [str(f) for f in sp_loaded["features"]]
+        if "features" in sp_loaded.files else None
     )
-    test["xgb_spatial_prob_dry"]    = sp_probs[:, 0]
-    test["xgb_spatial_prob_normal"] = sp_probs[:, 1]
-    test["xgb_spatial_prob_wet"]    = sp_probs[:, 2]
-    test["xgb_spatial_pred"]        = np.array(
-        [INV_LABEL_MAP[i] for i in sp_probs.argmax(axis=1)]
-    )
-    HAS_XGB_SPATIAL = True
+    if len(sp_probs) != len(test):
+        print(
+            f"WARNING: XGBoost-Spatial probs length ({len(sp_probs)}) != test rows "
+            f"({len(test)}); skipping stale probabilities."
+        )
+        HAS_XGB_SPATIAL = False
+    elif saved_features is not None and saved_features != expected_spatial_features:
+        print("WARNING: XGBoost-Spatial feature set is stale/incompatible; skipping.")
+        HAS_XGB_SPATIAL = False
+    elif not _saved_probability_rows_match(
+        sp_loaded, test, "XGBoost-Spatial", require_time_space=False
+    ):
+        print("WARNING: XGBoost-Spatial probability rows are stale/incompatible; skipping.")
+        HAS_XGB_SPATIAL = False
+    else:
+        test["xgb_spatial_prob_dry"]    = sp_probs[:, 0]
+        test["xgb_spatial_prob_normal"] = sp_probs[:, 1]
+        test["xgb_spatial_prob_wet"]    = sp_probs[:, 2]
+        test["xgb_spatial_pred"]        = np.array(
+            [INV_LABEL_MAP[i] for i in sp_probs.argmax(axis=1)]
+        )
+        HAS_XGB_SPATIAL = True
 else:
     print("WARNING: XGBoost-Spatial probs not found at", XGB_SPATIAL_NPZ)
     HAS_XGB_SPATIAL = False
@@ -199,18 +299,65 @@ else:
 HAS_CONVLSTM = False
 if CONVLSTM_NPZ.exists() and CONVLSTM_META.exists():
     cl_meta = np.load(CONVLSTM_META, allow_pickle=True)
+    cl_proba = None
     if "test_feature_times" not in cl_meta:
-        print("WARNING: convlstm_meta.npz is missing 'test_feature_times'. "
-              "Re-run build_dataset_convlstm.py to regenerate meta.")
+        print("WARNING: convlstm_meta.npz is missing 'test_feature_times'; "
+              "skipping stale ConvLSTM artifact. Re-run build_dataset_convlstm.py.")
+    elif "test_target_times" not in cl_meta:
+        print("WARNING: convlstm_meta.npz is missing 'test_target_times'; "
+              "skipping stale ConvLSTM artifact from before the target-alignment fix. "
+              "Re-run build_dataset_convlstm.py and train_forecast_convlstm.py.")
+    elif "target_alignment_version" not in cl_meta:
+        print("WARNING: convlstm_meta.npz is missing target alignment version; "
+              "skipping ConvLSTM artifact. Re-run build_dataset_convlstm.py.")
     else:
         print("Loading ConvLSTM probabilities from", CONVLSTM_NPZ)
         cl_loaded  = np.load(CONVLSTM_NPZ, allow_pickle=True)
-        cl_proba   = cl_loaded["proba"]                       # (N_test, 3, lat, lon)
-        cl_lat     = cl_meta["lat"]                           # (nlat,)
-        cl_lon     = cl_meta["lon"]                           # (nlon,)
-        cl_times   = pd.to_datetime(cl_meta["test_feature_times"])  # (N_test,)
+        if "target_alignment_version" not in cl_loaded.files:
+            print("WARNING: ConvLSTM probabilities lack target alignment version; "
+                  "skipping stale artifact. Re-run train_forecast_convlstm.py.")
+            cl_proba = None
+        elif str(cl_loaded["target_alignment_version"]) != str(cl_meta["target_alignment_version"]):
+            print("WARNING: ConvLSTM probability target alignment version does not "
+                  "match metadata; skipping stale artifact.")
+            cl_proba = None
+        elif "test_feature_times" not in cl_loaded.files or "test_target_times" not in cl_loaded.files:
+            print("WARNING: ConvLSTM probabilities lack time metadata; "
+                  "skipping stale artifact. Re-run train_forecast_convlstm.py.")
+            cl_proba = None
+        else:
+            cl_proba   = cl_loaded["proba"]                       # (N_test, 3, lat, lon)
+            cl_lat     = cl_meta["lat"]                           # (nlat,)
+            cl_lon     = cl_meta["lon"]                           # (nlon,)
+            cl_times   = pd.to_datetime(cl_loaded["test_feature_times"])  # (N_test,)
+            cl_targets = pd.to_datetime(cl_loaded["test_target_times"])
 
-        N_cl, _, nlat, nlon = cl_proba.shape
+            N_cl, _, nlat, nlon = cl_proba.shape
+            expected_feature_times = pd.DatetimeIndex(
+                sorted(pd.to_datetime(test["time"]).unique())
+            )
+            expected_target_times = pd.DatetimeIndex(
+                sorted(pd.to_datetime(test["month_dt"]).unique())
+            )
+            valid_convlstm_meta = True
+            if N_cl != len(cl_times):
+                print("WARNING: ConvLSTM probability count does not match feature-time metadata; skipping.")
+                valid_convlstm_meta = False
+            if not cl_times.equals(expected_feature_times):
+                print("WARNING: ConvLSTM feature-time metadata does not match current test split; skipping.")
+                valid_convlstm_meta = False
+            if not cl_targets.equals(expected_target_times):
+                print("WARNING: ConvLSTM target-time metadata does not match current test split; skipping.")
+                valid_convlstm_meta = False
+            if not valid_convlstm_meta:
+                cl_proba = None
+
+    if (
+        "test_feature_times" in cl_meta
+        and "test_target_times" in cl_meta
+        and "target_alignment_version" in cl_meta
+        and cl_proba is not None
+    ):
         # Compute per-pixel argmax prediction: (N_test, nlat, nlon) encoded {0,1,2}
         cl_pred_enc = cl_proba.argmax(axis=1)
         _inv_enc    = {0: -1, 1: 0, 2: 1}
@@ -716,7 +863,38 @@ _FEAT_WITH_SP    = FEATURES + _SPATIAL_FEAT  # full feature list including spati
 
 _sp_val_dry = None  # (n_val_pixels,) dry-class prob — filled below when possible
 
-if (HAS_XGB_SPATIAL and _XGB_SP_MDL_PATH.exists()
+if HAS_XGB_SPATIAL and XGB_SPATIAL_VAL_NPZ.exists():
+    try:
+        print("  Calibration study: loading XGB-Spatial validation probabilities ...")
+        _spv_loaded = np.load(XGB_SPATIAL_VAL_NPZ, allow_pickle=True)
+        _spv_probs = _spv_loaded["proba_raw"]
+        _spv_y_enc = _spv_loaded["y_val_enc"]
+        _spv_features = (
+            [str(f) for f in _spv_loaded["features"]]
+            if "features" in _spv_loaded.files else None
+        )
+        if len(_spv_probs) != len(val):
+            raise ValueError(
+                f"saved validation probs length {len(_spv_probs)} != val rows {len(val)}"
+            )
+        if not np.array_equal(_spv_y_enc, val_y_enc):
+            raise ValueError("saved validation labels do not match current validation split")
+        if _spv_features is not None and _spv_features != _FEAT_WITH_SP:
+            raise ValueError("saved validation feature set does not match current schema")
+        if _spv_features is None:
+            print("  NOTE: XGB-Spatial saved val probs lack feature metadata; "
+                  "retrain spatial model to add it.")
+        for _key in ("times", "latitude", "longitude"):
+            if _key not in _spv_loaded.files:
+                print(f"  NOTE: XGB-Spatial saved val probs lack '{_key}' metadata; "
+                      "retrain spatial model to add full row checks.")
+        _sp_val_dry = _spv_probs.reshape(-1, 3)[:, 0]
+        print(f"  XGB-Spatial saved val probs ready ({len(_sp_val_dry)} pixels).")
+    except Exception as _exc:
+        print(f"  WARNING: Saved XGB-Spatial val probs unavailable/stale ({_exc}).")
+        _sp_val_dry = None
+
+if (_sp_val_dry is None and HAS_XGB_SPATIAL and _XGB_SP_MDL_PATH.exists()
         and _SPI_NC_PATH.exists() and _PR_NC_PATH.exists()):
     try:
         import xarray as xr
@@ -769,7 +947,7 @@ if (HAS_XGB_SPATIAL and _XGB_SP_MDL_PATH.exists()
         _spm  = xgb.Booster()
         _spm.load_model(_XGB_SP_MDL_PATH.as_posix())
         _dvsp = xgb.DMatrix(_vsp[_FEAT_WITH_SP], feature_names=_FEAT_WITH_SP)
-        _sp_val_dry = _spm.predict(_dvsp).reshape(-1, 3)[:, 0]
+        _sp_val_dry = _predict_booster(_spm, _dvsp).reshape(-1, 3)[:, 0]
         print(f"  XGB-Spatial val probs ready ({len(_sp_val_dry)} pixels).")
     except Exception as _exc:
         print(f"  WARNING: Calibration study — XGB-Spatial val probs unavailable ({_exc}).")
@@ -902,6 +1080,14 @@ if not np.isnan(_p_sp_vs_xgb) and len(_cdf) >= 2:
 calib_csv_path = OUT_DIR / "calib_study_results.csv"
 _cdf.to_csv(calib_csv_path, index=False)
 print(f"  Wrote: {calib_csv_path}")
+
+# Attach validation-selected calibrated monthly probabilities for downstream
+# stratified diagnostics.
+for _mlbl, _mo in _best_test_mo.items():
+    if _mlbl == "XGB":
+        monthly["xgb_calibrated_dry_frac"] = _mo
+    elif _mlbl == "XGB-Spatial":
+        monthly["xgb_spatial_calibrated_dry_frac"] = _mo
 
 
 # ── Figure 1: Reliability diagram for calibrated XGB models (monthly level) ───
@@ -1085,22 +1271,14 @@ monthly["season"] = monthly["month_dt"].dt.month.map({
 })
 
 _CI_FILE = Path("data/processed/climate_indices_monthly.csv")
+_enso_source = "dataset" if "nino34_lag1" in test.columns else "unavailable"
+_enso_file_read = False
 
-if "nino34_lag1" in test.columns:
-    monthly_nino = (
-        test.groupby("month_dt")["nino34_lag1"]
-        .mean()
-        .reindex(monthly["month_dt"])
-        .values
-    )
-    monthly["nino34_lag1_mean"] = monthly_nino
-    monthly["enso_phase"] = np.where(
-        monthly["nino34_lag1_mean"] >= 0.5, "ElNino",
-        np.where(monthly["nino34_lag1_mean"] <= -0.5, "LaNina", "Neutral"),
-    )
-elif _CI_FILE.exists():
-    # nino34 was not a training feature but the climate-indices file is available;
-    # load it to assign ENSO phases for stratified diagnostics only (no test leakage).
+if _CI_FILE.exists():
+    # Use target-month Niño3.4 for stratified diagnostics, independent of whether
+    # Niño3.4 was used as a lagged training feature.
+    _enso_source = _CI_FILE.as_posix()
+    _enso_file_read = True
     _ci_raw = pd.read_csv(_CI_FILE)
     _ci_raw["time"] = pd.to_datetime(_ci_raw["time"]).dt.to_period("M").dt.to_timestamp()
     _ci_nino = (
@@ -1113,16 +1291,179 @@ elif _CI_FILE.exists():
         monthly["nino34_lag1_mean"] >= 0.5, "ElNino",
         np.where(monthly["nino34_lag1_mean"] <= -0.5, "LaNina", "Neutral"),
     )
-    print("  ENSO phase assigned from climate_indices_monthly.csv "
-          "(nino34 was not a training feature).")
+    print("  ENSO phase assigned from climate_indices_monthly.csv.")
+elif "nino34_lag1" in test.columns:
+    monthly_nino = (
+        test.groupby("month_dt")["nino34_lag1"]
+        .mean()
+        .reindex(monthly["month_dt"])
+        .values
+    )
+    monthly["nino34_lag1_mean"] = monthly_nino
+    monthly["enso_phase"] = np.where(
+        monthly["nino34_lag1_mean"] >= 0.5, "ElNino",
+        np.where(monthly["nino34_lag1_mean"] <= -0.5, "LaNina", "Neutral"),
+    )
+    print("  ENSO phase assigned from lagged dataset feature "
+          "(climate_indices_monthly.csv unavailable).")
 else:
     monthly["enso_phase"] = "Unavailable"
     print("  NOTE: ENSO stratification unavailable — "
           "run scripts/download_climate_indices.py to enable.")
 
-def _stratified_bss(dfm: pd.DataFrame, group_col: str) -> pd.DataFrame:
+print(
+    "  ENSO stratification debug: "
+    f"source={_enso_source}, climate_file_exists={_CI_FILE.exists()}, "
+    f"climate_file_read={_enso_file_read}, "
+    f"enso_phase_counts={monthly['enso_phase'].value_counts(dropna=False).to_dict()}, "
+    f"nunique={monthly['enso_phase'].nunique(dropna=False)}"
+)
+
+
+def _season_specific_xgb_calibration() -> pd.DataFrame:
+    """Fit/select XGB dry-probability calibrators separately by target season."""
     rows = []
-    for g, grp in dfm.groupby(group_col):
+    test_pred_by_month = pd.Series(
+        index=pd.DatetimeIndex(monthly["month_dt"]), dtype=float
+    )
+    val_target_season = _val_mo_keys.dt.month.map({
+        12: "DJF", 1: "DJF", 2: "DJF",
+        3: "MAM", 4: "MAM", 5: "MAM",
+        6: "JJA", 7: "JJA", 8: "JJA",
+        9: "SON", 10: "SON", 11: "SON",
+    }).values
+    test_target_season = pd.to_datetime(test["month_dt"]).dt.month.map({
+        12: "DJF", 1: "DJF", 2: "DJF",
+        3: "MAM", 4: "MAM", 5: "MAM",
+        6: "JJA", 7: "JJA", 8: "JJA",
+        9: "SON", 10: "SON", 11: "SON",
+    }).values
+
+    for season in ["DJF", "MAM", "JJA", "SON"]:
+        vmask = val_target_season == season
+        tmask = test_target_season == season
+        if not vmask.any() or not tmask.any():
+            continue
+
+        vdp = val_probs[:, 0][vmask]
+        vobs = _val_obs_bin[vmask]
+        val_mo_keys_s = _val_mo_keys[vmask]
+        val_obs_mo_s = (
+            pd.Series(vobs.astype(float), index=val_mo_keys_s)
+            .groupby(level=0)
+            .mean()
+        )
+
+        fitted: dict = {}
+        candidates: list[tuple[str, float]] = []
+        for method in ("none", "platt", "isotonic"):
+            try:
+                if method == "none":
+                    fitted[method] = None
+                    vdp_c = vdp.copy()
+                elif method == "platt":
+                    fitted[method] = _fit_platt(vdp, vobs)
+                    vdp_c = _apply_platt(fitted[method], vdp)
+                else:
+                    fitted[method] = _fit_isotonic_cal(vdp, vobs)
+                    vdp_c = _apply_isotonic_cal(fitted[method], vdp)
+                vmo = pd.Series(vdp_c, index=val_mo_keys_s).groupby(level=0).mean()
+                common_idx = vmo.index.intersection(val_obs_mo_s.index)
+                if len(common_idx) == 0:
+                    continue
+                val_bs = brier_score(
+                    val_obs_mo_s.loc[common_idx].values,
+                    vmo.loc[common_idx].values,
+                )
+                if np.isfinite(val_bs):
+                    candidates.append((method, val_bs))
+            except Exception as exc:
+                print(
+                    f"  WARNING: season-specific calibration skipped "
+                    f"{season}/{method}: {exc}"
+                )
+
+        if not candidates:
+            continue
+
+        best_method, best_val_bs = min(candidates, key=lambda x: x[1])
+        tdp = test["xgb_prob_dry"].values[tmask]
+        if best_method == "none":
+            tdp_c = tdp.copy()
+        elif best_method == "platt":
+            tdp_c = _apply_platt(fitted[best_method], tdp)
+        else:
+            tdp_c = _apply_isotonic_cal(fitted[best_method], tdp)
+
+        test_mo_keys_s = _test_mo_keys[tmask]
+        tmo = pd.Series(tdp_c, index=test_mo_keys_s).groupby(level=0).mean()
+        season_months = pd.DatetimeIndex(
+            monthly.loc[monthly["season"] == season, "month_dt"]
+        )
+        tmo = tmo.reindex(season_months)
+        test_pred_by_month.loc[season_months] = tmo.values
+
+        obs = monthly.loc[monthly["season"] == season, "y_true_dry_frac"].values.astype(float)
+        ref = monthly.loc[monthly["season"] == season, "clim_dry_frac"].values.astype(float)
+        test_bs = brier_score(obs, tmo.values)
+        ref_bs = brier_score(obs, ref)
+        rows.append({
+            "season": season,
+            "n_val_months": int(len(val_obs_mo_s)),
+            "n_test_months": int(len(season_months)),
+            "best_calibration": best_method,
+            "val_BS_selected": round(best_val_bs, 5),
+            "test_BS": round(test_bs, 5),
+            "test_BSS": round(bss(test_bs, ref_bs), 5),
+        })
+
+    if test_pred_by_month.notna().all():
+        conditional_pred = test_pred_by_month.reindex(monthly["month_dt"]).values
+        test_bs = brier_score(obs_dry_frac, conditional_pred)
+        rows.append({
+            "season": "ALL_season_specific",
+            "n_val_months": int(_val_obs_mo.shape[0]),
+            "n_test_months": int(n_months),
+            "best_calibration": "per-season",
+            "val_BS_selected": np.nan,
+            "test_BS": round(test_bs, 5),
+            "test_BSS": round(bss(test_bs, bs_clim), 5),
+        })
+
+    return pd.DataFrame(rows)
+
+
+season_calib_df = _season_specific_xgb_calibration()
+season_calib_csv = OUT_DIR / "calib_study_stratified_season.csv"
+season_calib_df.to_csv(season_calib_csv, index=False)
+print("Wrote:", season_calib_csv)
+
+
+def _stratified_bss(dfm: pd.DataFrame, group_col: str) -> pd.DataFrame:
+    def _bss_with_ci(obs: np.ndarray, pred: np.ndarray, ref: np.ndarray,
+                     seed: int) -> tuple[float, str]:
+        score = bss(brier_score(obs, pred), brier_score(obs, ref))
+        if not np.isfinite(score):
+            return score, "[nan, nan]"
+        ci = bootstrap_metric(
+            lambda idx: bss(
+                brier_score(obs[idx], pred[idx]),
+                brier_score(obs[idx], ref[idx]),
+            ),
+            len(obs),
+            n_boot=N_BOOTSTRAP_ITERATIONS,
+            seed=seed,
+        )
+        return score, fmt_ci(ci)
+
+    def _add_metric(row: dict, name: str, obs: np.ndarray, pred: np.ndarray,
+                    ref: np.ndarray, seed: int) -> None:
+        score, ci = _bss_with_ci(obs, pred, ref, seed)
+        row[name] = score
+        row[f"{name}_95CI"] = ci
+
+    rows = []
+    for gi, (g, grp) in enumerate(dfm.groupby(group_col)):
         if len(grp) < 3:
             continue
         obs = grp["y_true_dry_frac"].values.astype(float)
@@ -1131,23 +1472,64 @@ def _stratified_bss(dfm: pd.DataFrame, group_col: str) -> pd.DataFrame:
             "stratifier": group_col,
             "group": g,
             "n_months": int(len(grp)),
-            "bss_xgb": bss(brier_score(obs, grp["xgb_dry_frac"].values), brier_score(obs, ref)),
-            "bss_persistence": bss(brier_score(obs, grp["persist_dry_frac"].values), brier_score(obs, ref)),
-            "bss_spi_threshold": bss(brier_score(obs, grp["thr_dry_frac"].values), brier_score(obs, ref)),
         }
+        seed_base = 5000 + gi * 100
+        _add_metric(row, "bss_xgb", obs, grp["xgb_dry_frac"].values, ref, seed_base + 1)
+        if "xgb_calibrated_dry_frac" in grp.columns:
+            _add_metric(
+                row,
+                "bss_xgb_calibrated",
+                obs,
+                grp["xgb_calibrated_dry_frac"].values,
+                ref,
+                seed_base + 2,
+            )
+        _add_metric(
+            row,
+            "bss_persistence",
+            obs,
+            grp["persist_dry_frac"].values,
+            ref,
+            seed_base + 3,
+        )
+        _add_metric(
+            row,
+            "bss_spi_threshold",
+            obs,
+            grp["thr_dry_frac"].values,
+            ref,
+            seed_base + 4,
+        )
         if HAS_XGB_SPATIAL and "xgb_spatial_dry_frac" in grp.columns:
-            row["bss_xgb_spatial"] = bss(
-                brier_score(obs, grp["xgb_spatial_dry_frac"].values),
-                brier_score(obs, ref),
+            _add_metric(
+                row,
+                "bss_xgb_spatial",
+                obs,
+                grp["xgb_spatial_dry_frac"].values,
+                ref,
+                seed_base + 5,
+            )
+        if "xgb_spatial_calibrated_dry_frac" in grp.columns:
+            _add_metric(
+                row,
+                "bss_xgb_spatial_calibrated",
+                obs,
+                grp["xgb_spatial_calibrated_dry_frac"].values,
+                ref,
+                seed_base + 6,
             )
         if HAS_LOGREG and "lr_dry_frac" in grp.columns:
-            row["bss_logreg"] = bss(brier_score(obs, grp["lr_dry_frac"].values), brier_score(obs, ref))
+            _add_metric(row, "bss_logreg", obs, grp["lr_dry_frac"].values, ref, seed_base + 7)
         if HAS_RF and "rf_dry_frac" in grp.columns:
-            row["bss_rf"] = bss(brier_score(obs, grp["rf_dry_frac"].values), brier_score(obs, ref))
+            _add_metric(row, "bss_rf", obs, grp["rf_dry_frac"].values, ref, seed_base + 8)
         if HAS_CONVLSTM and "convlstm_dry_frac" in grp.columns:
-            row["bss_convlstm"] = bss(
-                brier_score(obs, grp["convlstm_dry_frac"].values),
-                brier_score(obs, ref),
+            _add_metric(
+                row,
+                "bss_convlstm",
+                obs,
+                grp["convlstm_dry_frac"].values,
+                ref,
+                seed_base + 9,
             )
         rows.append(row)
     return pd.DataFrame(rows)
@@ -1167,6 +1549,12 @@ else:
     print("Wrote (placeholder):", enso_csv)
 
 # ── text summary ──────────────────────────────────────────────────────────────
+complexity_ladder = (
+    "  Climatology → Persistence → SPI-1 threshold heuristic → XGBoost (no spatial)\n"
+    + ("    → XGBoost-Spatial (spatial features)" if HAS_XGB_SPATIAL else "")
+    + (" → ConvLSTM (spatial architecture)" if HAS_CONVLSTM else "")
+    + "\n\n"
+)
 summary = (
     "Forecast Skill Evaluation — Central Valley 2021–2026\n"
     + "=" * 63 + "\n"
@@ -1180,9 +1568,8 @@ summary = (
     "  Dry-event Brier target = observed monthly dry-area fraction (not a majority threshold).\n"
     "  ROC-AUC uses binary 'dry-dominant month' event for ranking diagnostics only.\n\n"
     "Spatial complexity ladder:\n"
-    "  Climatology → Persistence → SPI-1 threshold heuristic → XGBoost (no spatial)\n"
-    "    → XGBoost-Spatial (spatial features) → ConvLSTM (spatial architecture)\n\n"
-    "── Monthly-level Brier Scores (dry class) ──\n"
+    + complexity_ladder
+    + "── Monthly-level Brier Scores (dry class) ──\n"
     f"  Climatological (reference) : {bs_clim:.4f}\n"
     f"  Persistence baseline       : {bs_pers:.4f}\n"
     f"  SPI-1 threshold baseline   : {bs_thr:.4f}\n"
