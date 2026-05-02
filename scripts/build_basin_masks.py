@@ -10,6 +10,8 @@ script builds:
   - Mediterranean Spain: MITECO river basin district polygons for Ebro,
     Catalonia internal basins, Jucar, Segura, Andalusia Mediterranean basins,
     and Guadalquivir.
+  - Southern Great Plains: US EPA Level III ecoregion polygons in the South
+    Central Semi-Arid Prairies Level II region.
 
 The outputs are mask NetCDF files that can be passed to
 run_multiregion_xgb_experiment.py with --basin-mask.
@@ -20,16 +22,22 @@ from argparse import ArgumentParser, Namespace
 from pathlib import Path
 import json
 import shutil
+import tempfile
 import unicodedata
 import urllib.parse
 import urllib.request
+import zipfile
 
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import numpy as np
 import pandas as pd
+import shapefile
 from shapely import intersects_xy, union_all
+from shapely.geometry import box
 from shapely.geometry import shape
+from shapely.ops import transform
+from pyproj import CRS, Transformer
 import xarray as xr
 
 from region_config import Region, resolve_region
@@ -50,8 +58,15 @@ MITECO_OGC_ITEMS_URL = (
     "https://wmts.mapama.gob.es/sig-api/ogc/features/v1/collections/"
     "agua%3ADemarcaciones_ET/items"
 )
+EPA_LEVEL3_ZIP_URL = (
+    "https://dmap-prod-oms-edc.s3.us-east-1.amazonaws.com/ORD/Ecoregions/us/"
+    "us_eco_l3_state_boundaries.zip"
+)
+EPA_ECOREGION_PAGE = (
+    "https://www.epa.gov/eco-research/level-iii-and-iv-ecoregions-continental-united-states"
+)
 
-DEFAULT_REGIONS = ("cvalley", "mediterranean_spain")
+DEFAULT_REGIONS = ("cvalley", "southern_great_plains", "mediterranean_spain")
 DEFAULT_START_YEAR = 1991
 DEFAULT_END_YEAR = 2026
 ROUND_DECIMALS = 6
@@ -65,6 +80,7 @@ SPAIN_BASIN_DISTRICTS = (
     "CUENCAS MEDITERRANEAS ANDALUZAS",
     "GUADALQUIVIR",
 )
+SOUTHERN_GREAT_PLAINS_LEVEL2 = "SOUTH CENTRAL SEMI-ARID PRAIRIES"
 
 
 def parse_args() -> Namespace:
@@ -73,7 +89,7 @@ def parse_args() -> Namespace:
         "--regions",
         nargs="+",
         default=list(DEFAULT_REGIONS),
-        help="Region slugs or aliases to audit. Defaults to cvalley and mediterranean_spain.",
+        help="Region slugs or aliases to audit. Defaults to the three full-resolution priority regions.",
     )
     parser.add_argument("--start-year", type=int, default=DEFAULT_START_YEAR)
     parser.add_argument("--end-year", type=int, default=DEFAULT_END_YEAR)
@@ -126,12 +142,26 @@ def write_geojson(path: Path, features: list[dict[str, object]], source_url: str
     return path
 
 
+def download_file(url: str, path: Path, force: bool) -> Path:
+    if path.exists() and not force:
+        return path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    request = urllib.request.Request(url, headers={"User-Agent": "chirps-drought-classifier/1.0"})
+    with urllib.request.urlopen(request, timeout=240) as response:
+        path.write_bytes(response.read())
+    return path
+
+
 def load_cached_geojson(path: Path) -> list[dict[str, object]]:
     data = json.loads(path.read_text(encoding="utf-8"))
     features = data.get("features", [])
     if not isinstance(features, list):
         raise ValueError(f"Unexpected GeoJSON in {path}")
     return features
+
+
+def pyshp_shape_to_geojson(shape_obj: shapefile.Shape) -> dict[str, object]:
+    return shape_obj.__geo_interface__
 
 
 def central_valley_features(force: bool) -> tuple[list[dict[str, object]], Path, str, str]:
@@ -190,10 +220,60 @@ def spain_basin_features(force: bool) -> tuple[list[dict[str, object]], Path, st
     return features, out_path, MITECO_OGC_ITEMS_URL, source_note
 
 
+def southern_great_plains_features(region: Region, force: bool) -> tuple[list[dict[str, object]], Path, str, str]:
+    out_path = METADATA_ROOT / "epa" / "southern_great_plains_level2_ecoregions.geojson"
+    source_note = (
+        "US EPA Level III ecoregions with state boundaries; selected features in "
+        f"NA_L2NAME={SOUTHERN_GREAT_PLAINS_LEVEL2} that intersect the configured "
+        "Southern Great Plains bbox."
+    )
+    if out_path.exists() and not force:
+        return load_cached_geojson(out_path), out_path, EPA_LEVEL3_ZIP_URL, source_note
+
+    zip_path = METADATA_ROOT / "epa" / "us_eco_l3_state_boundaries.zip"
+    download_file(EPA_LEVEL3_ZIP_URL, zip_path, force=force)
+    bbox_ll = box(region.lon_min, region.lat_min, region.lon_max, region.lat_max)
+    features: list[dict[str, object]] = []
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with zipfile.ZipFile(zip_path) as archive:
+            archive.extractall(tmpdir)
+        shp_path = next(Path(tmpdir).rglob("*.shp"))
+        source_crs = CRS.from_wkt(shp_path.with_suffix(".prj").read_text())
+        to_source = Transformer.from_crs("EPSG:4326", source_crs, always_xy=True).transform
+        to_wgs84 = Transformer.from_crs(source_crs, "EPSG:4326", always_xy=True).transform
+        bbox_source = transform(to_source, bbox_ll)
+
+        reader = shapefile.Reader(str(shp_path))
+        for shape_record in reader.iterShapeRecords():
+            record = shape_record.record.as_dict()
+            if normalize_name(record.get("NA_L2NAME", "")) != SOUTHERN_GREAT_PLAINS_LEVEL2:
+                continue
+            geom_source = shape(pyshp_shape_to_geojson(shape_record.shape))
+            if not geom_source.intersects(bbox_source):
+                continue
+            geom_wgs84 = transform(to_wgs84, geom_source)
+            features.append(
+                {
+                    "type": "Feature",
+                    "properties": record,
+                    "geometry": geom_wgs84.__geo_interface__,
+                }
+            )
+
+    if not features:
+        raise ValueError("EPA ecoregion selection returned no Southern Great Plains features")
+    write_geojson(out_path, features, EPA_LEVEL3_ZIP_URL, source_note)
+    return features, out_path, EPA_LEVEL3_ZIP_URL, source_note
+
+
 def boundary_features(region: Region, force: bool) -> tuple[list[dict[str, object]], Path, str, str, str]:
     if region.slug == "cvalley":
         features, path, source_url, source_note = central_valley_features(force)
         return features, path, source_url, source_note, "Central Valley DWR Bulletin 118 groundwater basins"
+    if region.slug == "southern_great_plains":
+        features, path, source_url, source_note = southern_great_plains_features(region, force)
+        return features, path, source_url, source_note, "Southern Great Plains EPA South Central Semi-Arid Prairies"
     if region.slug == "mediterranean_spain":
         features, path, source_url, source_note = spain_basin_features(force)
         return features, path, source_url, source_note, "Mediterranean/eastern-southern Spain river basin districts"
@@ -347,6 +427,7 @@ def audit_region(region: Region, args: Namespace) -> dict[str, object] | None:
         {
             str((feature.get("properties") or {}).get("Basin_Subbasin_Name")
                 or (feature.get("properties") or {}).get("nom_demar")
+                or (feature.get("properties") or {}).get("US_L3NAME")
                 or feature.get("id"))
             for feature in features
         }
@@ -486,7 +567,7 @@ def write_notes(rows: list[dict[str, object]], out_path: Path) -> None:
         "Basin Geometry Diagnostics",
         "==========================",
         "",
-        "Masks use official basin/district polygons and CHIRPS grid-cell centers.",
+        "Masks use official basin/district/ecoregion polygons and CHIRPS grid-cell centers.",
         "They are stricter scientific region definitions than rectangular bounding boxes.",
         "",
     ]
@@ -499,6 +580,7 @@ def write_notes(rows: list[dict[str, object]], out_path: Path) -> None:
                 f"{row['region']} - {row['region_name']}",
                 f"  Mask: {row['mask_label']}",
                 f"  Source: {row['source_note']}",
+                f"  Source URL: {row['source_url']}",
                 (
                     "  Valid CHIRPS cells retained: "
                     f"{int(row['valid_in_basin_cells']):,}/{int(row['valid_pr_cells']):,} "
