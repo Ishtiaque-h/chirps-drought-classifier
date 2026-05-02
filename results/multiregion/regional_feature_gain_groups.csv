@@ -1,0 +1,28 @@
+region,region_name,model,feature_group,gain,gain_share,n_features_with_gain
+cvalley,California Central Valley,spatial,enso,1878.3289184570312,0.3632174789301878,2
+cvalley,California Central Valley,spatial,precip_lags,324.94496154785156,0.06283547496113227,3
+cvalley,California Central Valley,spatial,seasonality,1613.0480346679688,0.31191940601472273,2
+cvalley,California Central Valley,spatial,spatial_context,697.5695953369141,0.13489089546933963,4
+cvalley,California Central Valley,spatial,spi_lags,657.4700775146484,0.1271367446246176,5
+cvalley,California Central Valley,tabular,enso,1811.6631469726562,0.41408452268751067,2
+cvalley,California Central Valley,tabular,precip_lags,330.7693557739258,0.0756026146660744,3
+cvalley,California Central Valley,tabular,seasonality,1480.3087158203125,0.3383481797070897,2
+cvalley,California Central Valley,tabular,spi_lags,752.3634948730469,0.17196468293932524,5
+mediterranean_spain,Mediterranean Spain bounding box,spatial,enso,2097.2467041015625,0.41165232845019234,2
+mediterranean_spain,Mediterranean Spain bounding box,spatial,precip_lags,310.9634552001953,0.06103661059318009,3
+mediterranean_spain,Mediterranean Spain bounding box,spatial,seasonality,1533.65771484375,0.30102980642493715,2
+mediterranean_spain,Mediterranean Spain bounding box,spatial,spatial_context,542.0301513671875,0.10639090454363045,4
+mediterranean_spain,Mediterranean Spain bounding box,spatial,spi_lags,610.8058280944824,0.11989034998805997,5
+mediterranean_spain,Mediterranean Spain bounding box,tabular,enso,2142.4869995117188,0.46308944286836984,2
+mediterranean_spain,Mediterranean Spain bounding box,tabular,precip_lags,340.63014221191406,0.07362575493668758,3
+mediterranean_spain,Mediterranean Spain bounding box,tabular,seasonality,1486.4615478515625,0.32129233465440665,2
+mediterranean_spain,Mediterranean Spain bounding box,tabular,spi_lags,656.9292831420898,0.14199246754053593,5
+southern_great_plains,Southern Great Plains,spatial,enso,2085.3429565429688,0.40311570053062373,2
+southern_great_plains,Southern Great Plains,spatial,precip_lags,482.9321975708008,0.09335517235749015,3
+southern_great_plains,Southern Great Plains,spatial,seasonality,1400.4409790039062,0.2707179385202099,2
+southern_great_plains,Southern Great Plains,spatial,spatial_context,667.3805999755859,0.12901072086756435,4
+southern_great_plains,Southern Great Plains,spatial,spi_lags,536.9663696289062,0.10380046772411183,5
+southern_great_plains,Southern Great Plains,tabular,enso,1953.3239135742188,0.4366336806857039,2
+southern_great_plains,Southern Great Plains,tabular,precip_lags,512.5485076904297,0.11457185359151839,3
+southern_great_plains,Southern Great Plains,tabular,seasonality,1309.1077880859375,0.2926296800822762,2
+southern_great_plains,Southern Great Plains,tabular,spi_lags,698.6185989379883,0.15616478564050154,5
