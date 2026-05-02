@@ -1,0 +1,57 @@
+{
+  "args": {
+    "baseline_end_year": 2020,
+    "baseline_start_year": 1991,
+    "drought_threshold": -1.0,
+    "end_year": 2026,
+    "index_columns": [
+      "nino34",
+      "soi",
+      "pdo"
+    ],
+    "index_file": "/Users/ishtisdream/chirps-drought-classifier/data/processed/climate_indices_monthly.csv",
+    "index_lags": [
+      0,
+      1,
+      3,
+      6
+    ],
+    "list_regions": false,
+    "mask_file": "/Users/ishtisdream/chirps-drought-classifier/data/processed/regions/cvalley/masks/cvalley_basin_mask.nc",
+    "mask_kind": "basin",
+    "mask_var": null,
+    "min_valid_fraction": 0.85,
+    "n_clusters": 4,
+    "n_components": 3,
+    "n_jobs": 8,
+    "pr_file": null,
+    "recompute": true,
+    "region": "cvalley",
+    "start_year": 1991
+  },
+  "created_utc": "2026-05-02T19:04:03.146469+00:00",
+  "outputs": {
+    "diagnostic_netcdf": "/Users/ishtisdream/chirps-drought-classifier/outputs/regionalization/cvalley_basin_masked/spi12_regionalization.nc",
+    "notes": "/Users/ishtisdream/chirps-drought-classifier/results/regionalization/cvalley_basin_masked/regionalization_method_notes.txt",
+    "pca_explained_variance": "/Users/ishtisdream/chirps-drought-classifier/results/regionalization/cvalley_basin_masked/pca_explained_variance.csv",
+    "zone_climate_index_correlations": "/Users/ishtisdream/chirps-drought-classifier/results/regionalization/cvalley_basin_masked/zone_climate_index_correlations.csv",
+    "zone_drought_runs": "/Users/ishtisdream/chirps-drought-classifier/results/regionalization/cvalley_basin_masked/zone_drought_runs.csv",
+    "zone_pixel_counts": "/Users/ishtisdream/chirps-drought-classifier/results/regionalization/cvalley_basin_masked/zone_pixel_counts.csv",
+    "zone_run_metrics": "/Users/ishtisdream/chirps-drought-classifier/results/regionalization/cvalley_basin_masked/zone_run_metrics.csv",
+    "zone_spi12_timeseries": "/Users/ishtisdream/chirps-drought-classifier/results/regionalization/cvalley_basin_masked/zone_spi12_timeseries.csv"
+  },
+  "region": {
+    "lat_max": 40.6,
+    "lat_min": 35.4,
+    "lon_max": -119.0,
+    "lon_min": -122.5,
+    "mask_countries": [
+      "United States of America"
+    ],
+    "mask_note": "Country mask is only a land/country sanity check; it is not a Central Valley basin polygon.",
+    "name": "California Central Valley",
+    "rationale": "Canonical project region; Mediterranean winter precipitation.",
+    "slug": "cvalley"
+  },
+  "run_slug": "cvalley_basin_masked"
+}

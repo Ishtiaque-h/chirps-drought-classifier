@@ -1,0 +1,57 @@
+{
+  "args": {
+    "baseline_end_year": 2020,
+    "baseline_start_year": 1991,
+    "drought_threshold": -1.0,
+    "end_year": 2026,
+    "index_columns": [
+      "nino34",
+      "soi",
+      "pdo"
+    ],
+    "index_file": "/Users/ishtisdream/chirps-drought-classifier/data/processed/climate_indices_monthly.csv",
+    "index_lags": [
+      0,
+      1,
+      3,
+      6
+    ],
+    "list_regions": false,
+    "mask_file": "/Users/ishtisdream/chirps-drought-classifier/data/processed/regions/mediterranean_spain/masks/mediterranean_spain_basin_mask.nc",
+    "mask_kind": "basin",
+    "mask_var": null,
+    "min_valid_fraction": 0.85,
+    "n_clusters": 4,
+    "n_components": 3,
+    "n_jobs": 8,
+    "pr_file": null,
+    "recompute": true,
+    "region": "mediterranean_spain",
+    "start_year": 1991
+  },
+  "created_utc": "2026-05-02T19:16:24.470195+00:00",
+  "outputs": {
+    "diagnostic_netcdf": "/Users/ishtisdream/chirps-drought-classifier/outputs/regionalization/mediterranean_spain_basin_masked/spi12_regionalization.nc",
+    "notes": "/Users/ishtisdream/chirps-drought-classifier/results/regionalization/mediterranean_spain_basin_masked/regionalization_method_notes.txt",
+    "pca_explained_variance": "/Users/ishtisdream/chirps-drought-classifier/results/regionalization/mediterranean_spain_basin_masked/pca_explained_variance.csv",
+    "zone_climate_index_correlations": "/Users/ishtisdream/chirps-drought-classifier/results/regionalization/mediterranean_spain_basin_masked/zone_climate_index_correlations.csv",
+    "zone_drought_runs": "/Users/ishtisdream/chirps-drought-classifier/results/regionalization/mediterranean_spain_basin_masked/zone_drought_runs.csv",
+    "zone_pixel_counts": "/Users/ishtisdream/chirps-drought-classifier/results/regionalization/mediterranean_spain_basin_masked/zone_pixel_counts.csv",
+    "zone_run_metrics": "/Users/ishtisdream/chirps-drought-classifier/results/regionalization/mediterranean_spain_basin_masked/zone_run_metrics.csv",
+    "zone_spi12_timeseries": "/Users/ishtisdream/chirps-drought-classifier/results/regionalization/mediterranean_spain_basin_masked/zone_spi12_timeseries.csv"
+  },
+  "region": {
+    "lat_max": 42.8,
+    "lat_min": 36.0,
+    "lon_max": 1.5,
+    "lon_min": -6.5,
+    "mask_countries": [
+      "Spain"
+    ],
+    "mask_note": "Spain mask checks whether the rectangular box includes non-Spain land cells.",
+    "name": "Mediterranean Spain bounding box",
+    "rationale": "Mediterranean hydroclimate analogue spanning eastern/southern Spain; useful for testing whether the California result generalizes.",
+    "slug": "mediterranean_spain"
+  },
+  "run_slug": "mediterranean_spain_basin_masked"
+}

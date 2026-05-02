@@ -1,0 +1,43 @@
+SPI-12 Regionalization Diagnostics
+========================================================================
+
+Purpose:
+This analysis is diagnostic-only. It does not change the frozen SPI-1 lead-1 forecast target, feature table, model checkpoint, calibration protocol, or multi-region BSS evaluation.
+
+Region:
+  Slug: horn_of_africa
+  Name: Horn of Africa bounding box
+  Rationale: Bimodal rainfall regime with stronger large-scale climate coupling; CHIRPS has strong heritage in this region.
+  Precipitation file: /Users/ishtisdream/chirps-drought-classifier/data/processed/regions/horn_of_africa/chirps_v3_monthly_horn_of_africa_1991_2026.nc
+  Mask file: /Users/ishtisdream/chirps-drought-classifier/data/processed/regions/horn_of_africa/masks/horn_of_africa_country_mask.nc
+
+SPI-12 computation:
+  Accumulation window: 12 months
+  Baseline years: 1991-2020
+  Gamma fitting: per pixel x calendar month, matching make_spi_labels.py convention
+  Zero handling: empirical p_zero plus gamma CDF for nonzero precipitation
+
+Regionalization:
+  K-means zones: 4
+  PCA components requested: 3
+  PCA components used: 3
+  Cumulative explained variance: 0.4228
+  Minimum valid fraction: 0.85
+
+Zone pixel counts:
+  Zone 0: 20,626 pixels (38.498%)
+  Zone 1: 11,142 pixels (20.796%)
+  Zone 2: 7,113 pixels (13.276%)
+  Zone 3: 14,696 pixels (27.430%)
+
+Run theory:
+  Drought threshold: zone-mean SPI-12 <= -1.0
+  Severity definition: sum(threshold - SPI-12) across drought months
+  Intensity definition: severity / duration
+
+Climate-index correlations:
+  Index file: /Users/ishtisdream/chirps-drought-classifier/data/processed/climate_indices_monthly.csv
+  Requested columns: ['nino34', 'soi', 'pdo']
+  Positive lags mean the climate index leads SPI-12: [0, 1, 3, 6]
+
+Created UTC: 2026-05-02T19:28:30.944862+00:00

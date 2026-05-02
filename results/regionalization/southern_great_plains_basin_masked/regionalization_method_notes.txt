@@ -1,0 +1,43 @@
+SPI-12 Regionalization Diagnostics
+========================================================================
+
+Purpose:
+This analysis is diagnostic-only. It does not change the frozen SPI-1 lead-1 forecast target, feature table, model checkpoint, calibration protocol, or multi-region BSS evaluation.
+
+Region:
+  Slug: southern_great_plains
+  Name: Southern Great Plains
+  Rationale: Contrasting continental regime with warm-season convective rainfall over Kansas, Oklahoma, and north Texas.
+  Precipitation file: /Users/ishtisdream/chirps-drought-classifier/data/processed/regions/southern_great_plains/chirps_v3_monthly_southern_great_plains_1991_2026.nc
+  Mask file: /Users/ishtisdream/chirps-drought-classifier/data/processed/regions/southern_great_plains/masks/southern_great_plains_basin_mask.nc
+
+SPI-12 computation:
+  Accumulation window: 12 months
+  Baseline years: 1991-2020
+  Gamma fitting: per pixel x calendar month, matching make_spi_labels.py convention
+  Zero handling: empirical p_zero plus gamma CDF for nonzero precipitation
+
+Regionalization:
+  K-means zones: 4
+  PCA components requested: 3
+  PCA components used: 3
+  Cumulative explained variance: 0.5245
+  Minimum valid fraction: 0.85
+
+Zone pixel counts:
+  Zone 0: 4,227 pixels (21.762%)
+  Zone 1: 5,779 pixels (29.752%)
+  Zone 2: 5,375 pixels (27.672%)
+  Zone 3: 4,043 pixels (20.814%)
+
+Run theory:
+  Drought threshold: zone-mean SPI-12 <= -1.0
+  Severity definition: sum(threshold - SPI-12) across drought months
+  Intensity definition: severity / duration
+
+Climate-index correlations:
+  Index file: /Users/ishtisdream/chirps-drought-classifier/data/processed/climate_indices_monthly.csv
+  Requested columns: ['nino34', 'soi', 'pdo']
+  Positive lags mean the climate index leads SPI-12: [0, 1, 3, 6]
+
+Created UTC: 2026-05-02T19:06:54.849213+00:00
