@@ -1,0 +1,49 @@
+Multi-Region XGBoost Experiment: Mediterranean Spain bounding box (country-mask sensitivity)
+========================================================================
+Region slug: mediterranean_spain_country_masked
+Region bbox: lat[36.0, 42.8] lon[-6.5, 1.5]
+Region rationale: Mediterranean hydroclimate analogue spanning eastern/southern Spain; useful for testing whether the California result generalizes. Country-mask sensitivity run using configured Natural Earth countries: Spain.
+Model: tabular
+Target: SPI-1[t+1] dry class probability
+Rows: train=4,998,816, val=784,128, test=1,029,168
+Test months: 63
+Best iteration: 21
+Validation monthly BS by calibration: {'none': 0.07204034025247992, 'isotonic': 0.040741563796958785, 'platt': 0.045676910744310135}
+Selected calibration: isotonic
+Pixel dry ROC-AUC raw: 0.48015
+Features: ['spi1_lag1', 'spi1_lag2', 'spi1_lag3', 'spi3_lag1', 'spi6_lag1', 'pr_lag1', 'pr_lag2', 'pr_lag3', 'month_sin', 'month_cos', 'nino34_lag1', 'nino34_lag2']
+
+Monthly dry-fraction Brier Scores
+  Climatology        : 0.04944
+  XGBoost raw      : 0.08092
+  XGBoost isotonic : 0.04856
+  XGBoost platt    : 0.05083
+  XGBoost selected : 0.04856
+
+Brier Skill Score vs monthly climatology
+  XGBoost raw      : -0.63689 (95% CI [-1.81156, -0.14972])
+  XGBoost isotonic : 0.01781 (95% CI [-0.23055, 0.30003])
+  XGBoost platt    : -0.02823 (95% CI [-0.22932, 0.19794])
+  XGBoost selected : 0.01781 (95% CI [-0.23055, 0.30003])
+
+Pixel-level classification report (secondary diagnostic)
+              precision    recall  f1-score   support
+
+     dry(-1)      0.150     0.315     0.203    161963
+   normal(0)      0.655     0.324     0.434    677784
+     wet(+1)      0.204     0.381     0.266    189421
+
+    accuracy                          0.333   1029168
+   macro avg      0.336     0.340     0.301   1029168
+weighted avg      0.492     0.333     0.366   1029168
+
+Pixel-level confusion matrix labels [-1, 0, 1]
+[[ 51052  67065  43846]
+ [220842 219662 237280]
+ [ 68598  48694  72129]]
+
+Outputs:
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/mediterranean_spain_country_masked/tabular_monthly_scores.csv
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/mediterranean_spain_country_masked/tabular_model.json
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/mediterranean_spain_country_masked/tabular_test_probs.npz
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/mediterranean_spain_country_masked/tabular_feature_importance.png

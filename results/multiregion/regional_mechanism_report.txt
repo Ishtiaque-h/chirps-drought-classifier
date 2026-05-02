@@ -6,20 +6,23 @@ Primary target: monthly regional dry-fraction probability for SPI-1[t+1].
 Headline by best selected BSS per region:
 - California Central Valley (spatial): selected BSS=-0.026 [-0.124, 0.047], raw ROC-AUC=0.680
 - Mediterranean Spain bounding box (tabular): selected BSS=0.044 [-0.151, 0.241], raw ROC-AUC=0.538
+- Mediterranean Spain bounding box (country-mask sensitivity) (spatial): selected BSS=0.024 [-0.199, 0.305], raw ROC-AUC=0.480
 - Southern Great Plains (spatial): selected BSS=-0.082 [-0.148, -0.002], raw ROC-AUC=0.510
 
 Mechanism diagnostics:
 - California Central Valley: selected-probability correlation=0.311, amplitude ratio=0.213, selected bias=-0.034; train->test dry mean 0.133->0.173.
 - Mediterranean Spain bounding box: selected-probability correlation=0.216, amplitude ratio=0.230, selected bias=0.005; train->test dry mean 0.143->0.156.
+- Mediterranean Spain bounding box (country-mask sensitivity): selected-probability correlation=0.236, amplitude ratio=0.408, selected bias=0.008; train->test dry mean 0.145->0.157.
 - Southern Great Plains: selected-probability correlation=0.091, amplitude ratio=0.053, selected bias=-0.088; train->test dry mean 0.160->0.208.
 
 Scientific interpretation:
 - Central Valley has the strongest raw ranking signal, but selected probabilities still do not beat climatology robustly.
 - Southern Great Plains has weak raw ranking and a test-period seasonal climatology mismatch; both tabular and spatial XGB remain below climatology.
 - Mediterranean Spain has the best calibrated point estimate, but the confidence interval crosses zero; this is a hypothesis-generating regional hint, not a positive-skill claim.
+- The Spain country-mask sensitivity keeps a positive point estimate but lowers it and widens uncertainty; geometry matters enough that final regional claims need mask-aware runs.
 - ENSO and seasonality dominate gain in all regions, so model fit is mostly large-scale/seasonal. That does not guarantee calibrated probability skill.
 
 Recommended next actions:
-1. Add basin/land masks for rectangular regions before publication-level regional claims.
+1. Replace first-pass country masks with basin or hydroclimate masks before publication-level regional claims.
 2. Run one additional regime, preferably Murray-Darling or Horn of Africa, if compute budget allows.
 3. Add regional diagnostic plots to the paper narrative before adding more predictors.

@@ -1,0 +1,49 @@
+Multi-Region XGBoost Experiment: Mediterranean Spain bounding box (country-mask sensitivity)
+========================================================================
+Region slug: mediterranean_spain_country_masked
+Region bbox: lat[36.0, 42.8] lon[-6.5, 1.5]
+Region rationale: Mediterranean hydroclimate analogue spanning eastern/southern Spain; useful for testing whether the California result generalizes. Country-mask sensitivity run using configured Natural Earth countries: Spain.
+Model: spatial
+Target: SPI-1[t+1] dry class probability
+Rows: train=4,998,816, val=784,128, test=1,029,168
+Test months: 63
+Best iteration: 22
+Validation monthly BS by calibration: {'none': 0.07065310125586405, 'isotonic': 0.042218293748061186, 'platt': 0.045148485751966}
+Selected calibration: isotonic
+Pixel dry ROC-AUC raw: 0.48003
+Features: ['spi1_lag1', 'spi1_lag2', 'spi1_lag3', 'spi3_lag1', 'spi6_lag1', 'pr_lag1', 'pr_lag2', 'pr_lag3', 'month_sin', 'month_cos', 'nino34_lag1', 'nino34_lag2', 'spi1_nbr_mean', 'spi3_nbr_mean', 'spi6_nbr_mean', 'pr_nbr_mean']
+
+Monthly dry-fraction Brier Scores
+  Climatology        : 0.04944
+  XGBoost raw      : 0.07941
+  XGBoost isotonic : 0.04827
+  XGBoost platt    : 0.05052
+  XGBoost selected : 0.04827
+
+Brier Skill Score vs monthly climatology
+  XGBoost raw      : -0.60628 (95% CI [-1.71981, -0.13464])
+  XGBoost isotonic : 0.02350 (95% CI [-0.19910, 0.30486])
+  XGBoost platt    : -0.02195 (95% CI [-0.22468, 0.21570])
+  XGBoost selected : 0.02350 (95% CI [-0.19910, 0.30486])
+
+Pixel-level classification report (secondary diagnostic)
+              precision    recall  f1-score   support
+
+     dry(-1)      0.154     0.309     0.206    161963
+   normal(0)      0.630     0.342     0.444    677784
+     wet(+1)      0.196     0.348     0.250    189421
+
+    accuracy                          0.338   1029168
+   macro avg      0.327     0.333     0.300   1029168
+weighted avg      0.475     0.338     0.371   1029168
+
+Pixel-level confusion matrix labels [-1, 0, 1]
+[[ 49984  69849  42130]
+ [217043 232135 228606]
+ [ 57048  66494  65879]]
+
+Outputs:
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/mediterranean_spain_country_masked/spatial_monthly_scores.csv
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/mediterranean_spain_country_masked/spatial_model.json
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/mediterranean_spain_country_masked/spatial_test_probs.npz
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/mediterranean_spain_country_masked/spatial_feature_importance.png

@@ -1,0 +1,26 @@
+Region Geometry Diagnostics
+===========================
+
+Country masks use Natural Earth 1:50m country polygons and CHIRPS grid-cell centers.
+They are a first-pass rectangular-bbox audit, not a replacement for basin polygons.
+
+cvalley - California Central Valley
+  Countries: United States of America
+  Valid CHIRPS cells retained: 6,622/6,816 (97.15%); outside country: 194 (2.85%).
+  Forecast dataset pixels retained: 6,622/6,816 (97.15%).
+  Interpretation: Country geometry removes a small but measurable cell fraction; masked sensitivity is useful.
+  Caveat: Country mask is only a land/country sanity check; it is not a Central Valley basin polygon.
+
+southern_great_plains - Southern Great Plains
+  Countries: United States of America
+  Valid CHIRPS cells retained: 24,700/24,700 (100.00%); outside country: 0 (0.00%).
+  Forecast dataset pixels retained: 24,700/24,700 (100.00%).
+  Interpretation: Country geometry does not remove any valid CHIRPS cells from this bbox.
+  Caveat: Country mask should mainly confirm the rectangular box is within the U.S.
+
+mediterranean_spain - Mediterranean Spain bounding box
+  Countries: Spain
+  Valid CHIRPS cells retained: 16,336/17,313 (94.36%); outside country: 977 (5.64%).
+  Forecast dataset pixels retained: 16,336/17,313 (94.36%).
+  Interpretation: Country geometry removes enough valid cells that a masked rerun should precede final claims.
+  Caveat: Spain mask checks whether the rectangular box includes non-Spain land cells.
