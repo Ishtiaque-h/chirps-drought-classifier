@@ -1,0 +1,49 @@
+Multi-Region XGBoost Experiment: Southern Great Plains (basin-mask sensitivity)
+========================================================================
+Region slug: southern_great_plains_basin_masked
+Region bbox: lat[33.0, 39.5] lon[-103.5, -94.0]
+Region rationale: Contrasting continental regime with warm-season convective rainfall over Kansas, Oklahoma, and north Texas. Basin-mask sensitivity run using southern_great_plains_basin_mask.nc.
+Model: tabular
+Target: SPI-1[t+1] dry class probability
+Rows: train=5,943,744, val=932,352, test=1,223,712
+Test months: 63
+Best iteration: 129
+Validation monthly BS by calibration: {'none': 0.07508424926063774, 'isotonic': 0.023778972582367535, 'platt': 0.02463377647022581}
+Selected calibration: isotonic
+Pixel dry ROC-AUC raw: 0.56520
+Features: ['spi1_lag1', 'spi1_lag2', 'spi1_lag3', 'spi3_lag1', 'spi6_lag1', 'pr_lag1', 'pr_lag2', 'pr_lag3', 'month_sin', 'month_cos', 'nino34_lag1', 'nino34_lag2']
+
+Monthly dry-fraction Brier Scores
+  Climatology        : 0.05601
+  XGBoost raw      : 0.06842
+  XGBoost isotonic : 0.05856
+  XGBoost platt    : 0.05985
+  XGBoost selected : 0.05856
+
+Brier Skill Score vs monthly climatology
+  XGBoost raw      : -0.22164 (95% CI [-0.92253, 0.17327])
+  XGBoost isotonic : -0.04560 (95% CI [-0.11501, 0.03430])
+  XGBoost platt    : -0.06852 (95% CI [-0.11863, -0.00465])
+  XGBoost selected : -0.04560 (95% CI [-0.11501, 0.03430])
+
+Pixel-level classification report (secondary diagnostic)
+              precision    recall  f1-score   support
+
+     dry(-1)      0.280     0.340     0.307    272577
+   normal(0)      0.687     0.527     0.596    814704
+     wet(+1)      0.148     0.291     0.196    136431
+
+    accuracy                          0.459   1223712
+   macro avg      0.372     0.386     0.366   1223712
+weighted avg      0.536     0.459     0.487   1223712
+
+Pixel-level confusion matrix labels [-1, 0, 1]
+[[ 92699 119102  60776]
+ [217448 429070 168186]
+ [ 20428  76364  39639]]
+
+Outputs:
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/southern_great_plains_basin_masked/tabular_monthly_scores.csv
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/southern_great_plains_basin_masked/tabular_model.json
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/southern_great_plains_basin_masked/tabular_test_probs.npz
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/southern_great_plains_basin_masked/tabular_feature_importance.png

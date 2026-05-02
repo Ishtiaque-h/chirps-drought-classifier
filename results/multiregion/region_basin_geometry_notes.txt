@@ -1,12 +1,29 @@
 Basin Geometry Diagnostics
 ==========================
 
-Masks use official basin/district polygons and CHIRPS grid-cell centers.
+Masks use official basin/district/ecoregion polygons and CHIRPS grid-cell centers.
 They are stricter scientific region definitions than rectangular bounding boxes.
+
+cvalley - California Central Valley
+  Mask: Central Valley DWR Bulletin 118 groundwater basins
+  Source: CA DWR Bulletin 118 groundwater basin polygons; selected Basin_Number 5-021 Sacramento Valley and 5-022 San Joaquin Valley.
+  Source URL: https://gis.water.ca.gov/arcgis/rest/services/Geoscientific/i08_B118_CA_GroundwaterBasins/FeatureServer/0/query
+  Valid CHIRPS cells retained: 1,903/6,816 (27.92%); outside basin: 4,913 (72.08%).
+  Forecast dataset pixels retained: 1,903/6,816 (27.92%).
+  Interpretation: Basin geometry materially changes the sample; masked rerun should be treated as the cleaner checkpoint.
 
 southern_great_plains - Southern Great Plains
   Mask: Southern Great Plains EPA South Central Semi-Arid Prairies
   Source: US EPA Level III ecoregions with state boundaries; selected features in NA_L2NAME=SOUTH CENTRAL SEMI-ARID PRAIRIES that intersect the configured Southern Great Plains bbox.
+  Source URL: https://dmap-prod-oms-edc.s3.us-east-1.amazonaws.com/ORD/Ecoregions/us/us_eco_l3_state_boundaries.zip
   Valid CHIRPS cells retained: 19,424/24,700 (78.64%); outside basin: 5,276 (21.36%).
   Forecast dataset pixels retained: 19,424/24,700 (78.64%).
+  Interpretation: Basin geometry materially changes the sample; masked rerun should be treated as the cleaner checkpoint.
+
+mediterranean_spain - Mediterranean Spain bounding box
+  Mask: Mediterranean/eastern-southern Spain river basin districts
+  Source: MITECO terrestrial river basin districts; selected Ebro, Catalonia internal basins, Jucar, Segura, Andalusia Mediterranean basins, and Guadalquivir.
+  Source URL: https://wmts.mapama.gob.es/sig-api/ogc/features/v1/collections/agua%3ADemarcaciones_ET/items
+  Valid CHIRPS cells retained: 9,057/17,313 (52.31%); outside basin: 8,256 (47.69%).
+  Forecast dataset pixels retained: 9,057/17,313 (52.31%).
   Interpretation: Basin geometry materially changes the sample; masked rerun should be treated as the cleaner checkpoint.

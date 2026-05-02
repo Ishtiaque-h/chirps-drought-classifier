@@ -1,0 +1,49 @@
+Multi-Region XGBoost Experiment: Southern Great Plains (basin-mask sensitivity)
+========================================================================
+Region slug: southern_great_plains_basin_masked
+Region bbox: lat[33.0, 39.5] lon[-103.5, -94.0]
+Region rationale: Contrasting continental regime with warm-season convective rainfall over Kansas, Oklahoma, and north Texas. Basin-mask sensitivity run using southern_great_plains_basin_mask.nc.
+Model: spatial
+Target: SPI-1[t+1] dry class probability
+Rows: train=5,943,744, val=932,352, test=1,223,712
+Test months: 63
+Best iteration: 140
+Validation monthly BS by calibration: {'none': 0.07306027977884412, 'isotonic': 0.023112689853931088, 'platt': 0.02445021763536769}
+Selected calibration: isotonic
+Pixel dry ROC-AUC raw: 0.56700
+Features: ['spi1_lag1', 'spi1_lag2', 'spi1_lag3', 'spi3_lag1', 'spi6_lag1', 'pr_lag1', 'pr_lag2', 'pr_lag3', 'month_sin', 'month_cos', 'nino34_lag1', 'nino34_lag2', 'spi1_nbr_mean', 'spi3_nbr_mean', 'spi6_nbr_mean', 'pr_nbr_mean']
+
+Monthly dry-fraction Brier Scores
+  Climatology        : 0.05601
+  XGBoost raw      : 0.06489
+  XGBoost isotonic : 0.05544
+  XGBoost platt    : 0.05915
+  XGBoost selected : 0.05544
+
+Brier Skill Score vs monthly climatology
+  XGBoost raw      : -0.15865 (95% CI [-0.81780, 0.21913])
+  XGBoost isotonic : 0.01013 (95% CI [-0.09777, 0.15022])
+  XGBoost platt    : -0.05609 (95% CI [-0.11399, 0.00983])
+  XGBoost selected : 0.01013 (95% CI [-0.09777, 0.15022])
+
+Pixel-level classification report (secondary diagnostic)
+              precision    recall  f1-score   support
+
+     dry(-1)      0.284     0.315     0.299    272577
+   normal(0)      0.679     0.549     0.608    814704
+     wet(+1)      0.159     0.305     0.209    136431
+
+    accuracy                          0.470   1223712
+   macro avg      0.374     0.390     0.372   1223712
+weighted avg      0.533     0.470     0.494   1223712
+
+Pixel-level confusion matrix labels [-1, 0, 1]
+[[ 85941 133869  52767]
+ [198886 447671 168147]
+ [ 17267  77500  41664]]
+
+Outputs:
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/southern_great_plains_basin_masked/spatial_monthly_scores.csv
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/southern_great_plains_basin_masked/spatial_model.json
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/southern_great_plains_basin_masked/spatial_test_probs.npz
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/southern_great_plains_basin_masked/spatial_feature_importance.png

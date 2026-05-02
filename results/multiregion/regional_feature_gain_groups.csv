@@ -53,3 +53,12 @@ southern_great_plains,Southern Great Plains,tabular,enso,1953.3239135742188,0.43
 southern_great_plains,Southern Great Plains,tabular,precip_lags,512.5485076904297,0.11457185359151839,3
 southern_great_plains,Southern Great Plains,tabular,seasonality,1309.1077880859375,0.2926296800822762,2
 southern_great_plains,Southern Great Plains,tabular,spi_lags,698.6185989379883,0.15616478564050154,5
+southern_great_plains_basin_masked,Southern Great Plains (basin-mask sensitivity),spatial,enso,3112.6181640625,0.43912707514546984,2
+southern_great_plains_basin_masked,Southern Great Plains (basin-mask sensitivity),spatial,precip_lags,502.1279830932617,0.070840039138193,3
+southern_great_plains_basin_masked,Southern Great Plains (basin-mask sensitivity),spatial,seasonality,1930.5986328125,0.272368175671217,2
+southern_great_plains_basin_masked,Southern Great Plains (basin-mask sensitivity),spatial,spatial_context,829.5173645019531,0.11702801784742364,4
+southern_great_plains_basin_masked,Southern Great Plains (basin-mask sensitivity),spatial,spi_lags,713.3324584960938,0.10063669219769647,5
+southern_great_plains_basin_masked,Southern Great Plains (basin-mask sensitivity),tabular,enso,3142.27001953125,0.48546135566815346,2
+southern_great_plains_basin_masked,Southern Great Plains (basin-mask sensitivity),tabular,precip_lags,549.6229400634766,0.0849133575189489,3
+southern_great_plains_basin_masked,Southern Great Plains (basin-mask sensitivity),tabular,seasonality,1840.2064819335938,0.2843005622928839,2
+southern_great_plains_basin_masked,Southern Great Plains (basin-mask sensitivity),tabular,spi_lags,940.6506195068359,0.1453247245200137,5
