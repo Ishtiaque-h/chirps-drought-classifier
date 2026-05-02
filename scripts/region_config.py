@@ -2,9 +2,9 @@
 """
 Region registry for multi-region drought forecast experiments.
 
-Bounding boxes are intentionally rectangular for the first multi-region path.
-They are suitable for reproducible hydroclimate comparisons, but basin-polygon
-masking should be added before making fine-grained regional claims.
+Bounding boxes define reproducible CHIRPS clipping envelopes for each region.
+Final regional claims should use the source-cited country, basin, or ecoregion
+masks built by the mask audit scripts.
 """
 from __future__ import annotations
 
@@ -67,8 +67,8 @@ REGIONS: dict[str, Region] = {
         lon_max=153.8,
         rationale=(
             "Semi-arid agricultural analogue with different ENSO teleconnection "
-            "structure. This rectangular first pass should later be replaced by "
-            "a basin polygon mask."
+            "structure. The rectangular box is only the CHIRPS clipping envelope; "
+            "final comparisons should use the official basin boundary mask."
         ),
         mask_countries=("Australia",),
         mask_note=(

@@ -2,8 +2,7 @@
 """
 Run a leakage-free XGBoost drought-forecast experiment for a named region.
 
-This is the first multi-region evaluation path. It is deliberately
-non-destructive:
+This region-aware evaluation path is deliberately non-destructive:
   - canonical Central Valley files are reused by default for --region cvalley
   - new region products are written under data/processed/regions/<region>/
   - model artifacts are written under outputs/multiregion/<region>/
@@ -125,6 +124,11 @@ def parse_args() -> Namespace:
         "--prepare-only",
         action="store_true",
         help="Stop after clipping/SPI/dataset build; do not train models.",
+    )
+    parser.add_argument(
+        "--prepare-grid-only",
+        action="store_true",
+        help="Stop after clipping CHIRPS and computing SPI; do not build a forecast table.",
     )
     parser.add_argument(
         "--copy-report",
@@ -605,6 +609,7 @@ def build_forecast_dataset(
     spi6 = spi_ds["spi6"].sel(time=pr.time)
     label = spi_ds["drought_label_spi1"].sel(time=pr.time)
 
+    grid_mask = None
     if mask_file is not None:
         grid_mask = load_grid_mask(mask_file, pr, var_name=mask_var)
         n_keep = int(grid_mask.sum())
@@ -632,6 +637,9 @@ def build_forecast_dataset(
             "target_label": target,
         }
     ).stack(pixel=("latitude", "longitude"))
+    if grid_mask is not None:
+        flat_mask = grid_mask.stack(pixel=("latitude", "longitude"))
+        ds_stacked = ds_stacked.where(flat_mask, drop=True)
 
     df = ds_stacked.reset_index("pixel").to_dataframe()
     if "time" not in df.columns:
@@ -697,6 +705,7 @@ def build_spatial_feature_frame(
     spi3 = spi_ds["spi3"].sel(time=pr.time).astype("float32")
     spi6 = spi_ds["spi6"].sel(time=pr.time).astype("float32")
 
+    grid_mask = None
     if mask_file is not None:
         grid_mask = load_grid_mask(mask_file, pr, var_name=mask_var)
         n_keep = int(grid_mask.sum())
@@ -720,6 +729,9 @@ def build_spatial_feature_frame(
             "pr_nbr_mean": nbr_mean(pr, "pr_nbr_mean"),
         }
     ).stack(pixel=("latitude", "longitude"))
+    if grid_mask is not None:
+        flat_mask = grid_mask.stack(pixel=("latitude", "longitude"))
+        nbr_ds = nbr_ds.where(flat_mask, drop=True)
 
     nbr_df = nbr_ds.reset_index("pixel").to_dataframe()
     if "time" not in nbr_df.columns:
@@ -1184,6 +1196,10 @@ def main() -> None:
     if not use_canonical:
         clip_chirps(source_region, paths["pr"], args.start_year, end_year, args.rebuild_pr, args.grid_stride)
         make_spi_labels(paths["pr"], paths["spi"], args.rebuild_spi, args.spi_n_jobs)
+
+    if args.prepare_grid_only:
+        print("Prepare-grid-only requested; stopping before forecast dataset build.")
+        return
 
     df = build_forecast_dataset(
         region=run_region,
