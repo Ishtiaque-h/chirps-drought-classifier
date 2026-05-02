@@ -1,0 +1,49 @@
+Multi-Region XGBoost Experiment: Mediterranean Spain bounding box
+========================================================================
+Region slug: mediterranean_spain
+Region bbox: lat[36.0, 42.8] lon[-6.5, 1.5]
+Region rationale: Mediterranean hydroclimate analogue spanning eastern/southern Spain; useful for testing whether the California result generalizes.
+Model: tabular
+Target: SPI-1[t+1] dry class probability
+Rows: train=5,297,778, val=831,024, test=1,090,719
+Test months: 63
+Best iteration: 176
+Validation monthly BS by calibration: {'none': 0.07605446731201385, 'isotonic': 0.04210669791774802, 'platt': 0.04523642240611723}
+Selected calibration: isotonic
+Pixel dry ROC-AUC raw: 0.53805
+Features: ['spi1_lag1', 'spi1_lag2', 'spi1_lag3', 'spi3_lag1', 'spi6_lag1', 'pr_lag1', 'pr_lag2', 'pr_lag3', 'month_sin', 'month_cos', 'nino34_lag1', 'nino34_lag2']
+
+Monthly dry-fraction Brier Scores
+  Climatology        : 0.04798
+  XGBoost raw      : 0.07344
+  XGBoost isotonic : 0.04587
+  XGBoost platt    : 0.04762
+  XGBoost selected : 0.04587
+
+Brier Skill Score vs monthly climatology
+  XGBoost raw      : -0.53068 (95% CI [-1.55704, -0.05088])
+  XGBoost isotonic : 0.04403 (95% CI [-0.15104, 0.24096])
+  XGBoost platt    : 0.00748 (95% CI [-0.12548, 0.16536])
+  XGBoost selected : 0.04403 (95% CI [-0.15104, 0.24096])
+
+Pixel-level classification report (secondary diagnostic)
+              precision    recall  f1-score   support
+
+     dry(-1)      0.196     0.239     0.216    169920
+   normal(0)      0.648     0.503     0.566    720781
+     wet(+1)      0.199     0.323     0.246    200018
+
+    accuracy                          0.429   1090719
+   macro avg      0.348     0.355     0.343   1090719
+weighted avg      0.495     0.429     0.453   1090719
+
+Pixel-level confusion matrix labels [-1, 0, 1]
+[[ 40584  92691  36645]
+ [135109 362638 223034]
+ [ 30925 104537  64556]]
+
+Outputs:
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/mediterranean_spain/tabular_monthly_scores.csv
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/mediterranean_spain/tabular_model.json
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/mediterranean_spain/tabular_test_probs.npz
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/mediterranean_spain/tabular_feature_importance.png
