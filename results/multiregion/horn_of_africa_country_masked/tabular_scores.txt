@@ -1,0 +1,49 @@
+Multi-Region XGBoost Experiment: Horn of Africa bounding box (country-mask sensitivity)
+========================================================================
+Region slug: horn_of_africa_country_masked
+Region bbox: lat[-4.5, 13.5] lon[34.0, 43.0]
+Region rationale: Bimodal rainfall regime with stronger large-scale climate coupling; CHIRPS has strong heritage in this region. Country-mask sensitivity run using horn_of_africa_country_mask.nc.
+Model: tabular
+Target: SPI-1[t+1] dry class probability
+Rows: train=16,133,468, val=2,530,784, test=3,321,286
+Test months: 63
+Best iteration: 427
+Validation monthly BS by calibration: {'none': 0.055352762213245, 'isotonic': 0.008707094600888117, 'platt': 0.009191719285745702}
+Selected calibration: isotonic
+Pixel dry ROC-AUC raw: 0.56940
+Features: ['spi1_lag1', 'spi1_lag2', 'spi1_lag3', 'spi3_lag1', 'spi6_lag1', 'pr_lag1', 'pr_lag2', 'pr_lag3', 'month_sin', 'month_cos', 'nino34_lag1', 'nino34_lag2']
+
+Monthly dry-fraction Brier Scores
+  Climatology        : 0.01343
+  XGBoost raw      : 0.04775
+  XGBoost isotonic : 0.01405
+  XGBoost platt    : 0.01386
+  XGBoost selected : 0.01405
+
+Brier Skill Score vs monthly climatology
+  XGBoost raw      : -2.55441 (95% CI [-4.80362, -1.15968])
+  XGBoost isotonic : -0.04601 (95% CI [-0.31166, 0.31255])
+  XGBoost platt    : -0.03178 (95% CI [-0.28207, 0.28924])
+  XGBoost selected : -0.04601 (95% CI [-0.31166, 0.31255])
+
+Pixel-level classification report (secondary diagnostic)
+              precision    recall  f1-score   support
+
+     dry(-1)      0.149     0.247     0.186    390063
+   normal(0)      0.735     0.615     0.670   2362747
+     wet(+1)      0.222     0.272     0.244    568476
+
+    accuracy                          0.513   3321286
+   macro avg      0.369     0.378     0.367   3321286
+weighted avg      0.578     0.513     0.540   3321286
+
+Pixel-level confusion matrix labels [-1, 0, 1]
+[[  96435  214094   79534]
+ [ 446632 1453920  462195]
+ [ 102780  311321  154375]]
+
+Outputs:
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/horn_of_africa_country_masked/tabular_monthly_scores.csv
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/horn_of_africa_country_masked/tabular_model.json
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/horn_of_africa_country_masked/tabular_test_probs.npz
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/horn_of_africa_country_masked/tabular_feature_importance.png

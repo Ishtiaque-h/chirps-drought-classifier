@@ -17,6 +17,15 @@ cvalley_basin_masked,California Central Valley (basin-mask sensitivity),tabular,
 cvalley_basin_masked,California Central Valley (basin-mask sensitivity),tabular,precip_lags,195.32985305786133,0.11807675151454743,3
 cvalley_basin_masked,California Central Valley (basin-mask sensitivity),tabular,seasonality,469.26995849609375,0.28367334237522585,2
 cvalley_basin_masked,California Central Valley (basin-mask sensitivity),tabular,spi_lags,311.13297271728516,0.18807965158627754,5
+horn_of_africa_country_masked,Horn of Africa bounding box (country-mask sensitivity),spatial,enso,1299.9393920898438,0.3102770744759701,2
+horn_of_africa_country_masked,Horn of Africa bounding box (country-mask sensitivity),spatial,precip_lags,439.5487594604492,0.1049140475354594,3
+horn_of_africa_country_masked,Horn of Africa bounding box (country-mask sensitivity),spatial,seasonality,1211.8907470703125,0.28926111315156305,2
+horn_of_africa_country_masked,Horn of Africa bounding box (country-mask sensitivity),spatial,spatial_context,661.2058410644531,0.15782044550714144,4
+horn_of_africa_country_masked,Horn of Africa bounding box (country-mask sensitivity),spatial,spi_lags,577.0235137939453,0.1377273193298661,5
+horn_of_africa_country_masked,Horn of Africa bounding box (country-mask sensitivity),tabular,enso,1924.8411865234375,0.371723334889744,2
+horn_of_africa_country_masked,Horn of Africa bounding box (country-mask sensitivity),tabular,precip_lags,643.1834564208984,0.12421092245979823,3
+horn_of_africa_country_masked,Horn of Africa bounding box (country-mask sensitivity),tabular,seasonality,1695.2948608398438,0.3273935863929821,2
+horn_of_africa_country_masked,Horn of Africa bounding box (country-mask sensitivity),tabular,spi_lags,914.8358764648438,0.17667215625747565,5
 mediterranean_spain,Mediterranean Spain bounding box,spatial,enso,2097.2467041015625,0.41165232845019234,2
 mediterranean_spain,Mediterranean Spain bounding box,spatial,precip_lags,310.9634552001953,0.06103661059318009,3
 mediterranean_spain,Mediterranean Spain bounding box,spatial,seasonality,1533.65771484375,0.30102980642493715,2
@@ -44,6 +53,15 @@ mediterranean_spain_country_masked,Mediterranean Spain bounding box (country-mas
 mediterranean_spain_country_masked,Mediterranean Spain bounding box (country-mask sensitivity),tabular,precip_lags,445.17005920410156,0.045247204359878675,3
 mediterranean_spain_country_masked,Mediterranean Spain bounding box (country-mask sensitivity),tabular,seasonality,3001.973876953125,0.3051214309793453,2
 mediterranean_spain_country_masked,Mediterranean Spain bounding box (country-mask sensitivity),tabular,spi_lags,1070.2775421142578,0.10878329678418386,5
+murray_darling_basin_masked,Murray-Darling Basin bounding box (basin-mask sensitivity),spatial,enso,9391.43017578125,0.4537315751395576,2
+murray_darling_basin_masked,Murray-Darling Basin bounding box (basin-mask sensitivity),spatial,precip_lags,1167.3937072753906,0.05640071593951956,3
+murray_darling_basin_masked,Murray-Darling Basin bounding box (basin-mask sensitivity),spatial,seasonality,5832.763427734375,0.2818004167573089,2
+murray_darling_basin_masked,Murray-Darling Basin bounding box (basin-mask sensitivity),spatial,spatial_context,2267.149658203125,0.10953362440434056,4
+murray_darling_basin_masked,Murray-Darling Basin bounding box (basin-mask sensitivity),spatial,spi_lags,2039.4702758789062,0.09853366775927339,5
+murray_darling_basin_masked,Murray-Darling Basin bounding box (basin-mask sensitivity),tabular,enso,6340.77392578125,0.4834257539513782,2
+murray_darling_basin_masked,Murray-Darling Basin bounding box (basin-mask sensitivity),tabular,precip_lags,930.8138732910156,0.07096600568812579,3
+murray_darling_basin_masked,Murray-Darling Basin bounding box (basin-mask sensitivity),tabular,seasonality,3990.531005859375,0.30424132491622174,2
+murray_darling_basin_masked,Murray-Darling Basin bounding box (basin-mask sensitivity),tabular,spi_lags,1854.2157592773438,0.1413669154442743,5
 southern_great_plains,Southern Great Plains,spatial,enso,2085.3429565429688,0.40311570053062373,2
 southern_great_plains,Southern Great Plains,spatial,precip_lags,482.9321975708008,0.09335517235749015,3
 southern_great_plains,Southern Great Plains,spatial,seasonality,1400.4409790039062,0.2707179385202099,2

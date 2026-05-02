@@ -1,0 +1,49 @@
+Multi-Region XGBoost Experiment: Murray-Darling Basin bounding box (basin-mask sensitivity)
+========================================================================
+Region slug: murray_darling_basin_masked
+Region bbox: lat[-37.8, -24.0] lon[138.0, 153.8]
+Region rationale: Semi-arid agricultural analogue with different ENSO teleconnection structure. This rectangular first pass should later be replaced by a basin polygon mask. Basin-mask sensitivity run using murray_darling_basin_mask.nc.
+Model: spatial
+Target: SPI-1[t+1] dry class probability
+Rows: train=12,352,302, val=1,937,616, test=2,543,121
+Test months: 63
+Best iteration: 32
+Validation monthly BS by calibration: {'none': 0.07880105139344222, 'isotonic': 0.04321512301044928, 'platt': 0.04237538042273043}
+Selected calibration: platt
+Pixel dry ROC-AUC raw: 0.64243
+Features: ['spi1_lag1', 'spi1_lag2', 'spi1_lag3', 'spi3_lag1', 'spi6_lag1', 'pr_lag1', 'pr_lag2', 'pr_lag3', 'month_sin', 'month_cos', 'nino34_lag1', 'nino34_lag2', 'spi1_nbr_mean', 'spi3_nbr_mean', 'spi6_nbr_mean', 'pr_nbr_mean']
+
+Monthly dry-fraction Brier Scores
+  Climatology        : 0.02826
+  XGBoost raw      : 0.05523
+  XGBoost isotonic : 0.02960
+  XGBoost platt    : 0.04769
+  XGBoost selected : 0.04769
+
+Brier Skill Score vs monthly climatology
+  XGBoost raw      : -0.95433 (95% CI [-2.04809, -0.34304])
+  XGBoost isotonic : -0.04737 (95% CI [-0.29247, 0.10387])
+  XGBoost platt    : -0.68757 (95% CI [-1.37927, -0.30094])
+  XGBoost selected : -0.68757 (95% CI [-1.37927, -0.30094])
+
+Pixel-level classification report (secondary diagnostic)
+              precision    recall  f1-score   support
+
+     dry(-1)      0.216     0.353     0.268    276062
+   normal(0)      0.719     0.525     0.607   1720761
+     wet(+1)      0.350     0.534     0.423    546298
+
+    accuracy                          0.509   2543121
+   macro avg      0.428     0.471     0.433   2543121
+weighted avg      0.585     0.509     0.531   2543121
+
+Pixel-level confusion matrix labels [-1, 0, 1]
+[[ 97453 134284  44325]
+ [319543 903909 497309]
+ [ 34813 219595 291890]]
+
+Outputs:
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/murray_darling_basin_masked/spatial_monthly_scores.csv
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/murray_darling_basin_masked/spatial_model.json
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/murray_darling_basin_masked/spatial_test_probs.npz
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/murray_darling_basin_masked/spatial_feature_importance.png

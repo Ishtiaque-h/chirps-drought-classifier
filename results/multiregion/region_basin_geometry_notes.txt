@@ -20,6 +20,14 @@ southern_great_plains - Southern Great Plains
   Forecast dataset pixels retained: 19,424/24,700 (78.64%).
   Interpretation: Basin geometry materially changes the sample; masked rerun should be treated as the cleaner checkpoint.
 
+murray_darling - Murray-Darling Basin bounding box
+  Mask: Murray-Darling Basin Boundary - Water Act 2007
+  Source: Murray-Darling Basin Authority / data.gov.au Murray-Darling Basin Boundary as defined in Section 4(1) of the Water Act 2007.
+  Source URL: https://data.gov.au/geoserver/murray-darling-basin-boundary/wfs?request=GetFeature&typeName=ckan_4ede9aed_5620_47db_a72b_0b3aa0a3ced0&outputFormat=json
+  Valid CHIRPS cells retained: 40,367/77,530 (52.07%); outside basin: 37,163 (47.93%).
+  Forecast dataset pixels retained: 0/0 (nan%).
+  Interpretation: Basin geometry materially changes the sample; masked rerun should be treated as the cleaner checkpoint.
+
 mediterranean_spain - Mediterranean Spain bounding box
   Mask: Mediterranean/eastern-southern Spain river basin districts
   Source: MITECO terrestrial river basin districts; selected Ebro, Catalonia internal basins, Jucar, Segura, Andalusia Mediterranean basins, and Guadalquivir.

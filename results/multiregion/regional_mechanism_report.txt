@@ -6,29 +6,36 @@ Primary target: monthly regional dry-fraction probability for SPI-1[t+1].
 Headline by best selected BSS per region:
 - California Central Valley (spatial): selected BSS=-0.026 [-0.124, 0.047], raw ROC-AUC=0.680
 - California Central Valley (basin-mask sensitivity) (tabular): selected BSS=-0.021 [-0.129, 0.042], raw ROC-AUC=0.720
+- Horn of Africa bounding box (country-mask sensitivity) (spatial): selected BSS=-0.031 [-0.302, 0.320], raw ROC-AUC=0.577
 - Mediterranean Spain bounding box (tabular): selected BSS=0.044 [-0.151, 0.241], raw ROC-AUC=0.538
 - Mediterranean Spain bounding box (basin-mask sensitivity) (spatial): selected BSS=-0.085 [-0.234, 0.034], raw ROC-AUC=0.521
 - Mediterranean Spain bounding box (country-mask sensitivity) (spatial): selected BSS=0.024 [-0.199, 0.305], raw ROC-AUC=0.480
+- Murray-Darling Basin bounding box (basin-mask sensitivity) (tabular): selected BSS=-0.639 [-1.308, -0.278], raw ROC-AUC=0.631
 - Southern Great Plains (spatial): selected BSS=-0.082 [-0.148, -0.002], raw ROC-AUC=0.510
 - Southern Great Plains (basin-mask sensitivity) (spatial): selected BSS=0.010 [-0.098, 0.150], raw ROC-AUC=0.567
 
 Mechanism diagnostics:
 - California Central Valley: selected-probability correlation=0.311, amplitude ratio=0.213, selected bias=-0.034; train->test dry mean 0.133->0.173.
 - California Central Valley (basin-mask sensitivity): selected-probability correlation=0.367, amplitude ratio=0.250, selected bias=-0.053; train->test dry mean 0.126->0.181.
+- Horn of Africa bounding box (country-mask sensitivity): selected-probability correlation=0.182, amplitude ratio=0.208, selected bias=-0.039; train->test dry mean 0.135->0.117.
 - Mediterranean Spain bounding box: selected-probability correlation=0.216, amplitude ratio=0.230, selected bias=0.005; train->test dry mean 0.143->0.156.
 - Mediterranean Spain bounding box (basin-mask sensitivity): selected-probability correlation=-0.103, amplitude ratio=0.186, selected bias=0.008; train->test dry mean 0.142->0.144.
 - Mediterranean Spain bounding box (country-mask sensitivity): selected-probability correlation=0.236, amplitude ratio=0.408, selected bias=0.008; train->test dry mean 0.145->0.157.
+- Murray-Darling Basin bounding box (basin-mask sensitivity): selected-probability correlation=-0.271, amplitude ratio=0.260, selected bias=0.121; train->test dry mean 0.147->0.109.
 - Southern Great Plains: selected-probability correlation=0.091, amplitude ratio=0.053, selected bias=-0.088; train->test dry mean 0.160->0.208.
 - Southern Great Plains (basin-mask sensitivity): selected-probability correlation=0.289, amplitude ratio=0.186, selected bias=-0.093; train->test dry mean 0.159->0.223.
 
 Scientific interpretation:
+- The completed multi-region screen now spans California Central Valley, Southern Great Plains, Murray-Darling, Mediterranean Spain, and Horn of Africa geometry checkpoints; none gives a statistically robust positive selected BSS.
 - Central Valley has strong raw ranking signal, and the DWR groundwater-basin mask strengthens ranking, but selected probabilities still do not beat climatology robustly.
 - Southern Great Plains improves substantially under the EPA ecoregion mask, moving from negative skill to a small positive spatial point estimate, but its confidence interval still crosses zero.
+- Murray-Darling has good raw ranking but a severe calibration/shift failure: test dry frequency is lower than training, selected probabilities are biased high, and selected BSS is strongly negative.
+- Horn of Africa trains for many more boosting rounds and calibrates close to climatology, but the country-masked result is still not positive skill; it should be presented with the caveat that the mask is political-region geometry, not a basin or livelihood-zone boundary.
 - Mediterranean Spain has a positive rectangular-box point estimate, but the basin-district sensitivity turns negative; the earlier Spain hint is geometry-sensitive and should not be treated as evidence of robust positive skill.
 - Country masks are useful diagnostics, but basin/hydroclimate/ecoregion masks are the cleaner checkpoints because they materially change the sampled pixels.
 - ENSO and seasonality dominate gain in all regions, so model fit is mostly large-scale/seasonal. That does not guarantee calibrated probability skill.
 
 Recommended next actions:
-1. Treat the basin/ecoregion-masked runs as the cleaner interpretation checkpoints; keep rectangular/country results as sensitivity diagnostics.
-2. Promote the mask diagnostics and regional mechanism plots into paper-ready figures before adding more predictors.
-3. Run one additional regime, preferably Murray-Darling or Horn of Africa, after defining its final mask.
+1. Stop region expansion for now and write the source-cited mask methodology, including retained-cell fractions and the Horn country-mask caveat.
+2. Promote the mask diagnostics and regional mechanism plots into paper-ready figures/tables.
+3. If Horn becomes central to the claims, add a stricter ASAL/livelihood-zone mask as a sensitivity; otherwise keep it as a country-intersection checkpoint.
