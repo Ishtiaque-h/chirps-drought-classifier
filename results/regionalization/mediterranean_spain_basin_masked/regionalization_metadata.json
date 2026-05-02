@@ -25,11 +25,11 @@
     "n_components": 3,
     "n_jobs": 8,
     "pr_file": null,
-    "recompute": true,
+    "recompute": false,
     "region": "mediterranean_spain",
     "start_year": 1991
   },
-  "created_utc": "2026-05-02T19:16:24.470195+00:00",
+  "created_utc": "2026-05-02T20:29:28.110058+00:00",
   "outputs": {
     "diagnostic_netcdf": "/Users/ishtisdream/chirps-drought-classifier/outputs/regionalization/mediterranean_spain_basin_masked/spi12_regionalization.nc",
     "notes": "/Users/ishtisdream/chirps-drought-classifier/results/regionalization/mediterranean_spain_basin_masked/regionalization_method_notes.txt",

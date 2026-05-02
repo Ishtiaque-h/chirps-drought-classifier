@@ -25,11 +25,11 @@
     "n_components": 3,
     "n_jobs": 8,
     "pr_file": null,
-    "recompute": true,
+    "recompute": false,
     "region": "southern_great_plains",
     "start_year": 1991
   },
-  "created_utc": "2026-05-02T19:06:54.849420+00:00",
+  "created_utc": "2026-05-02T20:29:22.729826+00:00",
   "outputs": {
     "diagnostic_netcdf": "/Users/ishtisdream/chirps-drought-classifier/outputs/regionalization/southern_great_plains_basin_masked/spi12_regionalization.nc",
     "notes": "/Users/ishtisdream/chirps-drought-classifier/results/regionalization/southern_great_plains_basin_masked/regionalization_method_notes.txt",

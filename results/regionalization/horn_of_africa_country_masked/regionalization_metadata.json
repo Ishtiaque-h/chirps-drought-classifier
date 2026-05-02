@@ -25,11 +25,11 @@
     "n_components": 3,
     "n_jobs": 8,
     "pr_file": null,
-    "recompute": true,
+    "recompute": false,
     "region": "horn_of_africa",
     "start_year": 1991
   },
-  "created_utc": "2026-05-02T19:28:30.945326+00:00",
+  "created_utc": "2026-05-02T20:29:30.770753+00:00",
   "outputs": {
     "diagnostic_netcdf": "/Users/ishtisdream/chirps-drought-classifier/outputs/regionalization/horn_of_africa_country_masked/spi12_regionalization.nc",
     "notes": "/Users/ishtisdream/chirps-drought-classifier/results/regionalization/horn_of_africa_country_masked/regionalization_method_notes.txt",

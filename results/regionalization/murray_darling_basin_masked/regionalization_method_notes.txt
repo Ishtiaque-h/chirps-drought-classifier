@@ -40,4 +40,4 @@ Climate-index correlations:
   Requested columns: ['nino34', 'soi', 'pdo']
   Positive lags mean the climate index leads SPI-12: [0, 1, 3, 6]
 
-Created UTC: 2026-05-02T19:14:56.556821+00:00
+Created UTC: 2026-05-02T20:29:25.759003+00:00
