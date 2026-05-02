@@ -477,10 +477,11 @@ def write_report(
             "- Central Valley has the strongest raw ranking signal, but selected probabilities still do not beat climatology robustly.",
             "- Southern Great Plains has weak raw ranking and a test-period seasonal climatology mismatch; both tabular and spatial XGB remain below climatology.",
             "- Mediterranean Spain has the best calibrated point estimate, but the confidence interval crosses zero; this is a hypothesis-generating regional hint, not a positive-skill claim.",
+            "- The Spain country-mask sensitivity keeps a positive point estimate but lowers it and widens uncertainty; geometry matters enough that final regional claims need mask-aware runs.",
             "- ENSO and seasonality dominate gain in all regions, so model fit is mostly large-scale/seasonal. That does not guarantee calibrated probability skill.",
             "",
             "Recommended next actions:",
-            "1. Add basin/land masks for rectangular regions before publication-level regional claims.",
+            "1. Replace first-pass country masks with basin or hydroclimate masks before publication-level regional claims.",
             "2. Run one additional regime, preferably Murray-Darling or Horn of Africa, if compute budget allows.",
             "3. Add regional diagnostic plots to the paper narrative before adding more predictors.",
         ]
