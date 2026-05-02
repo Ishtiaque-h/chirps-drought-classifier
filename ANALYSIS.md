@@ -29,7 +29,7 @@ The project implements a complete, reproducible pipeline for **1-month-ahead dro
 | Seasonal SPI-3 experiment | ✅ Initial test complete | Leakage-free SPI-3 lead-3 tabular XGBoost remains below climatology after isotonic calibration |
 | Temperature/VPD experiment | ✅ Initial test complete | Regional ERA5-Land t2m/VPD anomalies improve raw XGB but still do not beat climatology |
 | Soil-moisture experiment | ✅ Initial test complete | Regional ERA5-Land soil-water/root-zone anomaly lags overfit and remain below climatology |
-| Multi-region path | ✅ Initial path complete | Region registry + runner now support Central Valley parity and full Southern Great Plains tabular/spatial tests |
+| Multi-region path | ✅ Initial path complete | Region registry + runner now supports Central Valley, Southern Great Plains, and Mediterranean Spain tabular/spatial tests |
 
 ### Key results (corrected ENSO + spatial checkpoint — 2026-05-01)
 
@@ -74,15 +74,16 @@ The project implements a complete, reproducible pipeline for **1-month-ahead dro
 > negative on the test period, so this is overfit land-surface memory rather
 > than usable 1-month-ahead SPI-1 skill.
 >
-> **The first multi-region extension supports the barrier hypothesis.**
+> **The first multi-region extension complicates the barrier hypothesis in a
+> useful way.**
 > `scripts/run_multiregion_xgb_experiment.py` now clips CHIRPS, computes
 > region-specific SPI, builds the same SPI-1[t+1] forecast table, and evaluates
-> monthly BSS for configured regions. A full-resolution Southern Great Plains
-> tabular XGBoost test gives selected calibrated BSS = -0.082 with a 95% CI
-> just below zero; the spatial XGBoost variant is effectively identical
-> (selected BSS = -0.082). This is not yet a complete multi-region proof, but
-> it is the first contrasting-hydroclimate result and it remains below
-> climatology.
+> monthly BSS for configured regions. Southern Great Plains tabular/spatial
+> XGBoost remains below climatology (`selected BSS ≈ -0.082`, CI just below
+> zero). Mediterranean Spain, however, has a positive calibrated point estimate
+> (`tabular BSS = +0.044`, `spatial BSS = +0.022`), but both confidence
+> intervals cross zero. The current result is therefore not "ML never works";
+> it is "positive 1-month SPI-1 skill is region-dependent and not yet robust."
 >
 > **XGB-Spatial is the best current ML option** because it has the best ranking
 > skill (ROC-AUC = 0.743) and the best calibrated Brier Score. Current evidence
@@ -132,8 +133,8 @@ This is a scientifically valid and publishable finding — but only if the analy
 **Recommended expansion regions (ranked by scientific complementarity):**
 
 1. **Great Plains, USA (Kansas–Oklahoma)** — first full tabular and spatial tests are complete and negative
-2. **Murray–Darling Basin, Australia** — analogous semi-arid agricultural region; CHIRPS coverage excellent; different ENSO teleconnection sign
-3. **Mediterranean Spain (Ebro/Guadalquivir basins)** — closest hydroclimate analog; tests cross-regime transferability within Mediterranean climates
+2. **Mediterranean Spain (Ebro/Guadalquivir basins)** — full tabular/spatial tests are complete; positive calibrated point estimates, but CIs cross zero
+3. **Murray–Darling Basin, Australia** — analogous semi-arid agricultural region; CHIRPS coverage excellent; different ENSO teleconnection sign
 4. **Horn of Africa (Kenya–Ethiopia)** — CHIRPS was originally designed for this region; bimodal precipitation with strong ENSO dependence
 
 ---
@@ -255,14 +256,15 @@ The finding that ML does not reliably outperform climatology at 1-month lead is 
 
 | Rank | Action | Impact | Feasibility | Rationale |
 |------|--------|--------|-------------|-----------|
-| **1** | **Add one more full region** (Murray-Darling or Spain) | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | Turns the current two-region result into a stronger hydroclimate comparison. |
-| **2** | **Compare regional mechanisms** | ⭐⭐⭐⭐ | ⭐⭐⭐ | Central Valley has useful ranking but weak calibration; Southern Great Plains has weak ranking and weak BSS. Explaining that contrast will strengthen the narrative. |
-| **3** | **Atmospheric-river or subseasonal circulation predictors** | ⭐⭐⭐⭐ | ⭐⭐ | Central Valley monthly extremes are event-driven; AR/circulation predictors are more physically targeted than more lagged land-surface tuning. |
-| **4** | **Seasonal target variants with more information** | ⭐⭐⭐ | ⭐⭐⭐ | The first tabular SPI-3 lead-3 run is negative; revisit with spatial features, extra drivers, or additional regions if needed. |
-| **5** | **Gridded/SMAP soil-moisture sensitivity** | ⭐⭐ | ⭐⭐ | Regional ERA5-Land soil moisture overfits; only pursue this if a spatial or independent-observation formulation is needed for completeness. |
-| **6** | **Refresh corrected explainability as figures evolve** | ⭐⭐ | ⭐⭐⭐⭐ | Current SHAP artifacts are refreshed; rerun only after model/schema changes. |
-| **7** | **Regional/seasonal stratified diagnostics with more months** | ⭐⭐⭐⭐ | ⭐⭐⭐ | Current MAM/ENSO hints have CIs crossing zero; more independent months or regions are needed. |
-| **8** | **Transfer learning experiment** | ⭐⭐⭐⭐ | ⭐⭐ | High novelty but requires multi-region setup. |
+| **1** | **Compare regional mechanisms** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | Central Valley has useful ranking but weak calibration; Southern Great Plains has weak ranking; Mediterranean Spain has the best calibrated point estimate but wide uncertainty. This contrast is now the main scientific story. |
+| **2** | **Improve region geometry** | ⭐⭐⭐⭐ | ⭐⭐⭐ | Rectangular boxes are fine for screening, but basin/land masks are needed before final publication claims, especially Spain/Murray-Darling. |
+| **3** | **Add one more full region** (Murray-Darling or Horn of Africa) | ⭐⭐⭐⭐ | ⭐⭐ | Tests whether the Mediterranean Spain hint is isolated or part of a broader regime pattern. |
+| **4** | **Atmospheric-river or subseasonal circulation predictors** | ⭐⭐⭐⭐ | ⭐⭐ | Central Valley monthly extremes are event-driven; AR/circulation predictors are more physically targeted than more lagged land-surface tuning. |
+| **5** | **Seasonal target variants with more information** | ⭐⭐⭐ | ⭐⭐⭐ | The first tabular SPI-3 lead-3 run is negative; revisit with spatial features, extra drivers, or additional regions if needed. |
+| **6** | **Gridded/SMAP soil-moisture sensitivity** | ⭐⭐ | ⭐⭐ | Regional ERA5-Land soil moisture overfits; only pursue this if a spatial or independent-observation formulation is needed for completeness. |
+| **7** | **Refresh corrected explainability as figures evolve** | ⭐⭐ | ⭐⭐⭐⭐ | Current SHAP artifacts are refreshed; rerun only after model/schema changes. |
+| **8** | **Regional/seasonal stratified diagnostics with more months** | ⭐⭐⭐⭐ | ⭐⭐⭐ | Current MAM/ENSO hints have CIs crossing zero; more independent months or regions are needed. |
+| **9** | **Transfer learning experiment** | ⭐⭐⭐⭐ | ⭐⭐ | High novelty but requires multi-region setup. |
 
 ### What NOT to prioritize:
 
@@ -327,17 +329,25 @@ This narrative transforms a "negative result" into a **methodological and scient
    dataset build, and monthly BSS evaluation without overwriting canonical artifacts.
    Central Valley parity remains near climatology, and the first full Southern Great Plains
    tabular and spatial runs are negative (`selected BSS = -0.082`, CI just below zero).
+14. ✅ **Mediterranean Spain full-region experiment added** —
+   tabular and spatial XGBoost both show positive calibrated point estimates
+   (`BSS = +0.044` and `+0.022`), but both CIs cross zero. This is the first
+   hint of region-dependent positive skill, not yet a defensible positive-skill claim.
 
 ### Next experiments (priority order)
 
-1. **Add a third full region**
-   Mediterranean Spain or Murray-Darling Basin would test whether the result holds outside
-   the western/central U.S. pair.
-
-2. **Compare Central Valley vs Southern Great Plains failure modes**
+1. **Compare regional failure/success modes**
    Central Valley has stronger dry ranking but little calibrated probability skill; Southern
-   Great Plains has both weak ranking and negative BSS. That contrast is now the most useful
-   diagnostic from the first multi-region result.
+   Great Plains has both weak ranking and negative BSS; Mediterranean Spain has modest
+   calibrated positive point estimates but wide CIs. This three-region contrast is now the
+   highest-value analysis.
+
+2. **Improve region geometry**
+   Add basin or land masks for rectangular regions before making final publication claims.
+
+3. **Add one more full region if resources allow**
+   Murray-Darling Basin or Horn of Africa would test whether the Mediterranean Spain hint is
+   isolated or regime-linked.
 
 3. **Extend seasonal SPI-3 only if needed**
    The first leakage-free tabular SPI-3 lead-3 result is negative. A fair next

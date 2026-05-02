@@ -226,6 +226,8 @@ The runner clips CHIRPS, computes region-specific SPI, builds the same
 SPI-1[t+1] forecast table, and evaluates monthly dry-fraction BSS. Parallel SPI
 fitting is available through `--spi-n-jobs`; `--grid-stride` is available only
 for smoke tests and should not be treated as a scientific result.
+The compact comparison table is saved at
+[results/multiregion/regional_mechanism_summary.csv](results/multiregion/regional_mechanism_summary.csv).
 
 Initial full-resolution result:
 
@@ -234,9 +236,14 @@ Initial full-resolution result:
 | Central Valley / spatial XGB retrain | 0.06598 | −0.02644 | [−0.12449, 0.04704] | Parity check: near climatology, consistent with frozen checkpoint |
 | Southern Great Plains / tabular XGB | 0.05164 | −0.08218 | [−0.14450, −0.00066] | First full contrasting-region test; still below climatology |
 | Southern Great Plains / spatial XGB | 0.05163 | −0.08200 | [−0.14790, −0.00190] | Spatial context does not close the gap |
+| Mediterranean Spain / tabular XGB | 0.04587 | +0.04403 | [−0.15104, 0.24096] | Positive point estimate, not statistically reliable |
+| Mediterranean Spain / spatial XGB | 0.04692 | +0.02212 | [−0.15139, 0.17647] | Spatial context weakens the point estimate |
 
-This does not yet prove a universal barrier, but it moves the project from a
-single-region case study toward a reproducible multi-region comparison.
+This no longer reads as a simple universal "no skill" result. Central Valley is
+near climatology, Southern Great Plains is below climatology, and Mediterranean
+Spain shows a positive but statistically uncertain calibrated point estimate.
+That is stronger science than a one-region claim: the next analysis should
+explain which hydroclimate properties produce ranking/calibration differences.
 
 ---
 
@@ -268,11 +275,11 @@ single-region case study toward a reproducible multi-region comparison.
 
 Highest-impact directions (see [`ANALYSIS.md`](ANALYSIS.md) for full roadmap):
 
-1. **Run one more contrasting region** — Mediterranean Spain or Murray-Darling would test whether the result holds outside the western/central U.S.
-2. **Compare regional mechanisms** — Southern Great Plains has weak dry ranking (ROC-AUC near 0.51), while Central Valley has stronger ranking but weak calibration; that difference is worth explaining.
-3. **Add targeted event-scale predictors only if staying single-region** — Atmospheric-river or subseasonal circulation features are more physically aligned with Central Valley monthly extremes than more lagged land-surface fields.
-4. **Seasonal target variants** — The first tabular SPI-3 lead-3 experiment is negative; only extend this with spatial features or additional drivers if it serves the paper's scope.
-5. **Region and season-conditioned experiments** — Current MAM/ENSO hints have CIs crossing zero; more independent months or regions are needed before claiming conditional skill.
+1. **Compare regional mechanisms** — Central Valley has stronger ranking but weak calibration, Southern Great Plains has weak ranking, and Mediterranean Spain has the best calibrated point estimate but wide uncertainty.
+2. **Run one more full region if resources allow** — Murray-Darling or Horn of Africa would test whether the Mediterranean Spain hint is regional or general.
+3. **Improve region geometry** — Rectangular boxes are acceptable for first-pass comparison; basin/land masks are needed before final publication claims.
+4. **Add targeted event-scale predictors only if staying single-region** — Atmospheric-river or subseasonal circulation features are more physically aligned with Central Valley monthly extremes than more lagged land-surface fields.
+5. **Seasonal target variants** — The first tabular SPI-3 lead-3 experiment is negative; only extend this with spatial features or additional drivers if it serves the paper's scope.
 
 ---
 
