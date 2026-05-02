@@ -1,0 +1,30 @@
+EDL Experiment (MLP baseline)
+============================================================
+Design: canonical SPI-1[t+1] target with EDL multi-class MLP.
+Features: ['spi1_lag1', 'spi1_lag2', 'spi1_lag3', 'spi3_lag1', 'spi6_lag1', 'pr_lag1', 'pr_lag2', 'pr_lag3', 'month_sin', 'month_cos', 'nino34_lag1', 'nino34_lag2']
+Train rows: 2,085,540  Val rows: 327,144  Test rows: 429,378
+Best calibration (val monthly BS): isotonic
+
+Monthly dry-fraction Brier Scores
+  Climatology         : 0.06428
+  EDL raw             : 0.09148
+  EDL isotonic        : 0.07175
+  EDL Platt           : 0.07214
+  EDL selected        : 0.07175
+
+Brier Skill Score vs monthly climatology
+  EDL raw             : -0.42323
+  EDL isotonic        : -0.11623
+  EDL Platt           : -0.12234
+  EDL selected        : -0.11623
+
+Pixel-level classification report (secondary diagnostic)
+              precision    recall  f1-score   support
+
+     dry(-1)      0.242     0.325     0.277     74453
+   normal(0)      0.703     0.541     0.612    298750
+     wet(+1)      0.142     0.250     0.181     56175
+
+    accuracy                          0.466    429378
+   macro avg      0.362     0.372     0.357    429378
+weighted avg      0.549     0.466     0.497    429378

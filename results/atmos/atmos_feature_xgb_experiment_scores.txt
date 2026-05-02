@@ -1,0 +1,43 @@
+Atmospheric Feature Experiment (MJO + optional AR/IVT)
+============================================================
+Design: canonical SPI-1[t+1] target with monthly MJO phase/amplitude features (and optional AR/IVT indices) at feature month t.
+Test months: 39
+Best iteration: 93
+Validation monthly BS by calibration: {'none': 0.08173258234109408, 'isotonic': 0.05377968713062459, 'platt': 0.06715724907136973}
+Selected calibration: isotonic
+Features: ['spi1_lag1', 'spi1_lag2', 'spi1_lag3', 'spi3_lag1', 'spi6_lag1', 'pr_lag1', 'pr_lag2', 'pr_lag3', 'month_sin', 'month_cos', 'nino34_lag1', 'nino34_lag2', 'mjo_amp_mean', 'mjo_phase_sin', 'mjo_phase_cos', 'mjo_active_frac', 'ivt_mean_anom_lag1', 'ivt_mean_anom_lag2', 'ivt_p90_anom_lag1', 'ivt_p90_anom_lag2']
+
+Monthly dry-fraction Brier Scores
+  Climatology           : 0.07910
+  XGBoost + atmos raw   : 0.09981
+  XGBoost + atmos isotonic: 0.10545
+  XGBoost + atmos Platt : 0.08850
+  XGBoost + atmos selected: 0.10545
+
+Brier Skill Score vs monthly climatology
+  XGBoost + atmos raw   : -0.26182 (95% CI [-0.99224, 0.01651])
+  XGBoost + atmos isotonic: -0.33308 (95% CI [-0.99835, -0.08959])
+  XGBoost + atmos Platt : -0.11875 (95% CI [-0.25503, -0.00172])
+  XGBoost + atmos selected: -0.33308 (95% CI [-0.99835, -0.08959])
+
+Pixel-level classification report (secondary diagnostic)
+              precision    recall  f1-score   support
+
+     dry(-1)      0.163     0.082     0.109     53864
+   normal(0)      0.648     0.858     0.738    171753
+     wet(+1)      0.058     0.016     0.026     40189
+
+    accuracy                          0.573    265806
+   macro avg      0.290     0.319     0.291    265806
+weighted avg      0.460     0.573     0.503    265806
+
+Pixel-level confusion matrix labels [-1, 0, 1]
+[[  4399  47132   2333]
+ [ 15959 147282   8512]
+ [  6572  32955    662]]
+
+Outputs:
+  /Users/ishtisdream/chirps-drought-classifier/outputs/atmos_feature_xgb_monthly_scores.csv
+  /Users/ishtisdream/chirps-drought-classifier/outputs/atmos_feature_xgb_model.json
+  /Users/ishtisdream/chirps-drought-classifier/outputs/atmos_feature_xgb_test_probs.npz
+  /Users/ishtisdream/chirps-drought-classifier/outputs/atmos_feature_xgb_feature_importance.png
