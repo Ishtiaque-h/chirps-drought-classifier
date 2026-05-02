@@ -140,10 +140,23 @@ def parse_args() -> Namespace:
         ),
     )
     parser.add_argument(
+        "--basin-mask",
+        action="store_true",
+        help=(
+            "Filter the forecast table to the configured basin/hydroclimate mask and write a "
+            "separate '<region>_basin_masked' sensitivity run."
+        ),
+    )
+    parser.add_argument(
         "--mask-file",
         type=Path,
         default=None,
-        help="Optional mask NetCDF with a 'country_mask' variable. Defaults to the region mask product.",
+        help="Optional mask NetCDF. Defaults to the selected country or basin mask product.",
+    )
+    parser.add_argument(
+        "--mask-var",
+        default=None,
+        help="Optional mask variable name inside --mask-file. Defaults from --country-mask/--basin-mask.",
     )
     return parser.parse_args()
 
@@ -207,6 +220,10 @@ def region_paths(region: Region, start_year: int, end_year: int, use_canonical: 
 
 def default_country_mask_file(region: Region) -> Path:
     return REGION_DATA_ROOT / region.slug / "masks" / f"{region.slug}_country_mask.nc"
+
+
+def default_basin_mask_file(region: Region) -> Path:
+    return REGION_DATA_ROOT / region.slug / "masks" / f"{region.slug}_basin_mask.nc"
 
 
 def masked_dataset_paths(region: Region) -> dict[str, Path]:
@@ -570,6 +587,7 @@ def build_forecast_dataset(
     climate_features: str,
     force: bool,
     mask_file: Path | None = None,
+    mask_var: str = "country_mask",
 ) -> pd.DataFrame:
     if dataset_file.exists() and not force:
         print(f"Using existing forecast dataset: {dataset_file}")
@@ -588,10 +606,10 @@ def build_forecast_dataset(
     label = spi_ds["drought_label_spi1"].sel(time=pr.time)
 
     if mask_file is not None:
-        grid_mask = load_grid_mask(mask_file, pr)
+        grid_mask = load_grid_mask(mask_file, pr, var_name=mask_var)
         n_keep = int(grid_mask.sum())
         n_total = int(grid_mask.size)
-        print(f"Applying country mask: {mask_file} ({n_keep:,}/{n_total:,} grid cells retained)")
+        print(f"Applying grid mask '{mask_var}': {mask_file} ({n_keep:,}/{n_total:,} grid cells retained)")
         pr = pr.where(grid_mask)
         spi1 = spi1.where(grid_mask)
         spi3 = spi3.where(grid_mask)
@@ -665,7 +683,12 @@ def build_forecast_dataset(
     return df
 
 
-def build_spatial_feature_frame(pr_file: Path, spi_file: Path, mask_file: Path | None = None) -> pd.DataFrame:
+def build_spatial_feature_frame(
+    pr_file: Path,
+    spi_file: Path,
+    mask_file: Path | None = None,
+    mask_var: str = "country_mask",
+) -> pd.DataFrame:
     print("Building 3x3 spatial-neighbourhood features...")
     pr_ds = xr.open_dataset(pr_file).load()
     spi_ds = xr.open_dataset(spi_file).load()
@@ -675,10 +698,10 @@ def build_spatial_feature_frame(pr_file: Path, spi_file: Path, mask_file: Path |
     spi6 = spi_ds["spi6"].sel(time=pr.time).astype("float32")
 
     if mask_file is not None:
-        grid_mask = load_grid_mask(mask_file, pr)
+        grid_mask = load_grid_mask(mask_file, pr, var_name=mask_var)
         n_keep = int(grid_mask.sum())
         n_total = int(grid_mask.size)
-        print(f"Applying country mask before neighbourhood rolling: {n_keep:,}/{n_total:,} grid cells retained")
+        print(f"Applying grid mask '{mask_var}' before neighbourhood rolling: {n_keep:,}/{n_total:,} grid cells retained")
         pr = pr.where(grid_mask)
         spi1 = spi1.where(grid_mask)
         spi3 = spi3.where(grid_mask)
@@ -1094,6 +1117,8 @@ def main() -> None:
 
     if args.grid_stride < 1:
         raise ValueError("--grid-stride must be >= 1")
+    if args.country_mask and args.basin_mask:
+        raise ValueError("Choose only one of --country-mask or --basin-mask")
 
     base_region = resolve_region(args.region)
     source_region = base_region
@@ -1113,22 +1138,31 @@ def main() -> None:
     paths = region_paths(source_region, args.start_year, end_year, use_canonical)
 
     mask_file = None
+    mask_var = None
     run_region = source_region
-    if args.country_mask:
+    mask_kind = "country" if args.country_mask else "basin" if args.basin_mask else None
+    if mask_kind is not None:
         if args.grid_stride > 1 and args.mask_file is None:
-            raise ValueError("--country-mask with --grid-stride requires an explicit --mask-file on the same grid")
-        if not base_region.mask_countries:
+            raise ValueError(
+                f"--{mask_kind}-mask with --grid-stride requires an explicit --mask-file on the same grid"
+            )
+        if mask_kind == "country" and not base_region.mask_countries:
             raise ValueError(f"Region {base_region.slug} has no configured mask countries")
-        mask_file = args.mask_file or default_country_mask_file(base_region)
-        masked_slug = f"{source_region.slug}_country_masked"
+        mask_file = args.mask_file or (
+            default_country_mask_file(base_region)
+            if mask_kind == "country"
+            else default_basin_mask_file(base_region)
+        )
+        mask_var = args.mask_var or ("country_mask" if mask_kind == "country" else "basin_mask")
+        masked_slug = f"{source_region.slug}_{mask_kind}_masked"
         run_region = replace(
             source_region,
             slug=masked_slug,
-            name=f"{source_region.name} (country-mask sensitivity)",
+            name=f"{source_region.name} ({mask_kind}-mask sensitivity)",
             rationale=(
                 source_region.rationale
-                + " Country-mask sensitivity run using configured Natural Earth "
-                f"countries: {', '.join(base_region.mask_countries)}."
+                + f" {mask_kind.title()}-mask sensitivity run using "
+                f"{mask_file.name}."
             ),
             mask_countries=base_region.mask_countries,
             mask_note=base_region.mask_note,
@@ -1144,7 +1178,8 @@ def main() -> None:
     print(f"Use canonical cvalley files: {use_canonical}")
     print(f"Climate features: {args.climate_features}")
     if mask_file is not None:
-        print(f"Country mask file: {mask_file}")
+        print(f"{mask_kind.title()} mask file: {mask_file}")
+        print(f"Mask variable: {mask_var}")
 
     if not use_canonical:
         clip_chirps(source_region, paths["pr"], args.start_year, end_year, args.rebuild_pr, args.grid_stride)
@@ -1157,8 +1192,9 @@ def main() -> None:
         dataset_file=paths["dataset"],
         sample_file=paths["sample"],
         climate_features=args.climate_features,
-        force=args.rebuild_dataset and (not use_canonical or args.country_mask),
+        force=args.rebuild_dataset and (not use_canonical or mask_kind is not None),
         mask_file=mask_file,
+        mask_var=mask_var or "country_mask",
     )
 
     if args.prepare_only:
@@ -1172,7 +1208,12 @@ def main() -> None:
         model_df = df
         features = get_feature_columns(model_df.columns)
         if model_name == "spatial":
-            spatial = build_spatial_feature_frame(paths["pr"], paths["spi"], mask_file=mask_file)
+            spatial = build_spatial_feature_frame(
+                paths["pr"],
+                paths["spi"],
+                mask_file=mask_file,
+                mask_var=mask_var or "country_mask",
+            )
             model_df = model_df.merge(
                 spatial,
                 on=["time", "latitude", "longitude"],

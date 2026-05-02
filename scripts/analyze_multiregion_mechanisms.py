@@ -442,7 +442,7 @@ def write_report(
     lines = [
         "Multi-Region Mechanism Analysis",
         "=" * 72,
-        "Scope: completed full-resolution regions only; grid-stride smoke tests are excluded.",
+        "Scope: completed full-resolution runs and geometry sensitivities; grid-stride smoke tests are excluded.",
         "Primary target: monthly regional dry-fraction probability for SPI-1[t+1].",
         "",
         "Headline by best selected BSS per region:",
@@ -474,16 +474,16 @@ def write_report(
         [
             "",
             "Scientific interpretation:",
-            "- Central Valley has the strongest raw ranking signal, but selected probabilities still do not beat climatology robustly.",
+            "- Central Valley has strong raw ranking signal, and the DWR groundwater-basin mask strengthens ranking, but selected probabilities still do not beat climatology robustly.",
             "- Southern Great Plains has weak raw ranking and a test-period seasonal climatology mismatch; both tabular and spatial XGB remain below climatology.",
-            "- Mediterranean Spain has the best calibrated point estimate, but the confidence interval crosses zero; this is a hypothesis-generating regional hint, not a positive-skill claim.",
-            "- The Spain country-mask sensitivity keeps a positive point estimate but lowers it and widens uncertainty; geometry matters enough that final regional claims need mask-aware runs.",
+            "- Mediterranean Spain has a positive rectangular-box point estimate, but the basin-district sensitivity turns negative; the earlier Spain hint is geometry-sensitive and should not be treated as evidence of robust positive skill.",
+            "- Country masks are useful diagnostics, but basin/hydroclimate masks are the cleaner checkpoints for Central Valley and Spain because they materially change the sampled pixels.",
             "- ENSO and seasonality dominate gain in all regions, so model fit is mostly large-scale/seasonal. That does not guarantee calibrated probability skill.",
             "",
             "Recommended next actions:",
-            "1. Replace first-pass country masks with basin or hydroclimate masks before publication-level regional claims.",
-            "2. Run one additional regime, preferably Murray-Darling or Horn of Africa, if compute budget allows.",
-            "3. Add regional diagnostic plots to the paper narrative before adding more predictors.",
+            "1. Treat basin-masked Central Valley and Spain as the cleaner interpretation checkpoints; keep rectangular/country results as sensitivity diagnostics.",
+            "2. Add an equivalent hydrologic or ecoregion mask for Southern Great Plains before comparing it directly with the basin-masked regions.",
+            "3. Run one additional regime, preferably Murray-Darling or Horn of Africa, after defining its final mask.",
         ]
     )
     out_path.write_text("\n".join(lines) + "\n")
