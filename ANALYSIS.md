@@ -29,9 +29,9 @@ The project implements a complete, reproducible pipeline for **1-month-ahead dro
 | Seasonal SPI-3 experiment | ✅ Initial test complete | Leakage-free SPI-3 lead-3 tabular XGBoost remains below climatology after isotonic calibration |
 | Temperature/VPD experiment | ✅ Initial test complete | Regional ERA5-Land t2m/VPD anomalies improve raw XGB but still do not beat climatology |
 | Soil-moisture experiment | ✅ Initial test complete | Regional ERA5-Land soil-water/root-zone anomaly lags overfit and remain below climatology |
-| Multi-region path | ✅ Initial path complete | Region registry + runner now supports Central Valley, Southern Great Plains, and Mediterranean Spain tabular/spatial tests |
+| Multi-region path | ✅ Five-region path complete | Region registry + runner now supports Central Valley, Southern Great Plains, Murray-Darling, Mediterranean Spain, and Horn of Africa tabular/spatial tests |
 | Regional mechanism comparison | ✅ Initial analysis complete | Reproducible diagnostics separate ranking, calibration, test-period shift, persistence, and feature-group gain |
-| Region geometry audit | ✅ Basin/ecoregion masks added | Natural Earth country masks plus DWR, EPA, and MITECO masks quantify rectangular-box sensitivity and add masked Central Valley, Southern Great Plains, and Spain runs |
+| Region geometry audit | ✅ Source-cited masks added | Natural Earth country masks plus DWR, EPA, Murray-Darling Basin Authority/data.gov.au, and MITECO masks quantify rectangular-box sensitivity and add masked priority-region runs |
 
 ### Key results (corrected ENSO + spatial checkpoint — 2026-05-01)
 
@@ -76,18 +76,19 @@ The project implements a complete, reproducible pipeline for **1-month-ahead dro
 > negative on the test period, so this is overfit land-surface memory rather
 > than usable 1-month-ahead SPI-1 skill.
 >
-> **The first multi-region extension is useful, but geometry-sensitive.**
+> **The multi-region extension is now broad enough for the generalization claim.**
 > `scripts/run_multiregion_xgb_experiment.py` now clips CHIRPS, computes
 > region-specific SPI, builds the same SPI-1[t+1] forecast table, and evaluates
-> monthly BSS for configured regions. Rectangular Southern Great Plains
-> tabular/spatial XGBoost remains below climatology (`selected BSS ≈ -0.082`,
-> CI just below zero), but the EPA ecoregion-masked run improves to a small
-> positive spatial point estimate (`BSS = +0.010`, CI [-0.098, +0.150]) with
-> better ranking (`ROC-AUC = 0.567`). Mediterranean Spain has a positive
-> rectangular calibrated point estimate (`tabular BSS = +0.044`, `spatial BSS =
-> +0.022`), but both confidence intervals cross zero. After stricter river-basin
-> district masking, Spain turns negative (`spatial BSS = -0.0846`, CI crossing
-> zero), so the rectangular Spain hint is not robust.
+> monthly BSS for configured regions. Across Central Valley, Southern Great
+> Plains, Murray-Darling, Mediterranean Spain, and Horn of Africa, no
+> source-cited geometry checkpoint gives statistically robust positive selected
+> BSS. Southern Great Plains improves under the EPA ecoregion mask (`BSS =
+> +0.010`, CI [-0.098, +0.150]) but remains uncertain. Horn of Africa calibrates
+> near climatology (`BSS = -0.031`, CI [-0.302, +0.320]) under a country-mask
+> checkpoint. Murray-Darling is strongly negative after official basin masking
+> (`BSS = -0.639`, CI [-1.308, -0.278]). Mediterranean Spain's rectangular
+> positive point estimate does not survive stricter river-basin district masking
+> (`spatial BSS = -0.0846`, CI crossing zero).
 >
 > **The mechanism diagnostics identify multiple failure modes.**
 > `scripts/analyze_multiregion_mechanisms.py` shows that Central Valley has the
@@ -97,18 +98,23 @@ The project implements a complete, reproducible pipeline for **1-month-ahead dro
 > dry shift from 0.160 to 0.208. The EPA ecoregion mask improves Southern Great
 > Plains ranking and BSS, but still leaves a wide CI crossing zero. Basin-masked
 > Central Valley strengthens raw ranking (`ROC-AUC ≈ 0.72`) but still remains
-> below climatology. Basin-masked Spain has weak/negative selected-probability
-> correlation, so its rectangular positive point estimate was a
-> geometry-sensitive artifact.
+> below climatology. Murray-Darling has ranking signal (`ROC-AUC ≈ 0.63`) but
+> negative selected-probability correlation, high positive bias, and a train-to-test
+> dry-frequency drop from 0.147 to 0.109. Horn has weak ranking and a small
+> negative selected BSS, but its CI is wide and crosses zero. Basin-masked Spain
+> has weak/negative selected-probability correlation, so its rectangular positive
+> point estimate was a geometry-sensitive artifact.
 >
 > **Basin geometry materially changes the sample.**
 > `scripts/build_basin_masks.py` uses CA DWR Bulletin 118 groundwater basins for
-> Central Valley, US EPA Level III ecoregions for Southern Great Plains, and
-> MITECO terrestrial river-basin districts for Spain. The DWR Central Valley
-> mask retains 27.92% of valid rectangular cells, the EPA Southern Great Plains
-> ecoregion mask retains 78.64%, and the selected Spain basin-district mask
-> retains 52.31%. These source-cited masked runs are the cleaner interpretation
-> checkpoints.
+> Central Valley, US EPA Level III ecoregions for Southern Great Plains, the
+> official Murray-Darling Basin Boundary - Water Act 2007, and MITECO terrestrial
+> river-basin districts for Spain. The DWR Central Valley mask retains 27.92% of
+> valid rectangular cells, the EPA Southern Great Plains ecoregion mask retains
+> 78.64%, the Murray-Darling Basin mask retains 52.07%, and the selected Spain
+> basin-district mask retains 52.31%. Horn of Africa currently uses a Natural
+> Earth country-intersection mask retaining 87.29%; that is a useful regional
+> checkpoint but not a hydrologic or livelihood-zone boundary.
 >
 > **XGB-Spatial is the best current ML option** because it has the best ranking
 > skill (ROC-AUC = 0.743) and the best calibrated Brier Score. Current evidence
@@ -145,7 +151,7 @@ This is a scientifically valid and publishable finding — but only if the analy
 - Test period (2021–2026) coincidentally includes an extreme drought (2021–22) followed by an extreme wet reversal (2023). This is good for case-study value but means the test set is not climatologically representative — it over-represents extreme events relative to the training distribution.
 - The 30-year gamma-fit baseline (1991–2020) may not capture non-stationarity driven by climate change, potentially biasing SPI values in the 2021–2026 test period.
 
-### 2.3 What expanding to additional regions would offer
+### 2.3 What the completed regional expansion now offers
 
 | Benefit | Detail |
 |---------|--------|
@@ -155,12 +161,14 @@ This is a scientifically valid and publishable finding — but only if the analy
 | **Publication impact** | Multi-region studies are far more publishable (reviewer concern: "would this hold elsewhere?" is preemptively answered) |
 | **Mechanistic insight** | Comparing skill across regimes (Mediterranean vs. continental vs. monsoonal) reveals which climate properties enable or prevent predictability |
 
-**Recommended expansion regions (ranked by scientific complementarity):**
+**Completed expansion checkpoints:**
 
 1. **Great Plains, USA (Kansas–Oklahoma)** — rectangular tests are negative, while the EPA ecoregion-masked run improves to a small positive but uncertain spatial point estimate
 2. **Mediterranean Spain (Ebro/Guadalquivir basins)** — rectangular and country-mask runs have positive uncertain point estimates, but the stricter basin-district run turns negative
-3. **Murray–Darling Basin, Australia** — analogous semi-arid agricultural region; CHIRPS coverage excellent; different ENSO teleconnection sign
-4. **Horn of Africa (Kenya–Ethiopia)** — CHIRPS was originally designed for this region; bimodal precipitation with strong ENSO dependence
+3. **Murray-Darling Basin, Australia** — official basin-mask run is strongly negative despite moderate ranking signal, exposing calibration/test-period shift as a distinct failure mode
+4. **Horn of Africa (Djibouti/Eritrea/Ethiopia/Kenya/Somalia intersection)** — country-mask run calibrates close to climatology but does not exceed it; keep a caveat that it is not a basin or livelihood-zone mask
+
+**Verdict:** Additional regions are no longer the bottleneck. The scientific task is now to turn the five-region mechanism comparison into a clear, source-cited paper narrative.
 
 ---
 
@@ -202,7 +210,7 @@ This is a scientifically valid and publishable finding — but only if the analy
 1. **Treat the corrected ENSO experiment as the current checkpoint.** ENSO helps ranking and nearly closes the calibrated BSS gap, but the positive point estimate is not statistically reliable.
 2. **Treat temperature/VPD and regional soil moisture as completed negative land-surface tests.** They add model fit, but not reliable probability skill over climatology.
 3. **Treat ablation cautiously.** Current ablation shows precipitation lags and seasonality help, while removing ENSO/SPI lags improves this trained XGB model. Because these features are correlated, this should be read as a trained-model diagnostic, not a causal feature-importance statement.
-4. **Prioritize new independent information or new regions.** For Central Valley, atmospheric-river/subseasonal predictors are more defensible than more tuning of the same lagged land-surface fields. For the paper, multi-region generalization is higher value.
+4. **Prioritize new independent information only if the paper needs a feature-extension section.** For Central Valley, atmospheric-river/subseasonal predictors are more defensible than more tuning of the same lagged land-surface fields. For the paper, the five-region generalization result is now higher value than adding more regions.
 
 ---
 
@@ -289,6 +297,7 @@ The regional mask analyses use source-cited public boundary datasets:
 - **Country masks:** Natural Earth 1:50m Admin 0 country polygons via the project GitHub mirror ([GeoJSON](https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_50m_admin_0_countries.geojson)).
 - **Central Valley groundwater-basin mask:** California Department of Water Resources Bulletin 118 groundwater basins, selecting Sacramento Valley and San Joaquin Valley basin numbers 5-021 and 5-022 ([FeatureServer](https://gis.water.ca.gov/arcgis/rest/services/Geoscientific/i08_B118_CA_GroundwaterBasins/FeatureServer/0)).
 - **Southern Great Plains ecoregion mask:** US EPA Level III Ecoregions of the Continental United States, selecting Level II `SOUTH CENTRAL SEMI-ARID PRAIRIES` features intersecting the configured Southern Great Plains box ([EPA page](https://www.epa.gov/eco-research/level-iii-and-iv-ecoregions-continental-united-states)).
+- **Murray-Darling Basin mask:** Murray-Darling Basin Authority / data.gov.au boundary defined under Section 4(1) of the Water Act 2007 ([WFS GeoJSON](https://data.gov.au/geoserver/murray-darling-basin-boundary/wfs?request=GetFeature&typeName=ckan_4ede9aed_5620_47db_a72b_0b3aa0a3ced0&outputFormat=json)).
 - **Mediterranean Spain river-basin mask:** MITECO terrestrial river-basin district collection `agua:Demarcaciones_ET`, selecting Ebro, Catalonia internal basins, Jucar, Segura, Andalusia Mediterranean basins, and Guadalquivir ([OGC collection](https://wmts.mapama.gob.es/sig-api/ogc/features/v1/collections/agua%3ADemarcaciones_ET)).
 
 ---
@@ -299,15 +308,15 @@ The regional mask analyses use source-cited public boundary datasets:
 
 | Rank | Action | Impact | Feasibility | Rationale |
 |------|--------|--------|-------------|-----------|
-| **1** | **Turn mechanism diagnostics into paper figures** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | The geometry-sensitive regional contrast is now the main scientific story and should be presented before adding more features. |
-| **2** | **Write source-cited mask methods** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | The paper should explicitly cite Natural Earth, DWR, EPA, and MITECO boundary sources and report retained-cell fractions for each masked checkpoint. |
-| **3** | **Add one more masked region** (Murray-Darling or Horn of Africa) | ⭐⭐⭐⭐ | ⭐⭐ | Any added region should enter with its final basin/ecoregion mask, not just as another rectangular screen. |
+| **1** | **Write source-cited mask methods** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | The paper should explicitly cite Natural Earth, DWR, EPA, MDBA/data.gov.au, and MITECO boundary sources, report retained-cell fractions, and caveat Horn's country mask. |
+| **2** | **Turn mechanism diagnostics into paper figures** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | The five-region, geometry-sensitive comparison is now the main scientific story and should be presented before adding more features. |
+| **3** | **Perform final consistency review of claims** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | Ensure every positive point estimate is framed as uncertain and every rectangular result is labeled as a sensitivity rather than a final regional claim. |
 | **4** | **Atmospheric-river or subseasonal circulation predictors** | ⭐⭐⭐⭐ | ⭐⭐ | Central Valley monthly extremes are event-driven; AR/circulation predictors are more physically targeted than more lagged land-surface tuning. |
 | **5** | **Seasonal target variants with more information** | ⭐⭐⭐ | ⭐⭐⭐ | The first tabular SPI-3 lead-3 run is negative; revisit with spatial features, extra drivers, or additional regions if needed. |
 | **6** | **Gridded/SMAP soil-moisture sensitivity** | ⭐⭐ | ⭐⭐ | Regional ERA5-Land soil moisture overfits; only pursue this if a spatial or independent-observation formulation is needed for completeness. |
 | **7** | **Refresh corrected explainability as figures evolve** | ⭐⭐ | ⭐⭐⭐⭐ | Current SHAP artifacts are refreshed; rerun only after model/schema changes. |
 | **8** | **Regional/seasonal stratified diagnostics with more months** | ⭐⭐⭐⭐ | ⭐⭐⭐ | Current MAM/ENSO hints have CIs crossing zero; more independent months or regions are needed. |
-| **9** | **Transfer learning experiment** | ⭐⭐⭐⭐ | ⭐⭐ | High novelty but requires multi-region setup. |
+| **9** | **Transfer learning experiment** | ⭐⭐⭐⭐ | ⭐⭐ | High novelty but should wait until the source-cited regional results are written cleanly. |
 
 ### What NOT to prioritize:
 
@@ -327,7 +336,7 @@ The regional mask analyses use source-cited public boundary datasets:
 >
 > **Key finding:** In California's Central Valley (2021–2026), corrected ENSO + XGBoost-Spatial nearly ties climatology in calibrated Brier Skill Score (BSS = +0.005, CI crossing zero), despite showing useful discrimination signal (ROC-AUC = 0.743). Brier Score decomposition still shows only marginal resolution improvement over the climatological base rate, consistent with the theoretical expectation that single-month precipitation in this Mediterranean regime is largely chaotic at 1-month lead.
 >
-> **Implications:** (1) ML model accuracy reported without baseline comparison systematically overstates forecast utility. (2) ENSO and spatial context add information, but not enough for statistically reliable positive probability skill at this horizon. (3) The methodology presented here provides a template for rigorous drought ML evaluation that correctly accounts for spatial autocorrelation, class frequency, calibration, and uncertainty.
+> **Implications:** (1) ML model accuracy reported without baseline comparison systematically overstates forecast utility. (2) ENSO and spatial context add information, but not enough for statistically reliable positive probability skill at this horizon. (3) The same failure pattern now appears across five source-cited regional checkpoints, although the mechanism differs by region: under-amplification in California, geometry sensitivity in Spain, dry-frequency shift in the Great Plains, calibration shift in Murray-Darling, and near-climatology calibration in Horn of Africa. (4) The methodology presented here provides a template for rigorous drought ML evaluation that correctly accounts for spatial autocorrelation, class frequency, calibration, region geometry, and uncertainty.
 
 This narrative transforms a "negative result" into a **methodological and scientific contribution**.
 
@@ -391,20 +400,31 @@ This narrative transforms a "negative result" into a **methodological and scient
    EPA ecoregion-masked Southern Great Plains improves to a small positive but uncertain
    spatial point estimate (`BSS = +0.0101`, CI crossing zero), and basin-masked Spain
    turns negative (`best BSS = -0.0846`).
+18. ✅ **Murray-Darling official basin-mask experiment added** —
+   official Water Act 2007 basin geometry retains 52.07% of valid rectangular cells.
+   The masked run has moderate ranking (`ROC-AUC ≈ 0.63`) but strongly negative
+   selected BSS (`best BSS = -0.639`, CI below zero) because calibration/test-period
+   shift biases selected probabilities high.
+19. ✅ **Horn of Africa country-mask experiment added** —
+   Natural Earth country intersection for Djibouti, Eritrea, Ethiopia, Kenya, and
+   Somalia retains 87.29% of valid rectangular cells. The masked run calibrates close
+   to climatology but does not beat it (`best BSS = -0.031`, CI crossing zero); this
+   should be caveated as a political-region mask rather than a basin or livelihood-zone mask.
 
 ### Next experiments (priority order)
 
-1. **Promote mechanism diagnostics into publication figures**
-   The current BSS CI, monthly dry-fraction, signal-vs-skill, and feature-group plots are
-   now central to the paper narrative.
-
-2. **Write the source-cited mask-methods subsection**
+1. **Write the source-cited mask-methods subsection**
    Include the boundary sources, selection logic, retained-cell fractions, and why
-   each masked run is a cleaner scientific checkpoint than a rectangular bbox.
+   each masked run is a cleaner scientific checkpoint than a rectangular bbox. State
+   explicitly that Horn is country-intersection geometry, not a hydrologic/livelihood mask.
 
-3. **Add one more masked region if resources allow**
-   Murray-Darling Basin or Horn of Africa would test generality, but should be defined
-   with its final basin/ecoregion mask from the start.
+2. **Promote mechanism diagnostics into publication figures**
+   The current BSS CI, monthly dry-fraction, signal-vs-skill, feature-group, and mask
+   retention plots are now central to the paper narrative.
+
+3. **Do not add more regions before writing**
+   Five checkpoints are enough for the generalization claim; the immediate risk is
+   narrative inconsistency, not lack of regional coverage.
 
 4. **Extend seasonal SPI-3 only if needed**
    The first leakage-free tabular SPI-3 lead-3 result is negative. A fair next
@@ -416,7 +436,7 @@ This narrative transforms a "negative result" into a **methodological and scient
    python scripts/xgb_shap_forecast_analysis.py --model both
    ```
 
-5. **Feature ablation / sensitivity checks**
+6. **Feature ablation / sensitivity checks**
    ```bash
    python scripts/run_feature_ablation.py
    ```

@@ -235,6 +235,12 @@ python scripts/run_multiregion_xgb_experiment.py --region mediterranean_spain --
 python scripts/build_basin_masks.py --copy-report
 python scripts/run_multiregion_xgb_experiment.py --region cvalley --model both --basin-mask --rebuild-dataset --copy-report
 python scripts/run_multiregion_xgb_experiment.py --region southern_great_plains --model both --basin-mask --rebuild-dataset --copy-report
+python scripts/run_multiregion_xgb_experiment.py --region murray_darling --prepare-grid-only --rebuild-pr --rebuild-spi --spi-n-jobs 8
+python scripts/build_basin_masks.py --copy-report
+python scripts/run_multiregion_xgb_experiment.py --region murray_darling --model both --basin-mask --rebuild-dataset --copy-report
+python scripts/run_multiregion_xgb_experiment.py --region horn_of_africa --prepare-grid-only --rebuild-pr --rebuild-spi --spi-n-jobs 8
+python scripts/build_region_masks.py --copy-report
+python scripts/run_multiregion_xgb_experiment.py --region horn_of_africa --model both --country-mask --rebuild-dataset --copy-report
 python scripts/run_multiregion_xgb_experiment.py --region mediterranean_spain --model both --basin-mask --rebuild-dataset --copy-report
 ```
 
@@ -266,6 +272,8 @@ Current regional result:
 | Southern Great Plains / tabular XGB | 0.05164 | −0.08218 | [−0.14450, −0.00066] | First full contrasting-region test; still below climatology |
 | Southern Great Plains / spatial XGB | 0.05163 | −0.08200 | [−0.14790, −0.00190] | Spatial context does not close the gap |
 | Southern Great Plains ecoregion-mask / spatial XGB | 0.05544 | +0.01013 | [−0.09777, 0.15022] | EPA South Central Semi-Arid Prairies mask improves the point estimate, but the CI crosses zero |
+| Murray-Darling basin-mask / tabular XGB | 0.04633 | −0.63945 | [−1.30820, −0.27846] | Official Water Act basin mask; ranking exists but calibration/test-period shift fails badly |
+| Horn of Africa country-mask / spatial XGB | 0.01385 | −0.03111 | [−0.30241, 0.31967] | Near climatology after calibration, but not positive skill; country mask is not a livelihood-zone mask |
 | Mediterranean Spain / tabular XGB | 0.04587 | +0.04403 | [−0.15104, 0.24096] | Positive point estimate, not statistically reliable |
 | Mediterranean Spain / spatial XGB | 0.04692 | +0.02212 | [−0.15139, 0.17647] | Spatial context weakens the point estimate |
 | Mediterranean Spain country-mask / spatial XGB | 0.04827 | +0.02350 | [−0.19910, 0.30486] | Positive point estimate survives masking but remains highly uncertain |
@@ -275,18 +283,22 @@ This no longer reads as a simple universal "no skill" result, but the cleanest
 geometry-aware checkpoint still does not support robust positive skill. Central
 Valley has ranking signal but weak calibrated skill, rectangular Southern Great
 Plains is below climatology, the EPA ecoregion-masked Southern Great Plains
-checkpoint improves to a small positive but uncertain point estimate, and the
-earlier positive Mediterranean Spain point estimate does not survive the
-stricter basin-district mask.
+checkpoint improves to a small positive but uncertain point estimate,
+Murray-Darling fails strongly after calibration/test-period shift, Horn of
+Africa calibrates near climatology but not above it, and the earlier positive
+Mediterranean Spain point estimate does not survive the stricter basin-district
+mask.
 
 The geometry audit is now explicit. Natural Earth country masks remove 0.0% of
-valid Southern Great Plains cells, 2.85% of Central Valley rectangular cells,
-and 5.64% of Mediterranean Spain cells. Stricter basin/hydroclimate masks
-materially change the sample: the DWR Central Valley groundwater-basin mask
-retains 27.92% of valid Central Valley cells, the EPA Southern Great Plains
-ecoregion mask retains 78.64%, and the selected Spain river-basin district mask
-retains 52.31% of valid Spain cells. Those masked runs are the cleaner
-interpretation checkpoints.
+valid Southern Great Plains cells, 1.61% of Murray-Darling cells, 2.85% of
+Central Valley cells, 5.64% of Mediterranean Spain cells, and 12.71% of Horn of
+Africa cells. Stricter basin/hydroclimate masks materially change the sample:
+the DWR Central Valley groundwater-basin mask retains 27.92% of valid Central
+Valley cells, the EPA Southern Great Plains ecoregion mask retains 78.64%, the
+official Murray-Darling Basin mask retains 52.07%, and the selected Spain
+river-basin district mask retains 52.31%. Those masked runs are the cleaner
+interpretation checkpoints; Horn remains a country-intersection checkpoint with
+a boundary-definition caveat.
 
 Boundary and mask sources are cited in the reproducible diagnostics and in this
 README for paper traceability: Natural Earth 1:50m country polygons
@@ -295,6 +307,8 @@ California DWR Bulletin 118 groundwater basins
 ([FeatureServer](https://gis.water.ca.gov/arcgis/rest/services/Geoscientific/i08_B118_CA_GroundwaterBasins/FeatureServer/0)),
 US EPA Level III ecoregions
 ([EPA data page](https://www.epa.gov/eco-research/level-iii-and-iv-ecoregions-continental-united-states)),
+Murray-Darling Basin Authority / data.gov.au basin boundary
+([WFS GeoJSON](https://data.gov.au/geoserver/murray-darling-basin-boundary/wfs?request=GetFeature&typeName=ckan_4ede9aed_5620_47db_a72b_0b3aa0a3ced0&outputFormat=json)),
 and MITECO terrestrial river-basin districts
 ([OGC collection](https://wmts.mapama.gob.es/sig-api/ogc/features/v1/collections/agua%3ADemarcaciones_ET)).
 
@@ -318,7 +332,7 @@ and MITECO terrestrial river-basin districts
 
 - **1-month lead is fundamentally hard:** Monthly precipitation is dominated by chaotic synoptic weather; SPI-1 autocorrelation is weak.
 - **Small test set:** 63 months yields wide confidence intervals; positive skill claims require a confidence interval that excludes zero.
-- **Regional geometry:** Central Valley, Southern Great Plains, and Spain now have source-cited basin/ecoregion-mask sensitivities; positive point estimates remain uncertain and geometry-sensitive.
+- **Regional geometry:** Central Valley, Southern Great Plains, Murray-Darling, Spain, and Horn of Africa now have source-cited geometry checkpoints; Horn still uses political-country geometry rather than a basin or livelihood-zone mask.
 - **Limited exogenous drivers:** Corrected Niño3.4 anomaly lags are included; PDO is excluded from the active checkpoint because recent PDO values are missing. Regional/gridded ERA5-Land temperature/VPD and regional ERA5-Land soil moisture have been tested separately, but none beat climatology.
 - **Test period non-representative:** 2021–2026 is extreme (historic drought → extreme wet).
 
@@ -328,9 +342,9 @@ and MITECO terrestrial river-basin districts
 
 Highest-impact directions (see [`ANALYSIS.md`](ANALYSIS.md) for full roadmap):
 
-1. **Turn mechanism diagnostics into figures/tables for the paper narrative** — The current `results/multiregion/` artifacts are now the strongest evidence for region-dependent predictability.
-2. **Write a source-cited mask-methods subsection** — The boundary sources and retained-cell fractions should be explicit in the paper methods before adding more regions.
-3. **Run one more full region only after defining its mask** — Murray-Darling or Horn of Africa should enter as basin/ecoregion-masked experiments, not just rectangular screens.
+1. **Write a source-cited mask-methods subsection** — The boundary sources, selection logic, retained-cell fractions, and Horn caveat should be explicit before figure polishing.
+2. **Turn mechanism diagnostics into figures/tables for the paper narrative** — The current `results/multiregion/` artifacts are now the strongest evidence for region-dependent predictability.
+3. **Stop expanding regions for now** — Five hydroclimate checkpoints are enough to support the generalization claim; additional regions would add cost before the narrative is tightened.
 4. **Add targeted event-scale predictors only if staying single-region** — Atmospheric-river or subseasonal circulation features are more physically aligned with Central Valley monthly extremes than more lagged land-surface fields.
 5. **Seasonal target variants** — The first tabular SPI-3 lead-3 experiment is negative; only extend this with spatial features or additional drivers if it serves the paper's scope.
 
@@ -380,6 +394,12 @@ python scripts/run_multiregion_xgb_experiment.py --region mediterranean_spain --
 python scripts/build_basin_masks.py --copy-report
 python scripts/run_multiregion_xgb_experiment.py --region cvalley --model both --basin-mask --rebuild-dataset --copy-report
 python scripts/run_multiregion_xgb_experiment.py --region southern_great_plains --model both --basin-mask --rebuild-dataset --copy-report
+python scripts/run_multiregion_xgb_experiment.py --region murray_darling --prepare-grid-only --rebuild-pr --rebuild-spi --spi-n-jobs 8
+python scripts/build_basin_masks.py --copy-report
+python scripts/run_multiregion_xgb_experiment.py --region murray_darling --model both --basin-mask --rebuild-dataset --copy-report
+python scripts/run_multiregion_xgb_experiment.py --region horn_of_africa --prepare-grid-only --rebuild-pr --rebuild-spi --spi-n-jobs 8
+python scripts/build_region_masks.py --copy-report
+python scripts/run_multiregion_xgb_experiment.py --region horn_of_africa --model both --country-mask --rebuild-dataset --copy-report
 python scripts/run_multiregion_xgb_experiment.py --region mediterranean_spain --model both --basin-mask --rebuild-dataset --copy-report
 python scripts/analyze_multiregion_mechanisms.py
 python scripts/evaluate_regional_forecast.py     # regional (Central Valley) dominant class accuracy
