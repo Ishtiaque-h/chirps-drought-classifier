@@ -6,6 +6,9 @@ netCDF4==1.7.4
 h5netcdf==1.8.1
 scipy==1.17.1
 matplotlib==3.10.8
+shapely==2.1.2
+pyproj==3.7.2
+pyshp==3.0.3
 
 # Machine Learning & Optimization
 scikit-learn==1.8.0
