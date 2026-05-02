@@ -474,16 +474,19 @@ def write_report(
         [
             "",
             "Scientific interpretation:",
+            "- The completed multi-region screen now spans California Central Valley, Southern Great Plains, Murray-Darling, Mediterranean Spain, and Horn of Africa geometry checkpoints; none gives a statistically robust positive selected BSS.",
             "- Central Valley has strong raw ranking signal, and the DWR groundwater-basin mask strengthens ranking, but selected probabilities still do not beat climatology robustly.",
             "- Southern Great Plains improves substantially under the EPA ecoregion mask, moving from negative skill to a small positive spatial point estimate, but its confidence interval still crosses zero.",
+            "- Murray-Darling has good raw ranking but a severe calibration/shift failure: test dry frequency is lower than training, selected probabilities are biased high, and selected BSS is strongly negative.",
+            "- Horn of Africa trains for many more boosting rounds and calibrates close to climatology, but the country-masked result is still not positive skill; it should be presented with the caveat that the mask is political-region geometry, not a basin or livelihood-zone boundary.",
             "- Mediterranean Spain has a positive rectangular-box point estimate, but the basin-district sensitivity turns negative; the earlier Spain hint is geometry-sensitive and should not be treated as evidence of robust positive skill.",
             "- Country masks are useful diagnostics, but basin/hydroclimate/ecoregion masks are the cleaner checkpoints because they materially change the sampled pixels.",
             "- ENSO and seasonality dominate gain in all regions, so model fit is mostly large-scale/seasonal. That does not guarantee calibrated probability skill.",
             "",
             "Recommended next actions:",
-            "1. Treat the basin/ecoregion-masked runs as the cleaner interpretation checkpoints; keep rectangular/country results as sensitivity diagnostics.",
-            "2. Promote the mask diagnostics and regional mechanism plots into paper-ready figures before adding more predictors.",
-            "3. Run one additional regime, preferably Murray-Darling or Horn of Africa, after defining its final mask.",
+            "1. Stop region expansion for now and write the source-cited mask methodology, including retained-cell fractions and the Horn country-mask caveat.",
+            "2. Promote the mask diagnostics and regional mechanism plots into paper-ready figures/tables.",
+            "3. If Horn becomes central to the claims, add a stricter ASAL/livelihood-zone mask as a sensitivity; otherwise keep it as a country-intersection checkpoint.",
         ]
     )
     out_path.write_text("\n".join(lines) + "\n")
