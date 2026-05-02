@@ -20,6 +20,8 @@ class Region:
     lon_min: float
     lon_max: float
     rationale: str
+    mask_countries: tuple[str, ...] = ()
+    mask_note: str = ""
 
     @property
     def bbox(self) -> tuple[float, float, float, float]:
@@ -36,6 +38,11 @@ REGIONS: dict[str, Region] = {
         lon_min=-122.5,
         lon_max=-119.0,
         rationale="Canonical project region; Mediterranean winter precipitation.",
+        mask_countries=("United States of America",),
+        mask_note=(
+            "Country mask is only a land/country sanity check; it is not a "
+            "Central Valley basin polygon."
+        ),
     ),
     "southern_great_plains": Region(
         slug="southern_great_plains",
@@ -48,6 +55,8 @@ REGIONS: dict[str, Region] = {
             "Contrasting continental regime with warm-season convective rainfall "
             "over Kansas, Oklahoma, and north Texas."
         ),
+        mask_countries=("United States of America",),
+        mask_note="Country mask should mainly confirm the rectangular box is within the U.S.",
     ),
     "murray_darling": Region(
         slug="murray_darling",
@@ -61,6 +70,11 @@ REGIONS: dict[str, Region] = {
             "structure. This rectangular first pass should later be replaced by "
             "a basin polygon mask."
         ),
+        mask_countries=("Australia",),
+        mask_note=(
+            "Country mask is not a Murray-Darling Basin polygon; a basin boundary "
+            "is still needed for final claims."
+        ),
     ),
     "mediterranean_spain": Region(
         slug="mediterranean_spain",
@@ -73,6 +87,8 @@ REGIONS: dict[str, Region] = {
             "Mediterranean hydroclimate analogue spanning eastern/southern Spain; "
             "useful for testing whether the California result generalizes."
         ),
+        mask_countries=("Spain",),
+        mask_note="Spain mask checks whether the rectangular box includes non-Spain land cells.",
     ),
     "horn_of_africa": Region(
         slug="horn_of_africa",
@@ -84,6 +100,11 @@ REGIONS: dict[str, Region] = {
         rationale=(
             "Bimodal rainfall regime with stronger large-scale climate coupling; "
             "CHIRPS has strong heritage in this region."
+        ),
+        mask_countries=("Djibouti", "Eritrea", "Ethiopia", "Kenya", "Somalia"),
+        mask_note=(
+            "Country mask is a first-pass Horn land mask; it is not a hydrologic "
+            "or livelihood-zone boundary."
         ),
     ),
 }
