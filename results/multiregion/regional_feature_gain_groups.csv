@@ -8,6 +8,15 @@ cvalley,California Central Valley,tabular,enso,1811.6631469726562,0.414084522687
 cvalley,California Central Valley,tabular,precip_lags,330.7693557739258,0.0756026146660744,3
 cvalley,California Central Valley,tabular,seasonality,1480.3087158203125,0.3383481797070897,2
 cvalley,California Central Valley,tabular,spi_lags,752.3634948730469,0.17196468293932524,5
+cvalley_basin_masked,California Central Valley (basin-mask sensitivity),spatial,enso,709.7740783691406,0.363988610177759,2
+cvalley_basin_masked,California Central Valley (basin-mask sensitivity),spatial,precip_lags,173.55378341674805,0.0890024056134937,3
+cvalley_basin_masked,California Central Valley (basin-mask sensitivity),spatial,seasonality,471.8454132080078,0.24197327206842714,2
+cvalley_basin_masked,California Central Valley (basin-mask sensitivity),spatial,spatial_context,341.83223724365234,0.17529949985516496,4
+cvalley_basin_masked,California Central Valley (basin-mask sensitivity),spatial,spi_lags,252.98429107666016,0.12973621228515514,5
+cvalley_basin_masked,California Central Valley (basin-mask sensitivity),tabular,enso,678.5289611816406,0.41017025452394923,2
+cvalley_basin_masked,California Central Valley (basin-mask sensitivity),tabular,precip_lags,195.32985305786133,0.11807675151454743,3
+cvalley_basin_masked,California Central Valley (basin-mask sensitivity),tabular,seasonality,469.26995849609375,0.28367334237522585,2
+cvalley_basin_masked,California Central Valley (basin-mask sensitivity),tabular,spi_lags,311.13297271728516,0.18807965158627754,5
 mediterranean_spain,Mediterranean Spain bounding box,spatial,enso,2097.2467041015625,0.41165232845019234,2
 mediterranean_spain,Mediterranean Spain bounding box,spatial,precip_lags,310.9634552001953,0.06103661059318009,3
 mediterranean_spain,Mediterranean Spain bounding box,spatial,seasonality,1533.65771484375,0.30102980642493715,2
@@ -17,6 +26,15 @@ mediterranean_spain,Mediterranean Spain bounding box,tabular,enso,2142.486999511
 mediterranean_spain,Mediterranean Spain bounding box,tabular,precip_lags,340.63014221191406,0.07362575493668758,3
 mediterranean_spain,Mediterranean Spain bounding box,tabular,seasonality,1486.4615478515625,0.32129233465440665,2
 mediterranean_spain,Mediterranean Spain bounding box,tabular,spi_lags,656.9292831420898,0.14199246754053593,5
+mediterranean_spain_basin_masked,Mediterranean Spain bounding box (basin-mask sensitivity),spatial,enso,903.3524169921875,0.3724878958496743,2
+mediterranean_spain_basin_masked,Mediterranean Spain bounding box (basin-mask sensitivity),spatial,precip_lags,181.7424659729004,0.07493959994282294,3
+mediterranean_spain_basin_masked,Mediterranean Spain bounding box (basin-mask sensitivity),spatial,seasonality,729.3431701660156,0.30073700772510314,2
+mediterranean_spain_basin_masked,Mediterranean Spain bounding box (basin-mask sensitivity),spatial,spatial_context,304.68112564086914,0.12563206702092555,4
+mediterranean_spain_basin_masked,Mediterranean Spain bounding box (basin-mask sensitivity),spatial,spi_lags,306.06678581237793,0.12620342946147403,5
+mediterranean_spain_basin_masked,Mediterranean Spain bounding box (basin-mask sensitivity),tabular,enso,867.1318969726562,0.4200703915457778,2
+mediterranean_spain_basin_masked,Mediterranean Spain bounding box (basin-mask sensitivity),tabular,precip_lags,189.93931579589844,0.09201354838275104,3
+mediterranean_spain_basin_masked,Mediterranean Spain bounding box (basin-mask sensitivity),tabular,seasonality,678.2058410644531,0.32854770329543315,2
+mediterranean_spain_basin_masked,Mediterranean Spain bounding box (basin-mask sensitivity),tabular,spi_lags,328.97673416137695,0.15936835677603797,5
 mediterranean_spain_country_masked,Mediterranean Spain bounding box (country-mask sensitivity),spatial,enso,5462.8994140625,0.4975398170392877,2
 mediterranean_spain_country_masked,Mediterranean Spain bounding box (country-mask sensitivity),spatial,precip_lags,385.33264923095703,0.03509461208531799,3
 mediterranean_spain_country_masked,Mediterranean Spain bounding box (country-mask sensitivity),spatial,seasonality,3232.9273681640625,0.2944425605049683,2

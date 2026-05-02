@@ -1,0 +1,12 @@
+Basin Geometry Diagnostics
+==========================
+
+Masks use official basin/district polygons and CHIRPS grid-cell centers.
+They are stricter scientific region definitions than rectangular bounding boxes.
+
+southern_great_plains - Southern Great Plains
+  Mask: Southern Great Plains EPA South Central Semi-Arid Prairies
+  Source: US EPA Level III ecoregions with state boundaries; selected features in NA_L2NAME=SOUTH CENTRAL SEMI-ARID PRAIRIES that intersect the configured Southern Great Plains bbox.
+  Valid CHIRPS cells retained: 19,424/24,700 (78.64%); outside basin: 5,276 (21.36%).
+  Forecast dataset pixels retained: 19,424/24,700 (78.64%).
+  Interpretation: Basin geometry materially changes the sample; masked rerun should be treated as the cleaner checkpoint.
