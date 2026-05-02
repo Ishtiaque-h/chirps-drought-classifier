@@ -30,6 +30,7 @@ The project implements a complete, reproducible pipeline for **1-month-ahead dro
 | Temperature/VPD experiment | ✅ Initial test complete | Regional ERA5-Land t2m/VPD anomalies improve raw XGB but still do not beat climatology |
 | Soil-moisture experiment | ✅ Initial test complete | Regional ERA5-Land soil-water/root-zone anomaly lags overfit and remain below climatology |
 | Multi-region path | ✅ Initial path complete | Region registry + runner now supports Central Valley, Southern Great Plains, and Mediterranean Spain tabular/spatial tests |
+| Regional mechanism comparison | ✅ Initial analysis complete | Reproducible diagnostics separate ranking, calibration, test-period shift, persistence, and feature-group gain |
 
 ### Key results (corrected ENSO + spatial checkpoint — 2026-05-01)
 
@@ -84,6 +85,16 @@ The project implements a complete, reproducible pipeline for **1-month-ahead dro
 > (`tabular BSS = +0.044`, `spatial BSS = +0.022`), but both confidence
 > intervals cross zero. The current result is therefore not "ML never works";
 > it is "positive 1-month SPI-1 skill is region-dependent and not yet robust."
+>
+> **The mechanism diagnostics identify three different regimes.**
+> `scripts/analyze_multiregion_mechanisms.py` shows that Central Valley has the
+> strongest ranking signal but under-amplified calibrated probabilities
+> (`selected amplitude ratio ≈ 0.21`). Southern Great Plains has weak ranking,
+> strong underprediction of test dry frequency, and a train-to-test dry shift
+> from 0.160 to 0.208. Mediterranean Spain has the best calibrated point
+> estimate, near-zero selected bias, and higher selected-probability correlation
+> than climatology, but uncertainty remains too wide for a claim of robust
+> positive skill.
 >
 > **XGB-Spatial is the best current ML option** because it has the best ranking
 > skill (ROC-AUC = 0.743) and the best calibrated Brier Score. Current evidence
@@ -256,8 +267,8 @@ The finding that ML does not reliably outperform climatology at 1-month lead is 
 
 | Rank | Action | Impact | Feasibility | Rationale |
 |------|--------|--------|-------------|-----------|
-| **1** | **Compare regional mechanisms** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | Central Valley has useful ranking but weak calibration; Southern Great Plains has weak ranking; Mediterranean Spain has the best calibrated point estimate but wide uncertainty. This contrast is now the main scientific story. |
-| **2** | **Improve region geometry** | ⭐⭐⭐⭐ | ⭐⭐⭐ | Rectangular boxes are fine for screening, but basin/land masks are needed before final publication claims, especially Spain/Murray-Darling. |
+| **1** | **Improve region geometry** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | Rectangular boxes are fine for screening, but basin/land masks are needed before final publication claims, especially Spain/Murray-Darling. |
+| **2** | **Turn mechanism diagnostics into paper figures** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | The regional contrast is now the main scientific story and should be presented before adding more features. |
 | **3** | **Add one more full region** (Murray-Darling or Horn of Africa) | ⭐⭐⭐⭐ | ⭐⭐ | Tests whether the Mediterranean Spain hint is isolated or part of a broader regime pattern. |
 | **4** | **Atmospheric-river or subseasonal circulation predictors** | ⭐⭐⭐⭐ | ⭐⭐ | Central Valley monthly extremes are event-driven; AR/circulation predictors are more physically targeted than more lagged land-surface tuning. |
 | **5** | **Seasonal target variants with more information** | ⭐⭐⭐ | ⭐⭐⭐ | The first tabular SPI-3 lead-3 run is negative; revisit with spatial features, extra drivers, or additional regions if needed. |
@@ -333,28 +344,30 @@ This narrative transforms a "negative result" into a **methodological and scient
    tabular and spatial XGBoost both show positive calibrated point estimates
    (`BSS = +0.044` and `+0.022`), but both CIs cross zero. This is the first
    hint of region-dependent positive skill, not yet a defensible positive-skill claim.
+15. ✅ **Multi-region mechanism analysis added** —
+   `scripts/analyze_multiregion_mechanisms.py` regenerates regional mechanism summaries,
+   split dry-frequency stats, feature-group gain shares, BSS CI plots, monthly dry-fraction
+   traces, signal-vs-skill plots, and an interpretation report under `results/multiregion/`.
 
 ### Next experiments (priority order)
 
-1. **Compare regional failure/success modes**
-   Central Valley has stronger dry ranking but little calibrated probability skill; Southern
-   Great Plains has both weak ranking and negative BSS; Mediterranean Spain has modest
-   calibrated positive point estimates but wide CIs. This three-region contrast is now the
-   highest-value analysis.
-
-2. **Improve region geometry**
+1. **Improve region geometry**
    Add basin or land masks for rectangular regions before making final publication claims.
+
+2. **Promote mechanism diagnostics into publication figures**
+   The current BSS CI, monthly dry-fraction, signal-vs-skill, and feature-group plots are
+   now central to the paper narrative.
 
 3. **Add one more full region if resources allow**
    Murray-Darling Basin or Horn of Africa would test whether the Mediterranean Spain hint is
    isolated or regime-linked.
 
-3. **Extend seasonal SPI-3 only if needed**
+4. **Extend seasonal SPI-3 only if needed**
    The first leakage-free tabular SPI-3 lead-3 result is negative. A fair next
    seasonal test would add spatial features or new exogenous drivers rather than
    simply tuning the same tabular model.
 
-4. **Refresh corrected explainability artifacts after any model/schema change**
+5. **Refresh corrected explainability artifacts after any model/schema change**
    ```bash
    python scripts/xgb_shap_forecast_analysis.py --model both
    ```
