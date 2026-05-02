@@ -1,0 +1,40 @@
+Seasonal SPI-6 Lead-6 XGBoost Experiment
+================================================================
+Design: features at t, target SPI-6 class at t+6
+Leakage-safe condition enforced by builder: lead >= SPI window unless overlap allowed
+Test months: 62
+Best iteration: 46
+Features: ['spi1_lag1', 'spi1_lag2', 'spi1_lag3', 'spi3_lag1', 'spi6_lag1', 'pr_lag1', 'pr_lag2', 'pr_lag3', 'month_sin', 'month_cos', 'nino34_lag1', 'nino34_lag2', 'pdo_lag1', 'pdo_lag2']
+
+Monthly dry-fraction Brier Scores
+  Climatology       : 0.12695
+  Persistence SPI-3 : 0.20219
+  XGBoost           : 0.15178
+  XGBoost isotonic  : 0.14507
+
+Brier Skill Score vs monthly climatology
+  Persistence SPI-3 : -0.59269 (95% CI [-1.25221, -0.19652])
+  XGBoost           : -0.19558 (95% CI [-0.68881, 0.09630])
+  XGBoost isotonic  : -0.14277 (95% CI [-0.40683, 0.02224])
+
+Pixel-level classification report
+              precision    recall  f1-score   support
+
+     dry(-1)      0.219     0.217     0.218    122333
+   normal(0)      0.481     0.490     0.486    237516
+     wet(+1)      0.016     0.016     0.016     62709
+
+    accuracy                          0.341    422558
+   macro avg      0.239     0.241     0.240    422558
+weighted avg      0.336     0.341     0.339    422558
+
+Pixel-level confusion matrix labels [-1, 0, 1]
+[[ 26599  86229   9505]
+ [ 72165 116357  48994]
+ [ 22636  39097    976]]
+
+Outputs:
+  outputs/seasonal_spi6_lead6_monthly_scores.csv
+  outputs/seasonal_spi6_lead6_xgb_model.json
+  outputs/seasonal_spi6_lead6_xgb_test_probs.npz
+  outputs/seasonal_spi6_lead6_xgb_feature_importance.png

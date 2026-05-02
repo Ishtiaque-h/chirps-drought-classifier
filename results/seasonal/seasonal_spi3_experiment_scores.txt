@@ -1,0 +1,42 @@
+Seasonal SPI-3 Lead-3 XGBoost Experiment
+============================================================
+Design: features at t, target SPI-3 class at t+3
+No-overlap target window for lead=3: pr[t+1..t+3]
+Test months: 63
+Best iteration: 47
+Features: ['spi1_lag1', 'spi1_lag2', 'spi1_lag3', 'spi3_lag1', 'spi6_lag1', 'pr_lag1', 'pr_lag2', 'pr_lag3', 'month_sin', 'month_cos', 'nino34_lag1', 'nino34_lag2']
+
+Monthly dry-fraction Brier Scores
+  Climatology          : 0.08313
+  Persistence SPI-3    : 0.14806
+  XGBoost              : 0.11841
+
+  XGBoost isotonic     : 0.09370
+
+Brier Skill Score vs monthly climatology
+  Persistence SPI-3    : -0.78101 (95% CI [-1.58920, -0.32970])
+  XGBoost              : -0.42434 (95% CI [-1.06569, -0.08064])
+
+  XGBoost isotonic     : -0.12711 (95% CI [-0.26431, -0.01124])
+
+Pixel-level classification report (secondary diagnostic)
+              precision    recall  f1-score   support
+
+     dry(-1)      0.149     0.133     0.141     96932
+   normal(0)      0.613     0.586     0.599    270187
+     wet(+1)      0.108     0.146     0.124     62259
+
+    accuracy                          0.420    429378
+   macro avg      0.290     0.288     0.288    429378
+weighted avg      0.435     0.420     0.427    429378
+
+Pixel-level confusion matrix labels [-1, 0, 1]
+[[ 12932  65675  18325]
+ [ 55242 158285  56660]
+ [ 18798  34385   9076]]
+
+Outputs:
+  outputs/seasonal_spi3_monthly_scores.csv
+  outputs/seasonal_spi3_xgb_model.json
+  outputs/seasonal_spi3_xgb_test_probs.npz
+  outputs/seasonal_spi3_xgb_feature_importance.png
