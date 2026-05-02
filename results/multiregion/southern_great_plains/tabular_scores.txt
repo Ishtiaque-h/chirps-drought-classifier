@@ -1,0 +1,49 @@
+Multi-Region XGBoost Experiment: Southern Great Plains
+========================================================================
+Region slug: southern_great_plains
+Region bbox: lat[33.0, 39.5] lon[-103.5, -94.0]
+Region rationale: Contrasting continental regime with warm-season convective rainfall over Kansas, Oklahoma, and north Texas.
+Model: tabular
+Target: SPI-1[t+1] dry class probability
+Rows: train=7,558,200, val=1,185,600, test=1,556,100
+Test months: 63
+Best iteration: 368
+Validation monthly BS by calibration: {'none': 0.06127586147492426, 'isotonic': 0.021522563805753292, 'platt': 0.021549579858317777}
+Selected calibration: isotonic
+Pixel dry ROC-AUC raw: 0.52037
+Features: ['spi1_lag1', 'spi1_lag2', 'spi1_lag3', 'spi3_lag1', 'spi6_lag1', 'pr_lag1', 'pr_lag2', 'pr_lag3', 'month_sin', 'month_cos', 'nino34_lag1', 'nino34_lag2']
+
+Monthly dry-fraction Brier Scores
+  Climatology        : 0.04772
+  XGBoost raw      : 0.06750
+  XGBoost isotonic : 0.05164
+  XGBoost platt    : 0.05205
+  XGBoost selected : 0.05164
+
+Brier Skill Score vs monthly climatology
+  XGBoost raw      : -0.41447 (95% CI [-1.20843, -0.00196])
+  XGBoost isotonic : -0.08218 (95% CI [-0.14450, -0.00066])
+  XGBoost platt    : -0.09068 (95% CI [-0.15891, -0.00682])
+  XGBoost selected : -0.08218 (95% CI [-0.14450, -0.00066])
+
+Pixel-level classification report (secondary diagnostic)
+              precision    recall  f1-score   support
+
+     dry(-1)      0.218     0.205     0.211    323660
+   normal(0)      0.681     0.642     0.661   1058447
+     wet(+1)      0.156     0.228     0.186    173993
+
+    accuracy                          0.505   1556100
+   macro avg      0.352     0.358     0.353   1556100
+weighted avg      0.526     0.505     0.514   1556100
+
+Pixel-level confusion matrix labels [-1, 0, 1]
+[[ 66210 203604  53846]
+ [218140 679820 160487]
+ [ 19799 114455  39739]]
+
+Outputs:
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/southern_great_plains/tabular_monthly_scores.csv
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/southern_great_plains/tabular_model.json
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/southern_great_plains/tabular_test_probs.npz
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/southern_great_plains/tabular_feature_importance.png

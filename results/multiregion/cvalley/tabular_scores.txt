@@ -1,0 +1,49 @@
+Multi-Region XGBoost Experiment: California Central Valley
+========================================================================
+Region slug: cvalley
+Region bbox: lat[35.4, 40.6] lon[-122.5, -119.0]
+Region rationale: Canonical project region; Mediterranean winter precipitation.
+Model: tabular
+Target: SPI-1[t+1] dry class probability
+Rows: train=2,085,540, val=327,144, test=429,378
+Test months: 63
+Best iteration: 67
+Validation monthly BS by calibration: {'none': 0.0887313059371292, 'isotonic': 0.06065062305798474, 'platt': 0.06716389208018668}
+Selected calibration: isotonic
+Pixel dry ROC-AUC raw: 0.67022
+Features: ['spi1_lag1', 'spi1_lag2', 'spi1_lag3', 'spi3_lag1', 'spi6_lag1', 'pr_lag1', 'pr_lag2', 'pr_lag3', 'month_sin', 'month_cos', 'nino34_lag1', 'nino34_lag2']
+
+Monthly dry-fraction Brier Scores
+  Climatology        : 0.06428
+  XGBoost raw      : 0.07827
+  XGBoost isotonic : 0.06816
+  XGBoost platt    : 0.06729
+  XGBoost selected : 0.06816
+
+Brier Skill Score vs monthly climatology
+  XGBoost raw      : -0.21765 (95% CI [-0.97437, 0.11297])
+  XGBoost isotonic : -0.06045 (95% CI [-0.20725, 0.02423])
+  XGBoost platt    : -0.04690 (95% CI [-0.14092, 0.03597])
+  XGBoost selected : -0.06045 (95% CI [-0.20725, 0.02423])
+
+Pixel-level classification report (secondary diagnostic)
+              precision    recall  f1-score   support
+
+     dry(-1)      0.273     0.347     0.305     74453
+   normal(0)      0.683     0.572     0.623    298750
+     wet(+1)      0.201     0.302     0.241     56175
+
+    accuracy                          0.498    429378
+   macro avg      0.386     0.407     0.390    429378
+weighted avg      0.549     0.498     0.518    429378
+
+Pixel-level confusion matrix labels [-1, 0, 1]
+[[ 25848  45543   3062]
+ [ 63467 170875  64408]
+ [  5525  33688  16962]]
+
+Outputs:
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/cvalley/tabular_monthly_scores.csv
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/cvalley/tabular_model.json
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/cvalley/tabular_test_probs.npz
+  /Users/ishtisdream/chirps-drought-classifier/outputs/multiregion/cvalley/tabular_feature_importance.png
