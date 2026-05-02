@@ -222,6 +222,9 @@ python scripts/run_multiregion_xgb_experiment.py --region cvalley --model both -
 python scripts/run_multiregion_xgb_experiment.py --region southern_great_plains --model both --spi-n-jobs 8 --copy-report
 python scripts/build_region_masks.py --copy-report
 python scripts/run_multiregion_xgb_experiment.py --region mediterranean_spain --model both --country-mask --rebuild-dataset --copy-report
+python scripts/build_basin_masks.py --copy-report
+python scripts/run_multiregion_xgb_experiment.py --region cvalley --model both --basin-mask --rebuild-dataset --copy-report
+python scripts/run_multiregion_xgb_experiment.py --region mediterranean_spain --model both --basin-mask --rebuild-dataset --copy-report
 ```
 
 The runner clips CHIRPS, computes region-specific SPI, builds the same
@@ -230,10 +233,11 @@ fitting is available through `--spi-n-jobs`; `--grid-stride` is available only
 for smoke tests and should not be treated as a scientific result.
 The compact comparison table is saved at
 [results/multiregion/regional_mechanism_summary.csv](results/multiregion/regional_mechanism_summary.csv).
-The country-mask audit and reproducible mechanism analysis are:
+The mask audits and reproducible mechanism analysis are:
 
 ```bash
 python scripts/build_region_masks.py --copy-report
+python scripts/build_basin_masks.py --copy-report
 python scripts/analyze_multiregion_mechanisms.py
 ```
 
@@ -247,27 +251,27 @@ Current regional result:
 | Region / model | Dry BS | BSS vs. climatology | 95% CI | Note |
 |---|---:|---:|---|---|
 | Central Valley / spatial XGB retrain | 0.06598 | −0.02644 | [−0.12449, 0.04704] | Parity check: near climatology, consistent with frozen checkpoint |
+| Central Valley basin-mask / tabular XGB | 0.06972 | −0.02065 | [−0.12852, 0.04233] | DWR groundwater-basin mask strengthens ranking but not probability skill |
 | Southern Great Plains / tabular XGB | 0.05164 | −0.08218 | [−0.14450, −0.00066] | First full contrasting-region test; still below climatology |
 | Southern Great Plains / spatial XGB | 0.05163 | −0.08200 | [−0.14790, −0.00190] | Spatial context does not close the gap |
 | Mediterranean Spain / tabular XGB | 0.04587 | +0.04403 | [−0.15104, 0.24096] | Positive point estimate, not statistically reliable |
 | Mediterranean Spain / spatial XGB | 0.04692 | +0.02212 | [−0.15139, 0.17647] | Spatial context weakens the point estimate |
 | Mediterranean Spain country-mask / spatial XGB | 0.04827 | +0.02350 | [−0.19910, 0.30486] | Positive point estimate survives masking but remains highly uncertain |
+| Mediterranean Spain basin-mask / spatial XGB | 0.04738 | −0.08459 | [−0.23434, 0.03410] | Hydrologic-district mask turns the Spain hint negative |
 
-This no longer reads as a simple universal "no skill" result. Central Valley is
-near climatology, Southern Great Plains is below climatology, and Mediterranean
-Spain shows a positive but statistically uncertain calibrated point estimate.
-That is stronger science than a one-region claim. The mechanism diagnostics now
-show three distinct failure/success modes: Central Valley has ranking signal but
-weak calibrated skill; Southern Great Plains has weak ranking plus a dry
-test-period shift; Mediterranean Spain has the best calibrated point estimate
-but too much uncertainty for a positive-skill claim.
+This no longer reads as a simple universal "no skill" result, but the cleanest
+geometry-aware checkpoint still does not support robust positive skill. Central
+Valley has ranking signal but weak calibrated skill, Southern Great Plains is
+below climatology, and the earlier positive Mediterranean Spain point estimate
+does not survive the stricter basin-district mask.
 
-The first geometry audit is now explicit. Natural Earth country masks remove
-0.0% of valid Southern Great Plains cells, 2.85% of Central Valley rectangular
-cells, and 5.64% of Mediterranean Spain cells. Because Spain is geometry
-sensitive, the masked Spain run is the cleaner checkpoint: its point estimate
-stays positive (`BSS = +0.0235`) but the CI still crosses zero. This supports a
-regional predictability hypothesis, not a robust positive-skill claim.
+The geometry audit is now explicit. Natural Earth country masks remove 0.0% of
+valid Southern Great Plains cells, 2.85% of Central Valley rectangular cells,
+and 5.64% of Mediterranean Spain cells. Stricter basin/hydroclimate masks
+materially change the sample: the DWR Central Valley groundwater-basin mask
+retains 27.92% of valid Central Valley cells, and the selected Spain river-basin
+district mask retains 52.31% of valid Spain cells. Those basin-masked runs are
+the cleaner interpretation checkpoints.
 
 ---
 
@@ -289,7 +293,7 @@ regional predictability hypothesis, not a robust positive-skill claim.
 
 - **1-month lead is fundamentally hard:** Monthly precipitation is dominated by chaotic synoptic weather; SPI-1 autocorrelation is weak.
 - **Small test set:** 63 months yields wide confidence intervals; positive skill claims require a confidence interval that excludes zero.
-- **Regional geometry:** The multi-region path now has country-mask diagnostics, but final claims still need basin or hydroclimate masks rather than rectangular boxes alone.
+- **Regional geometry:** Central Valley and Spain now have basin/hydroclimate sensitivities; Southern Great Plains still needs an equivalent final mask before strict cross-region comparison.
 - **Limited exogenous drivers:** Corrected Niño3.4 anomaly lags are included; PDO is excluded from the active checkpoint because recent PDO values are missing. Regional/gridded ERA5-Land temperature/VPD and regional ERA5-Land soil moisture have been tested separately, but none beat climatology.
 - **Test period non-representative:** 2021–2026 is extreme (historic drought → extreme wet).
 
@@ -299,8 +303,8 @@ regional predictability hypothesis, not a robust positive-skill claim.
 
 Highest-impact directions (see [`ANALYSIS.md`](ANALYSIS.md) for full roadmap):
 
-1. **Improve region geometry beyond country masks** — Rectangular boxes are acceptable for first-pass comparison; basin or hydroclimate masks are needed before final publication claims.
-2. **Run one more full region if resources allow** — Murray-Darling or Horn of Africa would test whether the Mediterranean Spain hint is regional or general.
+1. **Add an equivalent final mask for Southern Great Plains** — The U.S. bbox is country-clean, but it is still a rectangular hydroclimate region.
+2. **Run one more full region only after defining its mask** — Murray-Darling or Horn of Africa should enter as basin/ecoregion-masked experiments, not just rectangular screens.
 3. **Turn mechanism diagnostics into figures/tables for the paper narrative** — The current `results/multiregion/` artifacts are now the strongest evidence for region-dependent predictability.
 4. **Add targeted event-scale predictors only if staying single-region** — Atmospheric-river or subseasonal circulation features are more physically aligned with Central Valley monthly extremes than more lagged land-surface fields.
 5. **Seasonal target variants** — The first tabular SPI-3 lead-3 experiment is negative; only extend this with spatial features or additional drivers if it serves the paper's scope.
@@ -348,6 +352,9 @@ python scripts/run_multiregion_xgb_experiment.py --list-regions
 python scripts/run_multiregion_xgb_experiment.py --region southern_great_plains --model both --spi-n-jobs 8 --copy-report
 python scripts/build_region_masks.py --copy-report
 python scripts/run_multiregion_xgb_experiment.py --region mediterranean_spain --model both --country-mask --rebuild-dataset --copy-report
+python scripts/build_basin_masks.py --copy-report
+python scripts/run_multiregion_xgb_experiment.py --region cvalley --model both --basin-mask --rebuild-dataset --copy-report
+python scripts/run_multiregion_xgb_experiment.py --region mediterranean_spain --model both --basin-mask --rebuild-dataset --copy-report
 python scripts/analyze_multiregion_mechanisms.py
 python scripts/evaluate_regional_forecast.py     # regional (Central Valley) dominant class accuracy
 python scripts/xgb_shap_forecast_analysis.py --model both  # SHAP interpretation
