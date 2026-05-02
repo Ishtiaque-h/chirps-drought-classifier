@@ -131,6 +131,20 @@ def parse_args() -> Namespace:
         action="store_true",
         help="Copy score text, summary CSV, and feature plots into results/multiregion/.",
     )
+    parser.add_argument(
+        "--country-mask",
+        action="store_true",
+        help=(
+            "Filter the forecast table to the configured country mask and write a "
+            "separate '<region>_country_masked' sensitivity run."
+        ),
+    )
+    parser.add_argument(
+        "--mask-file",
+        type=Path,
+        default=None,
+        help="Optional mask NetCDF with a 'country_mask' variable. Defaults to the region mask product.",
+    )
     return parser.parse_args()
 
 
@@ -186,6 +200,18 @@ def region_paths(region: Region, start_year: int, end_year: int, use_canonical: 
     return {
         "pr": rdir / f"chirps_v3_monthly_{region.slug}_{start_year}_{end_year}.nc",
         "spi": rdir / f"chirps_v3_monthly_{region.slug}_spi_{start_year}_{end_year}.nc",
+        "dataset": rdir / f"dataset_forecast_{region.slug}.parquet",
+        "sample": rdir / f"dataset_forecast_{region.slug}_sample.csv",
+    }
+
+
+def default_country_mask_file(region: Region) -> Path:
+    return REGION_DATA_ROOT / region.slug / "masks" / f"{region.slug}_country_mask.nc"
+
+
+def masked_dataset_paths(region: Region) -> dict[str, Path]:
+    rdir = region_dir(region)
+    return {
         "dataset": rdir / f"dataset_forecast_{region.slug}.parquet",
         "sample": rdir / f"dataset_forecast_{region.slug}_sample.csv",
     }
@@ -507,6 +533,34 @@ def load_climate_features(times: pd.DatetimeIndex, climate_features: str) -> tup
     return out[["time"] + exog_cols], exog_cols
 
 
+def load_grid_mask(mask_file: Path, template: xr.DataArray, var_name: str = "country_mask") -> xr.DataArray:
+    if not mask_file.exists():
+        raise FileNotFoundError(
+            f"Mask file not found: {mask_file}. "
+            "Run scripts/build_region_masks.py first or pass --mask-file."
+        )
+
+    mask_ds = xr.open_dataset(mask_file)
+    try:
+        if var_name not in mask_ds:
+            raise KeyError(f"Mask file {mask_file} does not contain variable '{var_name}'")
+        mask = mask_ds[var_name]
+        if "lat" in mask.coords:
+            mask = mask.rename({"lat": "latitude"})
+        if "lon" in mask.coords:
+            mask = mask.rename({"lon": "longitude"})
+
+        try:
+            mask = mask.sel(latitude=template["latitude"], longitude=template["longitude"])
+        except Exception as exc:
+            raise ValueError(
+                f"Mask grid in {mask_file} is not aligned with the region CHIRPS grid."
+            ) from exc
+        return mask.astype(bool).load()
+    finally:
+        mask_ds.close()
+
+
 def build_forecast_dataset(
     region: Region,
     pr_file: Path,
@@ -515,6 +569,7 @@ def build_forecast_dataset(
     sample_file: Path,
     climate_features: str,
     force: bool,
+    mask_file: Path | None = None,
 ) -> pd.DataFrame:
     if dataset_file.exists() and not force:
         print(f"Using existing forecast dataset: {dataset_file}")
@@ -531,6 +586,17 @@ def build_forecast_dataset(
     spi3 = spi_ds["spi3"].sel(time=pr.time)
     spi6 = spi_ds["spi6"].sel(time=pr.time)
     label = spi_ds["drought_label_spi1"].sel(time=pr.time)
+
+    if mask_file is not None:
+        grid_mask = load_grid_mask(mask_file, pr)
+        n_keep = int(grid_mask.sum())
+        n_total = int(grid_mask.size)
+        print(f"Applying country mask: {mask_file} ({n_keep:,}/{n_total:,} grid cells retained)")
+        pr = pr.where(grid_mask)
+        spi1 = spi1.where(grid_mask)
+        spi3 = spi3.where(grid_mask)
+        spi6 = spi6.where(grid_mask)
+        label = label.where(grid_mask)
 
     target = label.shift(time=-1)
     target.name = "target_label"
@@ -599,7 +665,7 @@ def build_forecast_dataset(
     return df
 
 
-def build_spatial_feature_frame(pr_file: Path, spi_file: Path) -> pd.DataFrame:
+def build_spatial_feature_frame(pr_file: Path, spi_file: Path, mask_file: Path | None = None) -> pd.DataFrame:
     print("Building 3x3 spatial-neighbourhood features...")
     pr_ds = xr.open_dataset(pr_file).load()
     spi_ds = xr.open_dataset(spi_file).load()
@@ -607,6 +673,16 @@ def build_spatial_feature_frame(pr_file: Path, spi_file: Path) -> pd.DataFrame:
     spi1 = spi_ds["spi1"].sel(time=pr.time).astype("float32")
     spi3 = spi_ds["spi3"].sel(time=pr.time).astype("float32")
     spi6 = spi_ds["spi6"].sel(time=pr.time).astype("float32")
+
+    if mask_file is not None:
+        grid_mask = load_grid_mask(mask_file, pr)
+        n_keep = int(grid_mask.sum())
+        n_total = int(grid_mask.size)
+        print(f"Applying country mask before neighbourhood rolling: {n_keep:,}/{n_total:,} grid cells retained")
+        pr = pr.where(grid_mask)
+        spi1 = spi1.where(grid_mask)
+        spi3 = spi3.where(grid_mask)
+        spi6 = spi6.where(grid_mask)
 
     def nbr_mean(da: xr.DataArray, name: str) -> xr.DataArray:
         rolled = da.rolling({"latitude": 3, "longitude": 3}, min_periods=1, center=True).mean()
@@ -984,6 +1060,10 @@ def copy_report_artifacts(region: Region, out_dir: Path, rows: list[dict[str, ob
 
 
 def write_region_metadata(region: Region, paths: dict[str, Path], out_dir: Path, args: Namespace) -> None:
+    args_dict = {
+        key: str(value) if isinstance(value, Path) else value
+        for key, value in vars(args).items()
+    }
     meta = {
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "region": {
@@ -994,9 +1074,11 @@ def write_region_metadata(region: Region, paths: dict[str, Path], out_dir: Path,
             "lon_min": region.lon_min,
             "lon_max": region.lon_max,
             "rationale": region.rationale,
+            "mask_countries": list(region.mask_countries),
+            "mask_note": region.mask_note,
         },
         "paths": {key: str(value) for key, value in paths.items()},
-        "args": vars(args),
+        "args": args_dict,
     }
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "region_metadata.json").write_text(json.dumps(meta, indent=2, sort_keys=True))
@@ -1014,9 +1096,9 @@ def main() -> None:
         raise ValueError("--grid-stride must be >= 1")
 
     base_region = resolve_region(args.region)
-    region = base_region
+    source_region = base_region
     if args.grid_stride > 1:
-        region = replace(
+        source_region = replace(
             base_region,
             slug=f"{base_region.slug}_stride{args.grid_stride}",
             name=f"{base_region.name} (grid-stride {args.grid_stride} smoke)",
@@ -1028,26 +1110,55 @@ def main() -> None:
         )
     end_year = args.end_year or latest_chirps_year()
     use_canonical = base_region.slug == "cvalley" and args.grid_stride == 1 and not args.no_canonical_cvalley
-    paths = region_paths(region, args.start_year, end_year, use_canonical)
-    out_dir = output_dir(region)
-    write_region_metadata(region, paths, out_dir, args)
+    paths = region_paths(source_region, args.start_year, end_year, use_canonical)
 
-    print(f"Running multi-region path for {region.name} ({region.slug})")
+    mask_file = None
+    run_region = source_region
+    if args.country_mask:
+        if args.grid_stride > 1 and args.mask_file is None:
+            raise ValueError("--country-mask with --grid-stride requires an explicit --mask-file on the same grid")
+        if not base_region.mask_countries:
+            raise ValueError(f"Region {base_region.slug} has no configured mask countries")
+        mask_file = args.mask_file or default_country_mask_file(base_region)
+        masked_slug = f"{source_region.slug}_country_masked"
+        run_region = replace(
+            source_region,
+            slug=masked_slug,
+            name=f"{source_region.name} (country-mask sensitivity)",
+            rationale=(
+                source_region.rationale
+                + " Country-mask sensitivity run using configured Natural Earth "
+                f"countries: {', '.join(base_region.mask_countries)}."
+            ),
+            mask_countries=base_region.mask_countries,
+            mask_note=base_region.mask_note,
+        )
+        paths.update(masked_dataset_paths(run_region))
+        paths["mask"] = mask_file
+
+    out_dir = output_dir(run_region)
+    write_region_metadata(run_region, paths, out_dir, args)
+
+    print(f"Running multi-region path for {run_region.name} ({run_region.slug})")
+    print(f"Source CHIRPS/SPI region: {source_region.name} ({source_region.slug})")
     print(f"Use canonical cvalley files: {use_canonical}")
     print(f"Climate features: {args.climate_features}")
+    if mask_file is not None:
+        print(f"Country mask file: {mask_file}")
 
     if not use_canonical:
-        clip_chirps(region, paths["pr"], args.start_year, end_year, args.rebuild_pr, args.grid_stride)
+        clip_chirps(source_region, paths["pr"], args.start_year, end_year, args.rebuild_pr, args.grid_stride)
         make_spi_labels(paths["pr"], paths["spi"], args.rebuild_spi, args.spi_n_jobs)
 
     df = build_forecast_dataset(
-        region=region,
+        region=run_region,
         pr_file=paths["pr"],
         spi_file=paths["spi"],
         dataset_file=paths["dataset"],
         sample_file=paths["sample"],
         climate_features=args.climate_features,
-        force=args.rebuild_dataset and not use_canonical,
+        force=args.rebuild_dataset and (not use_canonical or args.country_mask),
+        mask_file=mask_file,
     )
 
     if args.prepare_only:
@@ -1061,7 +1172,7 @@ def main() -> None:
         model_df = df
         features = get_feature_columns(model_df.columns)
         if model_name == "spatial":
-            spatial = build_spatial_feature_frame(paths["pr"], paths["spi"])
+            spatial = build_spatial_feature_frame(paths["pr"], paths["spi"], mask_file=mask_file)
             model_df = model_df.merge(
                 spatial,
                 on=["time", "latitude", "longitude"],
@@ -1072,12 +1183,12 @@ def main() -> None:
                 print(f"Spatial features missing values: {missing:,}; filling with 0.")
                 model_df[SPATIAL_FEATURES] = model_df[SPATIAL_FEATURES].fillna(0.0)
             features = get_feature_columns(model_df.columns) + SPATIAL_FEATURES
-        model_rows.append(evaluate_model(region, model_df, model_name, features, out_dir, args))
+        model_rows.append(evaluate_model(run_region, model_df, model_name, features, out_dir, args))
 
     update_region_summary(out_dir, model_rows)
     update_global_summary(model_rows)
     if args.copy_report:
-        copy_report_artifacts(region, out_dir, model_rows)
+        copy_report_artifacts(run_region, out_dir, model_rows)
 
 
 if __name__ == "__main__":
