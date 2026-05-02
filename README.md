@@ -211,6 +211,33 @@ usable SPI-1 lead-1 probability skill in this setup.
 
 Beyond pixel-level skill, we evaluate the model's ability to predict the **dominant drought class at the Central Valley scale**. For each month, we compute the fraction of pixels predicted as dry/normal/wet and compare the dominant class to observations. See [results/regional/](results/regional/) for dominant-class accuracy and class fraction time series.
 
+### Multi-Region Evaluation Path
+
+The first region-aware runner now supports rectangular CHIRPS regions without
+overwriting the canonical Central Valley checkpoint:
+
+```bash
+python scripts/run_multiregion_xgb_experiment.py --list-regions
+python scripts/run_multiregion_xgb_experiment.py --region cvalley --model both --copy-report
+python scripts/run_multiregion_xgb_experiment.py --region southern_great_plains --model both --spi-n-jobs 8 --copy-report
+```
+
+The runner clips CHIRPS, computes region-specific SPI, builds the same
+SPI-1[t+1] forecast table, and evaluates monthly dry-fraction BSS. Parallel SPI
+fitting is available through `--spi-n-jobs`; `--grid-stride` is available only
+for smoke tests and should not be treated as a scientific result.
+
+Initial full-resolution result:
+
+| Region / model | Dry BS | BSS vs. climatology | 95% CI | Note |
+|---|---:|---:|---|---|
+| Central Valley / spatial XGB retrain | 0.06598 | −0.02644 | [−0.12449, 0.04704] | Parity check: near climatology, consistent with frozen checkpoint |
+| Southern Great Plains / tabular XGB | 0.05164 | −0.08218 | [−0.14450, −0.00066] | First full contrasting-region test; still below climatology |
+| Southern Great Plains / spatial XGB | 0.05163 | −0.08200 | [−0.14790, −0.00190] | Spatial context does not close the gap |
+
+This does not yet prove a universal barrier, but it moves the project from a
+single-region case study toward a reproducible multi-region comparison.
+
 ---
 
 ## Evaluation Methods
@@ -241,8 +268,8 @@ Beyond pixel-level skill, we evaluate the model's ability to predict the **domin
 
 Highest-impact directions (see [`ANALYSIS.md`](ANALYSIS.md) for full roadmap):
 
-1. **Build the multi-region evaluation path** — A second hydroclimate is now the clearest way to test whether the near-climatology barrier generalizes.
-2. **Run one contrasting region** — Murray-Darling, Great Plains, or Mediterranean Spain would add much more evidence than more Central Valley-only tuning.
+1. **Run one more contrasting region** — Mediterranean Spain or Murray-Darling would test whether the result holds outside the western/central U.S.
+2. **Compare regional mechanisms** — Southern Great Plains has weak dry ranking (ROC-AUC near 0.51), while Central Valley has stronger ranking but weak calibration; that difference is worth explaining.
 3. **Add targeted event-scale predictors only if staying single-region** — Atmospheric-river or subseasonal circulation features are more physically aligned with Central Valley monthly extremes than more lagged land-surface fields.
 4. **Seasonal target variants** — The first tabular SPI-3 lead-3 experiment is negative; only extend this with spatial features or additional drivers if it serves the paper's scope.
 5. **Region and season-conditioned experiments** — Current MAM/ENSO hints have CIs crossing zero; more independent months or regions are needed before claiming conditional skill.
@@ -286,6 +313,8 @@ python scripts/run_spi3_seasonal_experiment.py   # optional leakage-free SPI-3 l
 python scripts/run_met_feature_experiment.py      # optional ERA5-Land temperature/VPD experiment
 python scripts/run_met_spatial_feature_experiment.py  # optional gridded met + spatial XGB experiment
 python scripts/run_soil_moisture_feature_experiment.py  # optional ERA5-Land soil-moisture experiment
+python scripts/run_multiregion_xgb_experiment.py --list-regions
+python scripts/run_multiregion_xgb_experiment.py --region southern_great_plains --model both --spi-n-jobs 8 --copy-report
 python scripts/evaluate_regional_forecast.py     # regional (Central Valley) dominant class accuracy
 python scripts/xgb_shap_forecast_analysis.py --model both  # SHAP interpretation
 python scripts/validate_era5_spi.py              # cross-dataset validation
@@ -304,6 +333,7 @@ python scripts/plot_case_study.py                # 2021-2026 case study
 - **[outputs/](outputs/)** — Full model artifacts, probability arrays, feature-importance plots, and detailed SHAP dependence plots
 - **[results/validation/](results/validation/)** — ERA5-Land and USDM cross-dataset validation
 - **[results/regional/](results/regional/)** — Regional (Central Valley) forecast evaluation
+- **[results/multiregion/](results/multiregion/)** — Region-aware XGBoost comparison artifacts
 
 ---
 
