@@ -39,7 +39,13 @@ COUNTRY_GEOJSON_URL = (
 )
 COUNTRY_GEOJSON = METADATA_ROOT / "ne_50m_admin_0_countries.geojson"
 
-DEFAULT_REGIONS = ("cvalley", "southern_great_plains", "mediterranean_spain")
+DEFAULT_REGIONS = (
+    "cvalley",
+    "southern_great_plains",
+    "murray_darling",
+    "mediterranean_spain",
+    "horn_of_africa",
+)
 DEFAULT_START_YEAR = 1991
 DEFAULT_END_YEAR = 2026
 ROUND_DECIMALS = 6
@@ -51,7 +57,7 @@ def parse_args() -> Namespace:
         "--regions",
         nargs="+",
         default=list(DEFAULT_REGIONS),
-        help="Region slugs or aliases to audit. Defaults to completed full-resolution regions.",
+        help="Region slugs or aliases to audit. Defaults to configured priority regions with local grids.",
     )
     parser.add_argument(
         "--include-all-configured",
@@ -325,7 +331,7 @@ def audit_region(region: Region, features: list[dict[str, object]], args: Namesp
         return None
 
     paths = region_paths(region, args.start_year, args.end_year)
-    missing = [name for name, path in paths.items() if not path.exists()]
+    missing = [name for name in ("pr",) if not paths[name].exists()]
     if missing:
         message = (
             f"Skipping {region.slug}: missing "
@@ -466,6 +472,7 @@ def write_geometry_notes(rows: list[dict[str, object]], out_path: Path) -> None:
         "",
         "Country masks use Natural Earth 1:50m country polygons and CHIRPS grid-cell centers.",
         "They are a first-pass rectangular-bbox audit, not a replacement for basin polygons.",
+        f"Source URL: {COUNTRY_GEOJSON_URL}",
         "",
     ]
     for row in rows:

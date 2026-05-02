@@ -12,6 +12,8 @@ script builds:
     and Guadalquivir.
   - Southern Great Plains: US EPA Level III ecoregion polygons in the South
     Central Semi-Arid Prairies Level II region.
+  - Murray-Darling: official Murray-Darling Basin Boundary - Water Act 2007
+    GeoJSON from data.gov.au / Murray-Darling Basin Authority.
 
 The outputs are mask NetCDF files that can be passed to
 run_multiregion_xgb_experiment.py with --basin-mask.
@@ -65,8 +67,17 @@ EPA_LEVEL3_ZIP_URL = (
 EPA_ECOREGION_PAGE = (
     "https://www.epa.gov/eco-research/level-iii-and-iv-ecoregions-continental-united-states"
 )
+MURRAY_DARLING_GEOJSON_URL = (
+    "https://data.gov.au/geoserver/murray-darling-basin-boundary/wfs?"
+    "request=GetFeature&typeName=ckan_4ede9aed_5620_47db_a72b_0b3aa0a3ced0"
+    "&outputFormat=json"
+)
+MURRAY_DARLING_DATA_PAGE = (
+    "https://data.gov.au/data/dataset/murray-darling-basin-boundary/"
+    "resource/78d9935c-c230-440f-a5c7-ada0b3adf43d"
+)
 
-DEFAULT_REGIONS = ("cvalley", "southern_great_plains", "mediterranean_spain")
+DEFAULT_REGIONS = ("cvalley", "southern_great_plains", "murray_darling", "mediterranean_spain")
 DEFAULT_START_YEAR = 1991
 DEFAULT_END_YEAR = 2026
 ROUND_DECIMALS = 6
@@ -89,7 +100,7 @@ def parse_args() -> Namespace:
         "--regions",
         nargs="+",
         default=list(DEFAULT_REGIONS),
-        help="Region slugs or aliases to audit. Defaults to the three full-resolution priority regions.",
+        help="Region slugs or aliases to audit. Defaults to priority regions with basin/ecoregion masks.",
     )
     parser.add_argument("--start-year", type=int, default=DEFAULT_START_YEAR)
     parser.add_argument("--end-year", type=int, default=DEFAULT_END_YEAR)
@@ -267,6 +278,23 @@ def southern_great_plains_features(region: Region, force: bool) -> tuple[list[di
     return features, out_path, EPA_LEVEL3_ZIP_URL, source_note
 
 
+def murray_darling_features(force: bool) -> tuple[list[dict[str, object]], Path, str, str]:
+    out_path = METADATA_ROOT / "mdb" / "murray_darling_basin_boundary_water_act_2007.geojson"
+    source_note = (
+        "Murray-Darling Basin Authority / data.gov.au Murray-Darling Basin Boundary "
+        "as defined in Section 4(1) of the Water Act 2007."
+    )
+    if out_path.exists() and not force:
+        return load_cached_geojson(out_path), out_path, MURRAY_DARLING_GEOJSON_URL, source_note
+
+    data = request_json(MURRAY_DARLING_GEOJSON_URL)
+    features = data.get("features", [])
+    if not features:
+        raise ValueError("Murray-Darling Basin boundary query returned no features")
+    write_geojson(out_path, features, MURRAY_DARLING_GEOJSON_URL, source_note)
+    return features, out_path, MURRAY_DARLING_GEOJSON_URL, source_note
+
+
 def boundary_features(region: Region, force: bool) -> tuple[list[dict[str, object]], Path, str, str, str]:
     if region.slug == "cvalley":
         features, path, source_url, source_note = central_valley_features(force)
@@ -274,6 +302,9 @@ def boundary_features(region: Region, force: bool) -> tuple[list[dict[str, objec
     if region.slug == "southern_great_plains":
         features, path, source_url, source_note = southern_great_plains_features(region, force)
         return features, path, source_url, source_note, "Southern Great Plains EPA South Central Semi-Arid Prairies"
+    if region.slug == "murray_darling":
+        features, path, source_url, source_note = murray_darling_features(force)
+        return features, path, source_url, source_note, "Murray-Darling Basin Boundary - Water Act 2007"
     if region.slug == "mediterranean_spain":
         features, path, source_url, source_note = spain_basin_features(force)
         return features, path, source_url, source_note, "Mediterranean/eastern-southern Spain river basin districts"
@@ -410,7 +441,7 @@ def write_mask_products(
 
 def audit_region(region: Region, args: Namespace) -> dict[str, object] | None:
     paths = region_paths(region, args.start_year, args.end_year)
-    missing = [name for name, path in paths.items() if not path.exists()]
+    missing = [name for name in ("pr",) if not paths[name].exists()]
     if missing:
         message = (
             f"Skipping {region.slug}: missing "
@@ -428,6 +459,7 @@ def audit_region(region: Region, args: Namespace) -> dict[str, object] | None:
             str((feature.get("properties") or {}).get("Basin_Subbasin_Name")
                 or (feature.get("properties") or {}).get("nom_demar")
                 or (feature.get("properties") or {}).get("US_L3NAME")
+                or (feature.get("properties") or {}).get("DDIV_NAME")
                 or feature.get("id"))
             for feature in features
         }
