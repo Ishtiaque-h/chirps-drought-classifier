@@ -440,3 +440,23 @@ This narrative transforms a "negative result" into a **methodological and scient
    ```bash
    python scripts/run_feature_ablation.py
    ```
+
+## 10. Scientific Strength Upgrades Already in Place
+
+These are the changes that most improve the scientific credibility of the project:
+
+1. **Leakage-safe target design.** The canonical forecast target is now SPI-1[t+1] or SPI-3/6 at non-overlapping leads, so features never reuse the same accumulation window as the label.
+2. **Monthly-level inference.** Skill is always summarized over independent test months, not pixels, which avoids pseudo-replication and inflated significance.
+3. **Calibration with validation-only selection.** Isotonic and Platt calibration are fit on the validation split only, then frozen before test evaluation.
+4. **Multi-region generalization checks.** Central Valley is no longer treated as a one-off result; the same pipeline has been run across Great Plains, Spain, Murray-Darling, and Horn of Africa checkpoints.
+5. **Conditional-skill diagnostics.** ENSO- and season-stratified BSS is now computed and saved in `results/seasonal/seasonal_monthly_scores_stratified_bss.csv` so the paper can distinguish global skill from regime-specific hints.
+
+### What the new seasonal stratification actually says
+
+The seasonal summaries are useful, but they are not yet strong enough to support an operational claim:
+
+- SPI-3 lead-3 shows a small overall isotonic gain at the monthly level, but the confidence interval still crosses zero.
+- SPI-3 lead-6 is weaker overall and remains below climatology after calibration.
+- The strongest conditional skill appears in El Niño months and some individual season bins, but several of those bins have only 2–3 months, so they should be presented as hypothesis-generating rather than confirmatory.
+
+In practice, this means the project is now scientifically stronger because it can say **where the signal might live**, while still being honest that the signal is not yet robust enough for a positive-skill claim.
