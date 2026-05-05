@@ -63,12 +63,18 @@ The project implements a complete, reproducible pipeline for **1-month-ahead dro
 > calibration removes most of the MAM gain, and season-specific calibration
 > overfits badly with only 12 validation months per season.
 >
-> **The seasonal target result is suggestive but not yet defensible.** A
-> leakage-free SPI-3 lead-3 setup (features at t, target SPI-3 ending t+3)
-> gives calibrated XGBoost BSS = +0.036 with a 95% CI crossing zero. SPI-3
-> lead-6 and SPI-6 lead-6 remain below climatology after calibration. The
-> SPI-6 persistence baseline has been corrected to use `spi6_lag1`, which makes
-> the baseline target-consistent and worse than the old SPI-3 proxy.
+> **The seasonal target result is suggestive but not yet defensible as temporal
+> forecast skill.** A leakage-free Central Valley SPI-3 lead-3 setup (features
+> at t, target SPI-3 ending t+3) gives calibrated XGBoost BSS = +0.036 with a
+> 95% CI crossing zero. Regional SPI-3/SPI-6 long-lead tests are now summarized
+> in `results/seasonal/seasonal_regional_longlead_summary.csv`: most rows are
+> negative or uncertain, and the only robust-positive row is Mediterranean
+> Spain SPI-6 lead-6 with Niño3.4-only features (BSS = +0.078, CI
+> [+0.004, +0.162]). The signal audit in
+> `results/seasonal/seasonal_regional_signal_audit.csv` flags that row as a
+> calibration-shift result, not event tracking (`r = 0.041`, variance ratio =
+> 0.104). The SPI-6 persistence baseline has been corrected to use `spi6_lag1`,
+> which makes the baseline target-consistent and worse than the old SPI-3 proxy.
 >
 > **Temperature/VPD adds signal but not positive skill.** ERA5-Land t2m/VPD
 > anomaly lags dominate gain in a separate non-spatial XGBoost experiment and
@@ -153,8 +159,10 @@ The project implements a complete, reproducible pipeline for **1-month-ahead dro
 > correlations (e.g., Horn zone 0 Niño3.4 lag-6 `r = 0.542`, Murray-Darling zone
 > 0 Niño3.4 lag-1 `r = -0.460`, Southern Great Plains zone 3 Niño3.4 lag-6
 > `r = 0.501`). But zone-level SPI-1 forecast BSS remains mostly negative or
-> only weakly positive in isolated zones, supporting a target-timescale mismatch
-> interpretation.
+> only weakly positive in isolated zones. This motivated the SPI-3/SPI-6
+> seasonal audit; the current seasonal results show that target-timescale
+> mismatch is only a partial explanation, because longer targets still do not
+> produce broad event-tracking skill.
 >
 > **XGB-Spatial is the best current ML option** because it has the best ranking
 > skill (ROC-AUC = 0.743) and the best calibrated Brier Score. Current evidence
@@ -502,10 +510,12 @@ This narrative transforms a "negative result" into a **methodological and scient
    follow-up should use NMME probabilistic terciles, full GRIB/hindcast support,
    or SubX only if the paper needs a stronger operational comparison.
 
-6. **Extend seasonal SPI-3 only if needed**
-   SPI-3 lead-3 is positive but uncertain. A fair next seasonal test should add
-   spatial features, forecast precipitation, or additional regions rather than
-   simply tuning the same tabular model.
+6. **Treat seasonal regional results as a calibration/target-design audit**
+   The expanded seasonal table has one robust-positive BSS row, but its
+   near-zero correlation and low variance indicate calibration shift rather
+   than useful event timing. A fair next seasonal test should use independent
+   forecast precipitation or circulation predictors, not more tuning of the
+   same lagged-observation tabular model.
 
 7. **Refresh corrected explainability artifacts after any model/schema change**
    ```bash
@@ -527,7 +537,7 @@ These are the changes that most improve the scientific credibility of the projec
 4. **Multi-region generalization checks.** Central Valley is no longer treated as a one-off result; the same pipeline has been run across Great Plains, Spain, Murray-Darling, and Horn of Africa checkpoints.
 5. **Temporal robustness controls.** Five rolling Central Valley holdouts now test whether the 2021–2026 result is an artifact of a single unusual test period.
 6. **Independent precipitation-product validation.** PRISM SPI-1 validation checks whether the CHIRPS target itself is driving the conclusion.
-7. **Conditional-skill diagnostics.** ENSO- and season-stratified BSS is now computed and saved in `results/seasonal/seasonal_monthly_scores_stratified_bss.csv` so the paper can distinguish global skill from regime-specific hints.
+7. **Conditional-skill diagnostics.** ENSO- and season-stratified BSS is now computed and saved in `results/seasonal/seasonal_monthly_scores_stratified_bss.csv`; regional long-lead seasonal BSS is summarized in `results/seasonal/seasonal_regional_longlead_summary.csv`; and `results/seasonal/seasonal_regional_signal_audit.csv` separates calibration shifts from temporal tracking.
 
 ### What the new seasonal stratification actually says
 
@@ -536,5 +546,6 @@ The seasonal summaries are useful, but they are not yet strong enough to support
 - SPI-3 lead-3 shows a small overall isotonic gain at the monthly level, but the confidence interval still crosses zero.
 - SPI-3 lead-6 is weaker overall and remains below climatology after calibration.
 - The strongest conditional skill appears in El Niño months and some individual season bins, but several of those bins have only 2–3 months, so they should be presented as hypothesis-generating rather than confirmatory.
+- Multi-region SPI-3/SPI-6 long-lead tests do not show a broad timescale fix. Southern Great Plains SPI-6 lead-6 is robustly negative, Murray-Darling Niño3.4-only seasonal runs are robustly negative, Horn of Africa country-mask seasonal runs remain below climatology with wide uncertainty, and Mediterranean Spain SPI-6 lead-6 is robust-positive only after isotonic calibration while showing near-zero event correlation.
 
 In practice, this means the project is now scientifically stronger because it can say **where the signal might live**, while still being honest that the signal is not yet robust enough for a positive-skill claim.

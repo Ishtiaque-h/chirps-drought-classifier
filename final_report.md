@@ -42,12 +42,13 @@ The compiled mechanism table now shows strong SPI-12 teleconnection structure in
 ## Comprehensive ML Assessment: Project State & Predictability Barriers
 
 ### Overview
-The May 2026 reproducibility checkpoint includes the canonical Central Valley benchmark, calibration study, EDL uncertainty experiment, feature-extension experiments, leakage-safe seasonal targets, five-region geometry-sensitive evaluation, temporal robustness audit, PRISM validation, operational benchmark, and SPI-12 regionalization diagnostics. The current single source of truth for model-skill experiments is `results/report/master_results_headline.csv`. Its critical finding is: **no current experiment produces robust positive monthly BSS over climatology**.
+The May 2026 reproducibility checkpoint includes the canonical Central Valley benchmark, calibration study, EDL uncertainty experiment, feature-extension experiments, leakage-safe seasonal targets, five-region geometry-sensitive evaluation, temporal robustness audit, PRISM validation, operational benchmark, and SPI-12 regionalization diagnostics. The current single source of truth for canonical monthly SPI-1 model-skill experiments is `results/report/master_results_headline.csv`. Its critical finding is: **no canonical monthly SPI-1 experiment produces robust positive BSS over climatology**. The separate seasonal regional audit has one robust-positive SPI-6 row, but the diagnostic table shows it is mainly a calibration-shift result rather than temporal event tracking.
 
 ### Performance Hierarchy (Monthly Brier Skill Score vs Climatology)
 
 | Model | Test Set | BSS | Key Finding |
 |-------|----------|-----|------------|
+| Mediterranean Spain SPI-6 lead-6 Niño3.4-only | 62 mo | **+0.078** | Robust BSS, but audit flags calibration shift (`r = 0.041`, low variance), not event tracking |
 | Mediterranean Spain rectangular tabular | 63 mo | **+0.044** | Positive point estimate, but not robust and geometry-sensitive |
 | Seasonal SPI-3 lead-3 + isotonic | 59 mo | **+0.036** | Positive seasonal hint, but CI crosses zero |
 | Southern Great Plains ecoregion mask | 63 mo | **+0.010** | Positive regional hint, but CI crosses zero |
@@ -61,7 +62,7 @@ The May 2026 reproducibility checkpoint includes the canonical Central Valley be
 | MJO/IVT selected | 39 mo | -0.333 | Shorter-period atmospheric feature test is robustly negative |
 | Murray-Darling basin mask | 63 mo | -0.639 | Strong calibration/test-period shift failure |
 
-**Conclusion**: The project should not claim a positive forecast model. It should claim a rigorous predictability audit: ranking signals exist, but calibrated probability skill over climatology is not robust under monthly inference, source-cited regional masks, and validation-only calibration.
+**Conclusion**: The project should not claim a broadly positive forecast model. It should claim a rigorous predictability audit: ranking signals exist, but calibrated probability skill over climatology is not robust under monthly inference, source-cited regional masks, validation-only calibration, and signal-vs-calibration diagnostics.
 
 ### Temporal Robustness and Data-Source Validation
 
@@ -97,7 +98,7 @@ NetCDF coverage starts at target month 2018-05, so calibration uses 32 validatio
 - **Primary** (Recommended): "Limits of Lag-Based ML for Monthly Drought Forecasting" — rigorous negative result and multi-region predictability audit
 - **Secondary**: "Operational Forecast Inputs vs Lag-Only ML" — compare NMME/SubX precipitation forecasts to the lagged-observation ML benchmark
 - **Supporting**: "Regional Drought Teleconnections" — Step 3 regionalization standalone
-- **Most defensible next positive-skill direction**: shift from SPI-1 lead-1 to seasonal or zone-level SPI-3/SPI-6/SPI-12 targets, because regionalization shows teleconnection signal at longer drought-memory timescales.
+- **Most defensible next positive-skill direction**: shift from SPI-1 lead-1 to zone-level or forecast-informed seasonal targets. Regionalization shows teleconnection signal at longer drought-memory timescales, but current SPI-3/SPI-6 seasonal regional runs mostly fail to convert that signal into event-tracking BSS.
 
 ## References
 

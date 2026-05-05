@@ -190,10 +190,22 @@ SPI-3 class ending at `t+3`, so the target accumulation window is
 | SPI-6 lead-6 | Persistence SPI-6 | 0.24745 | −0.94918 | [−2.01903, −0.36532] |
 | SPI-6 lead-6 | XGBoost isotonic | 0.14092 | −0.11009 | [−0.37336, +0.03511] |
 
-SPI-3 lead-3 is the only seasonal target with a positive point estimate, but
-its confidence interval crosses zero. It is a useful hypothesis-generating
-signal, not a defensible positive-skill claim. The SPI-6 lead-6 persistence
-baseline is now target-consistent (`spi6_lag1`, not the old SPI-3 proxy).
+For Central Valley, SPI-3 lead-3 is the only seasonal target with a positive
+point estimate, but its confidence interval crosses zero. It is a useful
+hypothesis-generating signal, not a defensible positive-skill claim. The SPI-6
+lead-6 persistence baseline is now target-consistent (`spi6_lag1`, not the old
+SPI-3 proxy).
+
+The same runner now supports source-cited regional masks and climate-feature
+schemas, including the Horn of Africa country-mask caveat. The compiled table is
+[`results/seasonal/seasonal_regional_longlead_summary.csv`](results/seasonal/seasonal_regional_longlead_summary.csv),
+with a companion signal audit at
+[`results/seasonal/seasonal_regional_signal_audit.csv`](results/seasonal/seasonal_regional_signal_audit.csv).
+The only robust-positive regional seasonal row so far is Mediterranean Spain
+SPI-6 lead-6 with Niño3.4-only features (`BSS = +0.078`, 95% CI
+`[+0.004, +0.162]`), but the signal audit classifies it as a calibration-shift
+result rather than temporal event tracking (`r = 0.041`, calibrated variance
+ratio `0.104`). This does not overturn the main predictability-barrier result.
 
 ### Land-Surface Driver Experiments
 
@@ -417,7 +429,7 @@ Highest-impact directions (see [`ANALYSIS.md`](ANALYSIS.md) for full roadmap):
 2. **Turn mechanism diagnostics into figures/tables for the paper narrative** — `results/multiregion/`, `results/temporal/`, `results/validation/prism_*`, and `results/regionalization/` are now the core evidence.
 3. **Stop expanding regions for now** — Five hydroclimate checkpoints are enough to support the generalization claim; additional regions would add cost before the narrative is tightened.
 4. **Only extend operational benchmarks if needed** — The first CPC NMME lead-1 anomaly benchmark is also tied with climatology; a follow-up should use NMME probabilistic terciles, full hindcast NetCDF/GRIB support, or SubX only if the paper needs a stronger operational comparison.
-5. **Reframe the target only if pursuing positive skill** — SPI-12 regionalization shows teleconnection signal at longer drought-memory timescales, so SPI-3/SPI-6/SPI-12 seasonal or zone-level targets are more promising than another ML architecture on SPI-1 lead-1.
+5. **Reframe the target only if pursuing positive skill** — SPI-12 regionalization shows teleconnection signal at longer drought-memory timescales, but the current SPI-3/SPI-6 regional seasonal audit does not yet show reliable event tracking. The next fair target-reframing step should add independent forecast precipitation/circulation inputs or zone-level targets, not only tune the same lagged-observation model.
 
 ---
 
@@ -463,6 +475,9 @@ python scripts/run_multiregion_xgb_experiment.py --region southern_great_plains 
 python scripts/build_region_masks.py --copy-report
 python scripts/run_multiregion_xgb_experiment.py --region mediterranean_spain --model both --country-mask --rebuild-dataset --copy-report
 python scripts/build_basin_masks.py --copy-report
+python scripts/run_seasonal_longlead_experiment.py --list-regions
+python scripts/build_seasonal_regional_summary.py
+python scripts/audit_seasonal_regional_signal.py
 python scripts/run_multiregion_xgb_experiment.py --region cvalley --model both --basin-mask --rebuild-dataset --copy-report
 python scripts/run_multiregion_xgb_experiment.py --region southern_great_plains --model both --basin-mask --rebuild-dataset --copy-report
 python scripts/run_multiregion_xgb_experiment.py --region murray_darling --prepare-grid-only --rebuild-pr --rebuild-spi --spi-n-jobs 8
@@ -494,6 +509,7 @@ python scripts/plot_case_study.py                # 2021-2026 case study
 - **[outputs/](outputs/)** — Full model artifacts, probability arrays, feature-importance plots, and detailed SHAP dependence plots
 - **[results/validation/](results/validation/)** — ERA5-Land, PRISM, and USDM validation/consistency checks
 - **[results/temporal/](results/temporal/)** — Rolling temporal robustness and event-block diagnostics
+- **[results/seasonal/](results/seasonal/)** — Seasonal long-lead and regional seasonal signal audits
 - **[results/regionalization/](results/regionalization/)** — SPI-12 regionalization and zone-level mechanism tables
 - **[results/regional/](results/regional/)** — Regional (Central Valley) forecast evaluation
 - **[results/multiregion/](results/multiregion/)** — Region-aware XGBoost comparison artifacts
