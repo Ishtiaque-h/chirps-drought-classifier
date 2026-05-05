@@ -1,0 +1,21 @@
+Operational/Dynamical Precipitation Benchmark
+================================================================
+Forecast source CSV: outputs/nmme_cpc_cvalley_lead3_forecast.csv
+Design: external monthly precipitation forecast mapped to dry-fraction probability.
+Target: SPI-3 dry fraction at lead 3
+Calibration: validation-only mapping from forecast signal/probability to observed monthly dry fraction.
+Predictor kind: precip_anomaly_signal
+Validation months: 30 (2018-07 to 2020-12)
+Validation BS by method: {'isotonic': 0.07794387827495007}
+Selected method: isotonic
+Test months: 59 (2021-01 to 2025-11)
+Climatology BS: 0.08765
+Spearman corr(selected prob, observed dry fraction): 0.300
+Spearman corr(raw dry signal, observed dry fraction): 0.313
+Selected probability amplitude ratio: 0.349
+
+Monthly dry-fraction Brier Skill Score vs climatology:
+  isotonic     BS=0.08013 BSS=0.08580 95% CI [-0.24213, 0.27137]
+  selected     BS=0.08013 BSS=0.08580 95% CI [-0.27387, 0.26905]
+
+Monthly scores: /Users/ishtisdream/chirps-drought-classifier/outputs/operational_nmme_cpc_spi3_lead3_monthly_scores.csv

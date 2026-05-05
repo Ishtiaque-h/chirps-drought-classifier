@@ -1,0 +1,22 @@
+Operational/Dynamical Precipitation Benchmark
+================================================================
+Forecast source CSV: outputs/nmme_cpc_prob_cvalley_lead6_forecast.csv
+Design: external monthly precipitation forecast mapped to dry-fraction probability.
+Target: SPI-6 dry fraction at lead 6
+Calibration: validation-only mapping from forecast signal/probability to observed monthly dry fraction.
+Predictor kind: probability
+Validation months: 15 (2019-07 to 2020-12)
+Validation BS by method: {'raw': 0.11175595508196942, 'isotonic': 0.0734871004683082}
+Selected method: isotonic
+Test months: 49 (2021-01 to 2026-02)
+Climatology BS: 0.10419
+Spearman corr(selected prob, observed dry fraction): 0.361
+Spearman corr(raw predictor, observed dry fraction): 0.375
+Selected probability amplitude ratio: 0.612
+
+Monthly dry-fraction Brier Skill Score vs climatology:
+  raw          BS=0.10051 BSS=0.03530 95% CI [-0.44807, 0.25822]
+  isotonic     BS=0.14676 BSS=-0.40863 95% CI [-1.70475, 0.16310]
+  selected     BS=0.14676 BSS=-0.40863 95% CI [-1.62189, 0.16374]
+
+Monthly scores: /Users/ishtisdream/chirps-drought-classifier/outputs/operational_nmme_cpc_prob_spi6_lead6_monthly_scores.csv
