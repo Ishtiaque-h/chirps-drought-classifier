@@ -15,8 +15,8 @@ Required forecast CSV columns:
     forecast_pr        - forecast precipitation amount; lower means drier
 
 Outputs:
-  outputs/operational_precip_benchmark_monthly_scores.csv
-  outputs/operational_precip_benchmark_scores.txt
+  outputs/<output-prefix>_monthly_scores.csv
+  outputs/<output-prefix>_scores.txt
 """
 from __future__ import annotations
 
@@ -26,6 +26,7 @@ import shutil
 
 import numpy as np
 import pandas as pd
+import pyarrow.parquet as pq
 from sklearn.isotonic import IsotonicRegression
 
 
@@ -48,6 +49,28 @@ def parse_args() -> Namespace:
         help="Monthly external forecast CSV. See --write-template for required columns.",
     )
     parser.add_argument("--dataset", type=Path, default=DATASET)
+    parser.add_argument("--target-spi", type=int, choices=[1, 3, 6], default=1)
+    parser.add_argument(
+        "--lead-months",
+        type=int,
+        default=1,
+        help="Forecast lead in months; used to infer target_time when the dataset has no target_time column.",
+    )
+    parser.add_argument(
+        "--target-label-col",
+        default=None,
+        help="Optional target label column. Defaults to target_label for SPI-1 and target_label_spiN for SPI-N.",
+    )
+    parser.add_argument(
+        "--target-time-col",
+        default=None,
+        help="Optional target time column. Defaults to target_time if present; otherwise time + lead_months.",
+    )
+    parser.add_argument(
+        "--output-prefix",
+        default="operational_precip_benchmark",
+        help="Output filename prefix under outputs/ and results/report/.",
+    )
     parser.add_argument("--n-bootstrap", type=int, default=N_BOOTSTRAP)
     parser.add_argument("--copy-report", action="store_true")
     parser.add_argument(
@@ -103,16 +126,39 @@ def bootstrap_bss(monthly: pd.DataFrame, pred_col: str, n_bootstrap: int, seed: 
     return float(lo), float(hi)
 
 
-def load_observed_monthly(dataset: Path) -> pd.DataFrame:
+def load_observed_monthly(
+    dataset: Path,
+    target_spi: int,
+    lead_months: int,
+    target_label_col: str | None,
+    target_time_col: str | None,
+) -> pd.DataFrame:
     if not dataset.exists():
         raise FileNotFoundError(f"Forecast dataset not found: {dataset}")
-    df = pd.read_parquet(dataset, columns=["time", "target_label"])
-    df["target_time"] = (
-        pd.to_datetime(df["time"]) + pd.DateOffset(months=1)
-    ).dt.to_period("M").dt.to_timestamp()
+    schema = set(pq.ParquetFile(dataset).schema.names)
+    if target_label_col is None:
+        target_label_col = "target_label" if target_spi == 1 else f"target_label_spi{target_spi}"
+    if target_label_col not in schema:
+        raise ValueError(f"{dataset} does not contain target label column '{target_label_col}'")
+
+    read_cols = ["time", target_label_col]
+    if target_time_col is None and "target_time" in schema:
+        target_time_col = "target_time"
+    if target_time_col is not None:
+        if target_time_col not in schema:
+            raise ValueError(f"{dataset} does not contain target time column '{target_time_col}'")
+        read_cols.append(target_time_col)
+
+    df = pd.read_parquet(dataset, columns=read_cols)
+    if target_time_col is not None:
+        df["target_time"] = pd.to_datetime(df[target_time_col]).dt.to_period("M").dt.to_timestamp()
+    else:
+        df["target_time"] = (
+            pd.to_datetime(df["time"]) + pd.DateOffset(months=lead_months)
+        ).dt.to_period("M").dt.to_timestamp()
     df["target_year"] = df["target_time"].dt.year
     df["target_month"] = df["target_time"].dt.month
-    df["is_dry"] = (df["target_label"] == -1).astype(float)
+    df["is_dry"] = (df[target_label_col] == -1).astype(float)
 
     monthly = (
         df.groupby(["target_time", "target_year", "target_month"], observed=True)
@@ -214,6 +260,9 @@ def write_scores(
     coverage: dict[str, object],
     n_bootstrap: int,
     source: Path,
+    output_prefix: str,
+    target_spi: int,
+    lead_months: int,
 ) -> None:
     pred_cols = [c for c in monthly.columns if c.startswith("operational_") and c.endswith("_prob_dry")]
     rows = []
@@ -223,11 +272,16 @@ def write_scores(
     selected_corr = monthly["operational_selected_prob_dry"].corr(
         monthly["y_true_dry_frac"], method="spearman"
     )
-    signal_corr = (
-        monthly["dry_signal"].corr(monthly["y_true_dry_frac"], method="spearman")
-        if "dry_signal" in monthly.columns
-        else np.nan
-    )
+    if "dry_signal" in monthly.columns:
+        raw_predictor_corr = monthly["dry_signal"].corr(
+            monthly["y_true_dry_frac"], method="spearman"
+        )
+    elif "forecast_prob_dry" in monthly.columns:
+        raw_predictor_corr = monthly["forecast_prob_dry"].corr(
+            monthly["y_true_dry_frac"], method="spearman"
+        )
+    else:
+        raw_predictor_corr = np.nan
     y_std = float(monthly["y_true_dry_frac"].std(ddof=0))
     pred_std = float(monthly["operational_selected_prob_dry"].std(ddof=0))
     amplitude_ratio = pred_std / y_std if y_std > 0 else np.nan
@@ -243,8 +297,10 @@ def write_scores(
             }
         )
 
-    monthly_path = OUT_DIR / "operational_precip_benchmark_monthly_scores.csv"
-    score_path = OUT_DIR / "operational_precip_benchmark_scores.txt"
+    monthly_path = OUT_DIR / f"{output_prefix}_monthly_scores.csv"
+    score_path = OUT_DIR / f"{output_prefix}_scores.txt"
+    monthly["target_spi"] = target_spi
+    monthly["benchmark_lead_months"] = lead_months
     monthly.to_csv(monthly_path, index=False)
 
     lines = [
@@ -252,6 +308,7 @@ def write_scores(
         "=" * 64,
         f"Forecast source CSV: {source}",
         "Design: external monthly precipitation forecast mapped to dry-fraction probability.",
+        f"Target: SPI-{target_spi} dry fraction at lead {lead_months}",
         "Calibration: validation-only mapping from forecast signal/probability to observed monthly dry fraction.",
         f"Predictor kind: {coverage['predictor_kind']}",
         (
@@ -270,7 +327,7 @@ def write_scores(
         ),
         f"Climatology BS: {bs_ref:.5f}",
         f"Spearman corr(selected prob, observed dry fraction): {selected_corr:.3f}",
-        f"Spearman corr(raw dry signal, observed dry fraction): {signal_corr:.3f}",
+        f"Spearman corr(raw predictor, observed dry fraction): {raw_predictor_corr:.3f}",
         f"Selected probability amplitude ratio: {amplitude_ratio:.3f}",
         "",
         "Monthly dry-fraction Brier Skill Score vs climatology:",
@@ -292,7 +349,13 @@ def main() -> None:
         write_template(OUT_DIR / "operational_precip_benchmark_template.csv")
         return
 
-    observed = load_observed_monthly(args.dataset)
+    observed = load_observed_monthly(
+        args.dataset,
+        target_spi=args.target_spi,
+        lead_months=args.lead_months,
+        target_label_col=args.target_label_col,
+        target_time_col=args.target_time_col,
+    )
     forecast, predictor_col, predictor_kind = load_forecast(args.forecast_csv)
     merged = observed.merge(forecast, on="target_time", how="inner")
     merged = merged.dropna(subset=[predictor_col, "y_true_dry_frac", "clim_prob_dry"]).copy()
@@ -302,13 +365,20 @@ def main() -> None:
     test_monthly, best_method, val_bs, coverage = fit_candidates(
         merged, predictor_col, predictor_kind
     )
-    write_scores(test_monthly, best_method, val_bs, coverage, args.n_bootstrap, args.forecast_csv)
+    write_scores(
+        test_monthly,
+        best_method,
+        val_bs,
+        coverage,
+        args.n_bootstrap,
+        args.forecast_csv,
+        output_prefix=args.output_prefix,
+        target_spi=args.target_spi,
+        lead_months=args.lead_months,
+    )
 
     if args.copy_report:
-        for name in [
-            "operational_precip_benchmark_monthly_scores.csv",
-            "operational_precip_benchmark_scores.txt",
-        ]:
+        for name in [f"{args.output_prefix}_monthly_scores.csv", f"{args.output_prefix}_scores.txt"]:
             shutil.copy2(OUT_DIR / name, REPORT_DIR / name)
 
 
