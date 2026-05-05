@@ -118,6 +118,11 @@ def _load_or_build_dataset(target_spi: int, lead_months: int, climate_features: 
 def run_experiment(df: pd.DataFrame, target_spi: int, lead_months: int, n_bootstrap: int) -> None:
     target_col = f"target_label_spi{target_spi}"
     target_value_col = f"target_spi{target_spi}"
+    persistence_feature = f"spi{target_spi}_lag1"
+    if persistence_feature not in df.columns:
+        raise ValueError(
+            f"Cannot build target-consistent persistence baseline: missing {persistence_feature}"
+        )
 
     if "year" not in df.columns:
         df["year"] = pd.to_datetime(df["target_time"]).dt.year
@@ -198,7 +203,7 @@ def run_experiment(df: pd.DataFrame, target_spi: int, lead_months: int, n_bootst
     test["clim_prob_dry"] = test["month"].map(train_monthly_dry).fillna(global_dry)
     test["xgb_prob_dry"] = probs[:, LABEL_MAP[-1]]
     test["xgb_cal_prob_dry"] = probs_cal[:, LABEL_MAP[-1]]
-    test["persistence_prob_dry"] = (test["spi3_lag1"] <= -1.0).astype(float)
+    test["persistence_prob_dry"] = (test[persistence_feature] <= -1.0).astype(float)
 
     monthly = (
         test.groupby("target_time")
@@ -271,11 +276,11 @@ def run_experiment(df: pd.DataFrame, target_spi: int, lead_months: int, n_bootst
         f"Features: {features}\n\n"
         f"Monthly dry-fraction Brier Scores\n"
         f"  Climatology       : {bs_clim:.5f}\n"
-        f"  Persistence SPI-3 : {bs_persist:.5f}\n"
+        f"  Persistence SPI-{target_spi} : {bs_persist:.5f}\n"
         f"  XGBoost           : {bs_xgb:.5f}\n"
         f"  XGBoost isotonic  : {bs_xgb_cal:.5f}\n\n"
         f"Brier Skill Score vs monthly climatology\n"
-        f"  Persistence SPI-3 : {bss_persist:.5f} (95% CI [{persist_ci[0]:.5f}, {persist_ci[1]:.5f}])\n"
+        f"  Persistence SPI-{target_spi} : {bss_persist:.5f} (95% CI [{persist_ci[0]:.5f}, {persist_ci[1]:.5f}])\n"
         f"  XGBoost           : {bss_xgb:.5f} (95% CI [{xgb_ci[0]:.5f}, {xgb_ci[1]:.5f}])\n"
         f"  XGBoost isotonic  : {bss_xgb_cal:.5f} (95% CI [{xgb_cal_ci[0]:.5f}, {xgb_cal_ci[1]:.5f}])\n\n"
         f"Pixel-level classification report\n"
