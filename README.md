@@ -115,6 +115,19 @@ All primary metrics are computed at the **monthly level** (63 independent test m
 
 ## Results
 
+Paper-ready summary tables are now generated from the current artifacts:
+
+```bash
+python scripts/build_master_results_table.py
+```
+
+The consolidated outputs are
+[results/report/master_results_table.csv](results/report/master_results_table.csv)
+and the compact manuscript table
+[results/report/master_results_headline.csv](results/report/master_results_headline.csv).
+As of the current run, that table contains **no robust positive BSS result**:
+all positive point estimates have confidence intervals crossing zero.
+
 ### Skill Scores (63 test months, monthly level)
 
 Current corrected checkpoint: Niño3.4 anomaly lags + all tabular baselines retrained on the corrected feature schema. XGBoost-Spatial is the strongest raw ML model by ranking skill; Random Forest has the lowest raw Brier Score among uncalibrated ML models, but still does not beat climatology.
@@ -157,23 +170,26 @@ Current corrected XGBoost-Spatial SHAP importance is dominated by the corrected 
 
 The model captures real structure, but the structure is not strong enough to produce statistically reliable probability skill over climatology.
 
-### Seasonal SPI-3 Experiment
+### Seasonal Target Experiments
 
-An initial leakage-free seasonal experiment now tests SPI-3 at a 3-month lead:
-features at month `t`, target SPI-3 class at `t+3`, so the target accumulation
-window is `pr[t+1..t+3]` with no overlap. This first tabular XGBoost experiment
-does **not** improve the headline result:
+Leakage-free seasonal experiments now test longer accumulation targets with
+`lead >= SPI window`. For SPI-3 lead-3, features at month `t` predict the
+SPI-3 class ending at `t+3`, so the target accumulation window is
+`pr[t+1..t+3]` with no overlap.
 
-| Seasonal SPI-3 lead-3 forecaster | Dry BS | BSS vs. climatology | 95% CI |
-|---|---:|---:|---|
-| Climatology | 0.08313 | 0.00000 | — |
-| Persistence SPI-3 | 0.14806 | −0.78101 | [−1.58920, −0.32970] |
-| XGBoost raw | 0.11841 | −0.42434 | [−1.06569, −0.08064] |
-| XGBoost isotonic | 0.09370 | −0.12711 | [−0.26431, −0.01124] |
+| Seasonal target | Forecaster | Dry BS | BSS vs. climatology | 95% CI |
+|---|---|---:|---:|---|
+| SPI-3 lead-3 | Climatology | 0.08765 | 0.00000 | — |
+| SPI-3 lead-3 | Persistence SPI-3 | 0.15798 | −0.80245 | [−1.55296, −0.36279] |
+| SPI-3 lead-3 | XGBoost isotonic | 0.08449 | +0.03604 | [−0.12663, +0.13441] |
+| SPI-3 lead-6 | XGBoost isotonic | 0.09329 | −0.10782 | [−0.32744, +0.04534] |
+| SPI-6 lead-6 | Persistence SPI-6 | 0.24745 | −0.94918 | [−2.01903, −0.36532] |
+| SPI-6 lead-6 | XGBoost isotonic | 0.14092 | −0.11009 | [−0.37336, +0.03511] |
 
-This is a useful negative control: simply switching from SPI-1 lead-1 to a
-non-overlapping SPI-3 lead-3 target does not create positive probability skill
-in Central Valley with the current tabular feature set.
+SPI-3 lead-3 is the only seasonal target with a positive point estimate, but
+its confidence interval crosses zero. It is a useful hypothesis-generating
+signal, not a defensible positive-skill claim. The SPI-6 lead-6 persistence
+baseline is now target-consistent (`spi6_lag1`, not the old SPI-3 proxy).
 
 ### Land-Surface Driver Experiments
 
@@ -312,6 +328,54 @@ Murray-Darling Basin Authority / data.gov.au basin boundary
 and MITECO terrestrial river-basin districts
 ([OGC collection](https://wmts.mapama.gob.es/sig-api/ogc/features/v1/collections/agua%3ADemarcaciones_ET)).
 
+### Operational Forecast Benchmark Path
+
+The operational benchmark path compares external dynamical precipitation
+forecasts against the same monthly climatology reference. The reproducible
+Central Valley NMME run is:
+
+```bash
+python scripts/run_operational_precip_benchmark.py --write-template
+python scripts/build_nmme_cpc_forecast_csv.py --copy-report
+python scripts/run_operational_precip_benchmark.py \
+  --forecast-csv outputs/nmme_cpc_cvalley_lead1_forecast.csv \
+  --copy-report
+```
+
+The forecast CSV should contain `target_time` plus one of
+`forecast_prob_dry`, `forecast_pr_anom`, or `forecast_pr`. This lets SubX,
+NMME, GEFS, ECMWF/SEAS5, or similar precipitation forecasts be scored with the
+same validation-only calibration and monthly BSS protocol used everywhere else
+in the project.
+
+The first implemented operational checkpoint uses CPC NMME real-time
+multi-model ensemble-mean precipitation anomalies at lead 1 over the Central
+Valley bounding box. NetCDF coverage starts at target month May 2018 in this
+environment, so validation calibration uses 32 months (2018-05 to 2020-12) and
+test evaluation uses 63 months (2021-01 to 2026-03):
+
+| Operational benchmark | Test BS | BSS vs. climatology | 95% CI |
+|---|---:|---:|---|
+| CPC NMME precipitation anomaly + isotonic | 0.06412 | +0.00248 | [−0.43291, +0.23914] |
+
+This is another practical tie with climatology, not a positive-skill result.
+The raw NMME dry signal has modest test-period rank correlation with observed
+monthly dry fraction (Spearman ≈ 0.267), but the calibrated probabilities still
+do not reduce Brier error reliably.
+Artifacts are saved at
+[results/report/nmme_cpc_cvalley_lead1_forecast.csv](results/report/nmme_cpc_cvalley_lead1_forecast.csv),
+[results/report/operational_precip_benchmark_monthly_scores.csv](results/report/operational_precip_benchmark_monthly_scores.csv),
+and
+[results/report/operational_precip_benchmark_scores.txt](results/report/operational_precip_benchmark_scores.txt).
+
+Use the CPC/NMME data page
+([NOAA CPC](https://www.cpc.ncep.noaa.gov/products/NMME/data.html)), NCEI NMME
+access notes ([NOAA NCEI](https://www.ncei.noaa.gov/products/weather-climate-models/north-american-multi-model)),
+and cite Kirtman et al. (2014)
+([doi:10.1175/BAMS-D-12-00050.1](https://doi.org/10.1175/BAMS-D-12-00050.1)).
+SubX is the alternative subseasonal benchmark; cite Pegion et al. (2019)
+([doi:10.1175/BAMS-D-18-0270.1](https://doi.org/10.1175/BAMS-D-18-0270.1)).
+
 ---
 
 ## Evaluation Methods
@@ -345,8 +409,9 @@ Highest-impact directions (see [`ANALYSIS.md`](ANALYSIS.md) for full roadmap):
 1. **Write a source-cited mask-methods subsection** — The boundary sources, selection logic, retained-cell fractions, and Horn caveat should be explicit before figure polishing.
 2. **Turn mechanism diagnostics into figures/tables for the paper narrative** — The current `results/multiregion/` artifacts are now the strongest evidence for region-dependent predictability.
 3. **Stop expanding regions for now** — Five hydroclimate checkpoints are enough to support the generalization claim; additional regions would add cost before the narrative is tightened.
-4. **Add targeted event-scale predictors only if staying single-region** — Atmospheric-river or subseasonal circulation features are more physically aligned with Central Valley monthly extremes than more lagged land-surface fields.
-5. **Seasonal target variants** — The first tabular SPI-3 lead-3 experiment is negative; only extend this with spatial features or additional drivers if it serves the paper's scope.
+4. **Only extend operational benchmarks if needed** — The first CPC NMME lead-1 anomaly benchmark is also tied with climatology; a follow-up should use NMME probabilistic terciles, full hindcast NetCDF/GRIB support, or SubX only if the paper needs a stronger operational comparison.
+5. **Add targeted event-scale predictors only after the paper tables are stable** — Atmospheric-river or subseasonal circulation features are more physically aligned with Central Valley monthly extremes than more lagged land-surface fields.
+6. **Seasonal target variants** — SPI-3 lead-3 is a positive but uncertain hint; only extend it with spatial features, forecast precipitation inputs, or additional regions if it serves the paper's scope.
 
 ---
 

@@ -18,6 +18,16 @@
 ### Agriculture relevance
 - Central Valley agricultural scale motivates the societal impact framing. Drought indices are commonly linked to crop yield outcomes, reinforcing a potential small extension that connects drought probabilities to yield anomalies.
 
+### Positioning Against Prior Work (What This Study Adds)
+
+The literature supports three core points that make this study publishable if stated clearly:
+
+1. **Subseasonal limits are real.** Subseasonal drought skill drops after weeks 3-4 in multiple regions, which is consistent with the weak 1-month-ahead skill we observe here (Su et al., 2023; Masukwedza et al., 2025). This frames the result as an expected physical limit rather than a model failure.
+2. **Most studies emphasize monitoring, not forecast skill.** Many CHIRPS-based drought papers focus on multi-index monitoring, SPI/SPEI trends, and regionalization (Funk et al., 2015; Funk et al., 2026; WMO SPI guide). Our work turns that monitoring foundation into a leakage-safe forecast test and shows where predictability breaks.
+3. **Reliability and uncertainty matter more than point accuracy.** Reviews emphasize probabilistic calibration and uncertainty quantification, but they rarely show that improved reliability does not automatically yield positive skill (AghaKouchak et al., 2023; Klotz et al., 2022; Xu et al., 2022). We explicitly separate ranking skill from calibrated probability skill and show that calibration cannot create resolution where the signal is weak.
+
+In short, this project is positioned as a **predictability audit**: it tests whether ML adds reliable probability skill over climatology under leakage-safe targets, monthly-level inference, and source-cited regional masks. That methodological framing is the scientific claim, not a particular model’s accuracy.
+
 ## Step 3 Diagnostics (Regionalization)
 
 Method summary: Compute SPI-12 at each CHIRPS grid cell, standardize by 1991-2020 monthly climatology, then run PCA followed by k-means clustering to define homogeneous drought zones. For each zone, compute run-theory drought metrics (duration, severity, intensity) using the SPI-12 threshold of -1.0 and summarize ENSO/SOI/PDO correlations at lags 0-6 months to interpret teleconnection sensitivity. This is diagnostic-only and does not alter the frozen SPI-1 lead-1 forecast target or model checkpoints.
@@ -30,38 +40,54 @@ Core figures locked (Central Valley basin-masked):
 ## Comprehensive ML Assessment: Project State & Predictability Barriers
 
 ### Overview
-All scripts have been verified and executed successfully (May 2026). The project includes 9 major experiment tracks: baseline climatology, 6 traditional ML variants (RF, LogReg, XGBoost, XGBoost-Spatial, ConvLSTM, EDL), plus 3 feature engineering extensions (meteorological, soil moisture, atmospheric). Comprehensive evaluation reveals a critical finding: **1-month SPI-1 forecasting is fundamentally constrained by atmospheric chaos; feature engineering consistently degrades performance**.
+The May 2026 reproducibility checkpoint includes the canonical Central Valley benchmark, calibration study, EDL uncertainty experiment, feature-extension experiments, leakage-safe seasonal targets, five-region geometry-sensitive evaluation, and SPI-12 regionalization diagnostics. The current single source of truth is `results/report/master_results_headline.csv`. Its critical finding is: **no current experiment produces robust positive monthly BSS over climatology**.
 
 ### Performance Hierarchy (Monthly Brier Skill Score vs Climatology)
 
 | Model | Test Set | BSS | Key Finding |
 |-------|----------|-----|------------|
-| Random Forest | 63 mo | **-0.068** | ✓ Best non-climatology |
-| XGBoost-Spatial (3×3 neighborhood) | 63 mo | **-0.115** | ✓ Spatial helps |
-| Meteorological (T/VPD anomalies) | 63 mo | -0.092 | ✗ Marginal |
-| EDL MLP + isotonic calibration | ~63 mo | -0.126 | ✗ Fails |
-| Soil Moisture features | 63 mo | -0.158 | ✗ Fails |
-| XGBoost (no spatial) | 63 mo | -0.272 | ✗ Fails |
-| ConvLSTM | 63 mo | -0.357 | ✗ Fails |
-| Logistic Regression | 63 mo | -0.389 | ✗ Fails |
-| **Atmospheric (MJO+AR/IVT)** | **39 mo** | **-0.333** | ✗ **Worst** |
+| Mediterranean Spain rectangular tabular | 63 mo | **+0.044** | Positive point estimate, but not robust and geometry-sensitive |
+| Seasonal SPI-3 lead-3 + isotonic | 59 mo | **+0.036** | Positive seasonal hint, but CI crosses zero |
+| Southern Great Plains ecoregion mask | 63 mo | **+0.010** | Positive regional hint, but CI crosses zero |
+| XGB-Spatial + isotonic calibration | 63 mo | **+0.005** | Best Central Valley probability checkpoint, but CI crosses zero |
+| CPC NMME lead-1 precipitation anomaly | 63 mo | **+0.002** | Operational benchmark is also tied with climatology; CI crosses zero |
+| Random Forest raw | 63 mo | -0.068 | Strongest raw Central Valley Brier score among classical models |
+| XGBoost-Spatial raw | 63 mo | -0.115 | Strong ranking signal, weak calibrated probability skill |
+| EDL MLP selected | 63 mo | -0.116 | Uncertainty experiment underperforms climatology |
+| SPI-6 lead-6 XGBoost isotonic | 62 mo | -0.110 | Target-consistent persistence fixed; model still below climatology |
+| Soil moisture selected | 63 mo | -0.158 | Land-surface memory overfits this target |
+| MJO/IVT selected | 39 mo | -0.333 | Shorter-period atmospheric feature test is robustly negative |
+| Murray-Darling basin mask | 63 mo | -0.639 | Strong calibration/test-period shift failure |
 
-**Conclusion**: All feature engineering approaches (meteorological, soil moisture, atmospheric indices) either degrade performance or fail to improve beyond spatial neighbor averaging. This indicates the problem is **chaos-limited**, not **feature-limited**.
+**Conclusion**: The project should not claim a positive forecast model. It should claim a rigorous predictability audit: ranking signals exist, but calibrated probability skill over climatology is not robust under monthly inference, source-cited regional masks, and validation-only calibration.
 
 ### Why Feature Engineering Fails: Atmospheric Predictability Limits
 
-1. **Timescale Mismatch**: Deterministic atmospheric predictability extends ~10-14 days. SPI-1[t+1] integrates weather over days 31-60, landing in the stochastic ensemble-spread regime.
-2. **Feature Lag Obsolescence**: Soil moisture has ~10-30 day memory. After 30-60 days, predictors revert to climatology. Atmospheric features suffer from overfitting in low-signal regime (BSS -0.333).
-3. **Spatial Neighbors Work**: Spatial neighbor averaging (BS = 0.0717) succeeds via **denoising**, not prediction. Least-bad non-climatology approach (BSS -0.115).
+1. **Timescale Mismatch**: SPI-1[t+1] is a full next-month precipitation accumulation predicted from lagged monthly conditions, so much of the verifying precipitation lies beyond deterministic weather predictability.
+2. **Feature Lag Obsolescence**: Monthly soil-moisture and atmospheric lag features can carry memory, but the current test-period evidence shows overfitting or reversion toward climatology before they add calibrated probability skill.
+3. **Spatial Neighbors Help Ranking**: Spatial neighbor averaging improves raw XGBoost ranking and reduces overfitting, but even the calibrated spatial checkpoint is only `BSS = +0.005` with a confidence interval crossing zero.
 
-### Uncertainty Quantification: Aleatoric >> Epistemic
+### Uncertainty Quantification: Useful, But Not Yet a Claim
 
-EDL decomposition shows aleatoric uncertainty (0.85, 80%) dominates epistemic uncertainty (0.24, 20%). This correctly identifies the problem as **chaos-limited**, not model-limited. UQ is valuable for **reliability** and **decision-making**, not for claiming predictive skill.
+EDL decomposition shows high uncertainty, but the current EDL result should be framed cautiously. The selected EDL monthly BSS is `-0.116` with a CI below zero, and the monthly uncertainty signal has weak Spearman correlation with absolute forecast error (`total_u ≈ 0.03`, `epistemic_u ≈ 0.12`). EDL is therefore an exploratory uncertainty diagnostic, not a paper-ready uncertainty-quantification contribution by itself.
+
+### Operational Benchmark Path
+
+The first operational comparison has now been run using CPC NMME real-time multi-model ensemble-mean precipitation anomalies at lead 1:
+
+```bash
+python scripts/build_nmme_cpc_forecast_csv.py --copy-report
+python scripts/run_operational_precip_benchmark.py \
+  --forecast-csv outputs/nmme_cpc_cvalley_lead1_forecast.csv \
+  --copy-report
+```
+
+NetCDF coverage starts at target month 2018-05, so calibration uses 32 validation months (2018-05 to 2020-12) and evaluation uses 63 test months (2021-01 to 2026-03). The selected isotonic NMME benchmark has `BSS = +0.002` with a confidence interval crossing zero. The raw NMME dry signal has modest rank correlation with observed monthly dry fraction (`Spearman ≈ 0.267`), but that signal does not translate into robust Brier skill. This is scientifically useful because it shows that even adding a real dynamical precipitation forecast input does not yet produce robust monthly dry-fraction probability skill in this Central Valley setup. SubX remains the corresponding subseasonal benchmark if the target is reframed around weeks 3-4.
 
 ### Paper Narrative Recommendations
 
-- **Primary** (Recommended): "Subseasonal Drought Forecasting Barriers" — negative result framing, guides practitioners
-- **Secondary**: "Uncertainty Quantification for Drought Prediction" — EDL methods focus
+- **Primary** (Recommended): "Limits of Lag-Based ML for Monthly Drought Forecasting" — rigorous negative result and multi-region predictability audit
+- **Secondary**: "Operational Forecast Inputs vs Lag-Only ML" — compare NMME/SubX precipitation forecasts to the lagged-observation ML benchmark
 - **Supporting**: "Regional Drought Teleconnections" — Step 3 regionalization standalone
 
 ## References
@@ -71,6 +97,8 @@ EDL decomposition shows aleatoric uncertainty (0.85, 80%) dominates epistemic un
 3. World Meteorological Organization (2012). Standardized Precipitation Index User Guide (WMO-No. 1090). https://library.wmo.int/idurl/4/39629
 4. Murphy, A. (1973). Brier score decomposition. Journal of Applied Meteorology. https://ui.adsabs.harvard.edu/abs/1973JApMe..12..595M/abstract
 5. Su, L. et al. (2023). Subseasonal drought forecast skill over the coastal western United States. Journal of Hydrometeorology. https://doi.org/10.1175/JHM-D-22-0103.1
+5a. Kirtman, B. et al. (2014). The North American Multi-Model Ensemble. Bulletin of the American Meteorological Society. https://doi.org/10.1175/BAMS-D-12-00050.1
+5b. Pegion, K. et al. (2019). The Subseasonal Experiment (SubX). Bulletin of the American Meteorological Society. https://doi.org/10.1175/BAMS-D-18-0270.1
 6. AghaKouchak, A. et al. (2023). Drought as a cascading hazard (review). Nature Reviews Earth & Environment. https://doi.org/10.1038/s43017-023-00457-2
 7. Dikshit, A. et al. (2021). Drought forecasting with ML (review). Journal of Environmental Management. https://doi.org/10.1016/j.jenvman.2021.111979
 8. Hall, K., Acharya, N. (2022). XCast: a python climate forecasting toolkit. Frontiers in Climate. https://doi.org/10.3389/fclim.2022.953262
