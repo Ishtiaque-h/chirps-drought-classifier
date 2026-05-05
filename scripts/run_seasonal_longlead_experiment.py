@@ -1,5 +1,10 @@
 #!/usr/bin/env python
-"""Run leakage-safe seasonal long-lead XGBoost experiments for SPI-3/SPI-6 targets."""
+"""Run leakage-safe seasonal long-lead XGBoost experiments for SPI-3/SPI-6 targets.
+
+By default this reproduces the canonical Central Valley seasonal experiments.
+Optional CLI flags allow running the same seasonal target design on the
+precomputed multi-region CHIRPS/SPI grids under data/processed/regions/.
+"""
 from __future__ import annotations
 
 from argparse import ArgumentParser
@@ -16,14 +21,19 @@ from sklearn.utils.class_weight import compute_sample_weight
 from feature_config import get_feature_columns
 from build_dataset_seasonal import _build_one
 
+from region_config import resolve_region, region_table
+
 import xarray as xr
 
 PROCESSED = Path("data/processed")
-OUT_DIR = Path("outputs")
-OUT_DIR.mkdir(exist_ok=True)
+OUT_ROOT = Path("outputs")
+OUT_ROOT.mkdir(exist_ok=True)
 
-PR_FILE = PROCESSED / "chirps_v3_monthly_cvalley_1991_2026.nc"
-SPI_FILE = PROCESSED / "chirps_v3_monthly_cvalley_spi_1991_2026.nc"
+DEFAULT_START_YEAR = 1991
+DEFAULT_END_YEAR = 2026
+
+PR_FILE_CVALLEY = PROCESSED / f"chirps_v3_monthly_cvalley_{DEFAULT_START_YEAR}_{DEFAULT_END_YEAR}.nc"
+SPI_FILE_CVALLEY = PROCESSED / f"chirps_v3_monthly_cvalley_spi_{DEFAULT_START_YEAR}_{DEFAULT_END_YEAR}.nc"
 
 LABEL_MAP = {-1: 0, 0: 1, 1: 2}
 INV_LABEL_MAP = {v: k for k, v in LABEL_MAP.items()}
@@ -31,6 +41,39 @@ INV_LABEL_MAP = {v: k for k, v in LABEL_MAP.items()}
 
 def parse_args() -> ArgumentParser:
     parser = ArgumentParser(description=__doc__)
+    parser.add_argument("--region", default="cvalley", help="Region slug or alias (default: cvalley).")
+    parser.add_argument("--list-regions", action="store_true", help="List configured regions and exit.")
+    parser.add_argument("--start-year", type=int, default=DEFAULT_START_YEAR)
+    parser.add_argument("--end-year", type=int, default=DEFAULT_END_YEAR)
+    parser.add_argument(
+        "--mask-kind",
+        choices=["none", "country", "basin"],
+        default="none",
+        help="Optional grid mask to apply before building the seasonal dataset.",
+    )
+    parser.add_argument(
+        "--mask-file",
+        type=Path,
+        default=None,
+        help="Optional mask NetCDF. Defaults to data/processed/regions/<region>/masks/<region>_<mask-kind>_mask.nc.",
+    )
+    parser.add_argument(
+        "--mask-var",
+        default=None,
+        help="Optional mask variable name. Defaults to country_mask or basin_mask based on --mask-kind.",
+    )
+    parser.add_argument(
+        "--pr-file",
+        type=Path,
+        default=None,
+        help="Optional precipitation NetCDF override (advanced).",
+    )
+    parser.add_argument(
+        "--spi-file",
+        type=Path,
+        default=None,
+        help="Optional SPI NetCDF override (advanced).",
+    )
     parser.add_argument("--target-spi", type=int, choices=[3, 6], default=3)
     parser.add_argument("--lead-months", type=int, default=3)
     parser.add_argument(
@@ -41,6 +84,93 @@ def parse_args() -> ArgumentParser:
     parser.add_argument("--rebuild-dataset", action="store_true")
     parser.add_argument("--n-bootstrap", type=int, default=1000)
     return parser.parse_args()
+
+
+def run_slug(region_slug: str, mask_kind: str) -> str:
+    return region_slug if mask_kind == "none" else f"{region_slug}_{mask_kind}_masked"
+
+
+def climate_suffix(climate_features: str) -> str:
+    """Keep the historical nino34-only filenames, suffix other feature schemas."""
+    return "" if climate_features == "nino34" else f"_climate_{climate_features}"
+
+
+def output_climate_suffix(climate_features: str, canonical_cvalley: bool) -> str:
+    """Encode regional climate schemas while preserving canonical filenames."""
+    if canonical_cvalley:
+        return climate_suffix(climate_features)
+    return f"_climate_{climate_features}"
+
+
+def expected_climate_columns(climate_features: str) -> set[str]:
+    if climate_features == "none":
+        return set()
+    cols: set[str] = set()
+    if climate_features in {"all", "nino34"}:
+        cols.update({"nino34_lag1", "nino34_lag2"})
+    if climate_features in {"all", "pdo"}:
+        cols.update({"pdo_lag1", "pdo_lag2"})
+    return cols
+
+
+def resolve_input_files(
+    region_slug: str,
+    start_year: int,
+    end_year: int,
+    pr_file: Path | None,
+    spi_file: Path | None,
+) -> tuple[Path, Path]:
+    if (pr_file is None) ^ (spi_file is None):
+        raise ValueError("Pass both --pr-file and --spi-file, or neither.")
+    if pr_file is not None and spi_file is not None:
+        return pr_file, spi_file
+
+    if region_slug == "cvalley":
+        return (
+            PROCESSED / f"chirps_v3_monthly_cvalley_{start_year}_{end_year}.nc",
+            PROCESSED / f"chirps_v3_monthly_cvalley_spi_{start_year}_{end_year}.nc",
+        )
+
+    region_dir = PROCESSED / "regions" / region_slug
+    return (
+        region_dir / f"chirps_v3_monthly_{region_slug}_{start_year}_{end_year}.nc",
+        region_dir / f"chirps_v3_monthly_{region_slug}_spi_{start_year}_{end_year}.nc",
+    )
+
+
+def default_mask_file(region_slug: str, mask_kind: str) -> Path:
+    return PROCESSED / "regions" / region_slug / "masks" / f"{region_slug}_{mask_kind}_mask.nc"
+
+
+def load_mask(mask_kind: str, region_slug: str, pr: xr.DataArray, mask_file: Path | None, mask_var: str | None) -> xr.DataArray | None:
+    if mask_kind == "none":
+        return None
+    if mask_var is None:
+        mask_var = "country_mask" if mask_kind == "country" else "basin_mask"
+
+    path = mask_file if mask_file is not None else default_mask_file(region_slug, mask_kind)
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Mask file not found: {path}. Run scripts/build_region_masks.py or scripts/build_basin_masks.py first, "
+            "or pass --mask-file."
+        )
+
+    mask_ds = xr.open_dataset(path)
+    try:
+        if mask_var not in mask_ds:
+            raise KeyError(f"{path} does not contain mask variable '{mask_var}'")
+        mask = mask_ds[mask_var]
+        rename = {}
+        if "lat" in mask.coords:
+            rename["lat"] = "latitude"
+        if "lon" in mask.coords:
+            rename["lon"] = "longitude"
+        if rename:
+            mask = mask.rename(rename)
+        mask = mask.sel(latitude=pr["latitude"], longitude=pr["longitude"])
+        return mask.astype(bool).load()
+    finally:
+        mask_ds.close()
 
 
 def brier(y: np.ndarray, p: np.ndarray) -> float:
@@ -74,18 +204,36 @@ def bootstrap_bss(
     return float(lo), float(hi)
 
 
-def _load_or_build_dataset(target_spi: int, lead_months: int, climate_features: str, rebuild_dataset: bool) -> pd.DataFrame:
-    dataset_path = PROCESSED / f"dataset_seasonal_spi{target_spi}_lead{lead_months}.parquet"
+def _load_or_build_dataset(
+    target_spi: int,
+    lead_months: int,
+    climate_features: str,
+    rebuild_dataset: bool,
+    pr_file: Path,
+    spi_file: Path,
+    dataset_path: Path,
+    mask_kind: str,
+    mask_file: Path | None,
+    mask_var: str | None,
+    region_slug: str,
+) -> pd.DataFrame:
     if dataset_path.exists() and not rebuild_dataset:
         print(f"Loading existing dataset: {dataset_path}")
         df = pd.read_parquet(dataset_path)
         df["time"] = pd.to_datetime(df["time"])
         df["target_time"] = pd.to_datetime(df["target_time"])
-        return df
+        requested = expected_climate_columns(climate_features)
+        present = {c for c in df.columns if c in {"nino34_lag1", "nino34_lag2", "pdo_lag1", "pdo_lag2"}}
+        if present == requested:
+            return df
+        print(
+            "Existing dataset climate columns do not match request; rebuilding. "
+            f"present={sorted(present)} requested={sorted(requested)}"
+        )
 
     print("Building dataset from source grids...")
-    pr_ds = xr.open_dataset(PR_FILE).load()
-    spi_ds = xr.open_dataset(SPI_FILE).load()
+    pr_ds = xr.open_dataset(pr_file).load()
+    spi_ds = xr.open_dataset(spi_file).load()
 
     lat_name = "latitude" if "latitude" in pr_ds.coords else "lat"
     lon_name = "longitude" if "longitude" in pr_ds.coords else "lon"
@@ -95,6 +243,14 @@ def _load_or_build_dataset(target_spi: int, lead_months: int, climate_features: 
     spi3 = spi_ds["spi3"].sel(time=pr.time)
     spi6 = spi_ds["spi6"].sel(time=pr.time)
     spi_target = spi3 if target_spi == 3 else spi6
+
+    mask = load_mask(mask_kind, region_slug, pr, mask_file=mask_file, mask_var=mask_var)
+    if mask is not None:
+        pr = pr.where(mask)
+        spi1 = spi1.where(mask)
+        spi3 = spi3.where(mask)
+        spi6 = spi6.where(mask)
+        spi_target = spi_target.where(mask)
 
     df = _build_one(
         pr=pr,
@@ -115,7 +271,17 @@ def _load_or_build_dataset(target_spi: int, lead_months: int, climate_features: 
     return df
 
 
-def run_experiment(df: pd.DataFrame, target_spi: int, lead_months: int, n_bootstrap: int) -> None:
+def run_experiment(
+    df: pd.DataFrame,
+    target_spi: int,
+    lead_months: int,
+    n_bootstrap: int,
+    out_dir: Path,
+    prefix: str,
+    region_label: str,
+    mask_kind: str,
+    climate_features: str,
+) -> None:
     target_col = f"target_label_spi{target_spi}"
     target_value_col = f"target_spi{target_spi}"
     persistence_feature = f"spi{target_spi}_lag1"
@@ -230,12 +396,11 @@ def run_experiment(df: pd.DataFrame, target_spi: int, lead_months: int, n_bootst
     xgb_cal_ci = bootstrap_bss(monthly, "xgb_cal_prob_dry", "clim_prob_dry", n_bootstrap)
     persist_ci = bootstrap_bss(monthly, "persistence_prob_dry", "clim_prob_dry", n_bootstrap)
 
-    prefix = f"seasonal_spi{target_spi}_lead{lead_months}"
-    monthly_path = OUT_DIR / f"{prefix}_monthly_scores.csv"
-    model_path = OUT_DIR / f"{prefix}_xgb_model.json"
-    probs_path = OUT_DIR / f"{prefix}_xgb_test_probs.npz"
-    fi_path = OUT_DIR / f"{prefix}_xgb_feature_importance.png"
-    scores_path = OUT_DIR / f"{prefix}_experiment_scores.txt"
+    monthly_path = out_dir / f"{prefix}_monthly_scores.csv"
+    model_path = out_dir / f"{prefix}_xgb_model.json"
+    probs_path = out_dir / f"{prefix}_xgb_test_probs.npz"
+    fi_path = out_dir / f"{prefix}_xgb_feature_importance.png"
+    scores_path = out_dir / f"{prefix}_experiment_scores.txt"
 
     monthly.to_csv(monthly_path, index=False)
     model.save_model(model_path.as_posix())
@@ -269,6 +434,9 @@ def run_experiment(df: pd.DataFrame, target_spi: int, lead_months: int, n_bootst
     metrics = (
         f"Seasonal SPI-{target_spi} Lead-{lead_months} XGBoost Experiment\n"
         f"{'=' * 64}\n"
+        f"Region: {region_label}\n"
+        f"Mask kind: {mask_kind}\n"
+        f"Climate features: {climate_features}\n"
         f"Design: features at t, target SPI-{target_spi} class at t+{lead_months}\n"
         f"Leakage-safe condition enforced by builder: lead >= SPI window unless overlap allowed\n"
         f"Test months: {monthly['target_time'].nunique()}\n"
@@ -299,18 +467,67 @@ def run_experiment(df: pd.DataFrame, target_spi: int, lead_months: int, n_bootst
 
 def main() -> None:
     args = parse_args()
+    if args.list_regions:
+        print(region_table())
+        return
+
+    region = resolve_region(args.region)
+    region_slug = region.slug
+    run_id = run_slug(region_slug, args.mask_kind)
     if args.lead_months < args.target_spi:
         raise ValueError(
             f"Use lead_months >= target_spi ({args.target_spi}) for leakage-safe seasonal setup."
         )
+
+    pr_file, spi_file = resolve_input_files(
+        region_slug=region_slug,
+        start_year=args.start_year,
+        end_year=args.end_year,
+        pr_file=args.pr_file,
+        spi_file=args.spi_file,
+    )
+    if not pr_file.exists():
+        raise FileNotFoundError(f"Precipitation file not found: {pr_file}")
+    if not spi_file.exists():
+        raise FileNotFoundError(f"SPI file not found: {spi_file}")
+
+    canonical_cvalley = run_id == "cvalley" and args.mask_kind == "none"
+    schema_suffix = output_climate_suffix(args.climate_features, canonical_cvalley)
+
+    if canonical_cvalley:
+        dataset_path = PROCESSED / f"dataset_seasonal_spi{args.target_spi}_lead{args.lead_months}{schema_suffix}.parquet"
+        out_dir = OUT_ROOT
+    else:
+        dataset_path = PROCESSED / "regions" / run_id / f"dataset_seasonal_spi{args.target_spi}_lead{args.lead_months}{schema_suffix}.parquet"
+        out_dir = OUT_ROOT / "seasonal" / run_id
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+    prefix = f"seasonal_spi{args.target_spi}_lead{args.lead_months}{schema_suffix}"
 
     df = _load_or_build_dataset(
         target_spi=args.target_spi,
         lead_months=args.lead_months,
         climate_features=args.climate_features,
         rebuild_dataset=args.rebuild_dataset,
+        pr_file=pr_file,
+        spi_file=spi_file,
+        dataset_path=dataset_path,
+        mask_kind=args.mask_kind,
+        mask_file=args.mask_file,
+        mask_var=args.mask_var,
+        region_slug=region_slug,
     )
-    run_experiment(df, args.target_spi, args.lead_months, args.n_bootstrap)
+    run_experiment(
+        df,
+        args.target_spi,
+        args.lead_months,
+        args.n_bootstrap,
+        out_dir=out_dir,
+        prefix=prefix,
+        region_label=f"{region.name} ({run_id})",
+        mask_kind=args.mask_kind,
+        climate_features=args.climate_features,
+    )
 
 
 if __name__ == "__main__":
