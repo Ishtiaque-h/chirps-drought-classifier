@@ -371,33 +371,67 @@ def add_seasonal(rows: list[dict[str, object]], n_bootstrap: int) -> None:
 
 
 def add_operational_benchmark(rows: list[dict[str, object]], n_bootstrap: int) -> None:
-    path = OUTPUTS / "operational_precip_benchmark_monthly_scores.csv"
-    if not path.exists():
-        path = REPORT_DIR / "operational_precip_benchmark_monthly_scores.csv"
-    if not path.exists():
+    paths_by_name: dict[str, Path] = {}
+    for base in [REPORT_DIR, OUTPUTS]:
+        for path in sorted(base.glob("operational*_monthly_scores.csv")):
+            paths_by_name[path.name] = path
+    if not paths_by_name:
         return
     pred_cols = {
         "raw": "operational_raw_prob_dry",
         "isotonic": "operational_isotonic_prob_dry",
         "selected": "operational_selected_prob_dry",
     }
-    monthly_forecast_rows(
-        path=path,
-        pred_cols=pred_cols,
-        category="operational_dynamical_benchmark",
-        scope="canonical_spi1_lead1_external_precip",
-        region="California Central Valley",
-        target="SPI-1 dry fraction",
-        lead_months=1,
-        model_prefix="External precipitation forecast",
-        rows=rows,
-        n_bootstrap=n_bootstrap,
-        headline_methods={"selected"},
-        note=(
-            "External operational/dynamical precipitation forecast mapped to "
-            "monthly dry-fraction probability using validation-only calibration."
-        ),
-    )
+    for path in paths_by_name.values():
+        df = pd.read_csv(path, nrows=1)
+        target_spi = int(df["target_spi"].iloc[0]) if "target_spi" in df.columns else 1
+        if "benchmark_lead_months" in df.columns:
+            lead_months = int(df["benchmark_lead_months"].iloc[0])
+        elif "lead_months" in df.columns:
+            lead_months = int(df["lead_months"].iloc[0])
+        else:
+            lead_months = 1
+        stem = path.name.replace("_monthly_scores.csv", "")
+        source_model = str(df["source_model"].iloc[0]) if "source_model" in df.columns else stem
+        source_key = f"{stem} {source_model}".lower()
+        if "prob" in source_key:
+            source_slug = "nmme_probability"
+            model_prefix = "CPC NMME probability forecast"
+            source_note = (
+                "Official CPC NMME below-normal precipitation probability "
+                "mapped to monthly dry-fraction probability."
+            )
+        elif "nmme" in source_key:
+            source_slug = "nmme_anomaly"
+            model_prefix = "CPC NMME anomaly forecast"
+            source_note = (
+                "CPC NMME precipitation-anomaly forecast mapped to monthly "
+                "dry-fraction probability."
+            )
+        else:
+            source_slug = "external_precip"
+            model_prefix = "External precipitation forecast"
+            source_note = (
+                "External operational/dynamical precipitation forecast mapped "
+                "to monthly dry-fraction probability."
+            )
+        headline_methods = {"raw", "selected"} if source_slug == "nmme_probability" else {"selected"}
+        monthly_forecast_rows(
+            path=path,
+            pred_cols=pred_cols,
+            category="operational_dynamical_benchmark",
+            scope=f"operational_spi{target_spi}_lead{lead_months}_{source_slug}",
+            region="California Central Valley",
+            target=f"SPI-{target_spi} dry fraction",
+            lead_months=lead_months,
+            model_prefix=model_prefix,
+            rows=rows,
+            n_bootstrap=n_bootstrap,
+            headline_methods=headline_methods,
+            note=(
+                f"{source_note} Uses validation-only calibration; source_model={source_model}."
+            ),
+        )
 
 
 def add_multiregion(rows: list[dict[str, object]]) -> None:
