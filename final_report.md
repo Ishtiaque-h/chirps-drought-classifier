@@ -37,10 +37,12 @@ Core figures locked (Central Valley basin-masked):
 - zone_run_duration_summary.png
 - zone_spi12_timeseries.png
 
+The compiled mechanism table now shows strong SPI-12 teleconnection structure in several regions, but weak conversion into SPI-1 lead-1 forecast skill. Examples: Horn of Africa zone 0 has Niño3.4 lag-6 correlation `r = 0.542`; Murray-Darling zone 0 has Niño3.4 lag-1 correlation `r = -0.460`; Southern Great Plains zone 3 has Niño3.4 lag-6 correlation `r = 0.501`. Zone-level forecast BSS is still mostly negative or only weakly positive in isolated zones, supporting the interpretation that the project is seeing real climate-memory signal at longer drought timescales but not robust monthly SPI-1 probability skill.
+
 ## Comprehensive ML Assessment: Project State & Predictability Barriers
 
 ### Overview
-The May 2026 reproducibility checkpoint includes the canonical Central Valley benchmark, calibration study, EDL uncertainty experiment, feature-extension experiments, leakage-safe seasonal targets, five-region geometry-sensitive evaluation, and SPI-12 regionalization diagnostics. The current single source of truth is `results/report/master_results_headline.csv`. Its critical finding is: **no current experiment produces robust positive monthly BSS over climatology**.
+The May 2026 reproducibility checkpoint includes the canonical Central Valley benchmark, calibration study, EDL uncertainty experiment, feature-extension experiments, leakage-safe seasonal targets, five-region geometry-sensitive evaluation, temporal robustness audit, PRISM validation, operational benchmark, and SPI-12 regionalization diagnostics. The current single source of truth for model-skill experiments is `results/report/master_results_headline.csv`. Its critical finding is: **no current experiment produces robust positive monthly BSS over climatology**.
 
 ### Performance Hierarchy (Monthly Brier Skill Score vs Climatology)
 
@@ -60,6 +62,12 @@ The May 2026 reproducibility checkpoint includes the canonical Central Valley be
 | Murray-Darling basin mask | 63 mo | -0.639 | Strong calibration/test-period shift failure |
 
 **Conclusion**: The project should not claim a positive forecast model. It should claim a rigorous predictability audit: ranking signals exist, but calibrated probability skill over climatology is not robust under monthly inference, source-cited regional masks, and validation-only calibration.
+
+### Temporal Robustness and Data-Source Validation
+
+The test-period limitation is now controlled rather than only acknowledged. `scripts/run_temporal_robustness_audit.py` retrains tabular XGBoost across five chronological Central Valley holdouts. Against train-month climatology, all five BSS point estimates are non-positive: `2005-2008 = -0.089`, `2009-2012 = -0.004`, `2013-2016 = -0.077`, `2017-2020 = -0.010`, and `2021-2026 = -0.025`; all confidence intervals cross zero. The weak-skill conclusion is therefore not simply caused by the 2021-2026 drought/wet reversal. Within the canonical test, the main event-scale failure is underprediction during the 2021-2022 drought (`bias = -0.120`).
+
+`scripts/validate_chirps_prism_cvalley.py` now downloads official PRISM 4 km monthly precipitation, clips to the DWR Central Valley basin union, computes PRISM SPI-1 with a 1991-2020 baseline, and compares it with CHIRPS. CHIRPS and PRISM dry fractions agree strongly during 2021-2026 (`Pearson r = 0.816`, `Spearman r = 0.720`), but CHIRPS is drier on average (`CHIRPS - PRISM dry-fraction bias = +0.046`). Evaluated directly against PRISM SPI-1 dry fraction, XGB-Spatial remains tied with climatology (`BSS = -0.003`, `Spearman = 0.530`). This strengthens the claim that the no-skill result is not only a CHIRPS artifact, while requiring an explicit data-source uncertainty caveat.
 
 ### Why Feature Engineering Fails: Atmospheric Predictability Limits
 
@@ -89,6 +97,7 @@ NetCDF coverage starts at target month 2018-05, so calibration uses 32 validatio
 - **Primary** (Recommended): "Limits of Lag-Based ML for Monthly Drought Forecasting" — rigorous negative result and multi-region predictability audit
 - **Secondary**: "Operational Forecast Inputs vs Lag-Only ML" — compare NMME/SubX precipitation forecasts to the lagged-observation ML benchmark
 - **Supporting**: "Regional Drought Teleconnections" — Step 3 regionalization standalone
+- **Most defensible next positive-skill direction**: shift from SPI-1 lead-1 to seasonal or zone-level SPI-3/SPI-6/SPI-12 targets, because regionalization shows teleconnection signal at longer drought-memory timescales.
 
 ## References
 
@@ -118,3 +127,5 @@ NetCDF coverage starts at target month 2018-05, so calibration uses 32 validatio
 22. Agudelo, D. et al. (2024). Subseasonal drought forecasting in Bihar, India (report). https://hdl.handle.net/10568/163071
 23. USGS (accessed 2026). Central Valley agriculture facts. https://ca.water.usgs.gov/projects/central-valley/about-central-valley.html
 24. Islam, S. M. et al. (2024). Drought impact on crop yields in Iowa (preprint). https://doi.org/10.31223/X54Q4D
+25. PRISM Climate Group, Oregon State University. PRISM Climate Data. https://prism.oregonstate.edu/?id=US
+26. Daly, C. et al. (2008). Physiographically sensitive mapping of climatological temperature and precipitation. International Journal of Climatology. https://doi.org/10.1002/joc.1688

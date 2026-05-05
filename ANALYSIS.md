@@ -21,6 +21,7 @@ The project implements a complete, reproducible pipeline for **1-month-ahead dro
 | Explainability | ✅ Current | Corrected SHAP artifacts now exist for both XGBoost and XGBoost-Spatial |
 | Cross-dataset validation | ✅ Complete | ERA5-Land SPI-1 comparison |
 | Qualitative validation | ✅ Complete | USDM D1+ consistency check (correctly framed as non-metric) |
+| PRISM validation | ✅ Added | PRISM basin-mask SPI-1 comparison supports CHIRPS timing signal but shows CHIRPS is drier than PRISM in the test period |
 | Spatial analysis | ✅ Complete | Per-pixel accuracy maps, Sacramento/San Joaquin sub-regions |
 | Case study | ✅ Complete | 2021–22 drought / 2023 atmospheric rivers |
 | Season-conditional skill | ✅ Quantified | Raw MAM skill is positive, but bootstrap CI crosses zero and calibration removes the signal |
@@ -32,6 +33,8 @@ The project implements a complete, reproducible pipeline for **1-month-ahead dro
 | Soil-moisture experiment | ✅ Initial test complete | Regional ERA5-Land soil-water/root-zone anomaly lags overfit and remain below climatology |
 | Multi-region path | ✅ Five-region path complete | Region registry + runner now supports Central Valley, Southern Great Plains, Murray-Darling, Mediterranean Spain, and Horn of Africa tabular/spatial tests |
 | Regional mechanism comparison | ✅ Initial analysis complete | Reproducible diagnostics separate ranking, calibration, test-period shift, persistence, and feature-group gain |
+| Temporal robustness audit | ✅ Added | Five rolling Central Valley holdouts show no positive tabular BSS point estimates; 2021–2026 is not the only weak window |
+| SPI-12 regionalization mechanism tables | ✅ Added | Zone-level run metrics, climate-index correlations, and forecast diagnostics are compiled for paper tables |
 | Region geometry audit | ✅ Source-cited masks added | Natural Earth country masks plus DWR, EPA, Murray-Darling Basin Authority/data.gov.au, and MITECO masks quantify rectangular-box sensitivity and add masked priority-region runs |
 | Master results table | ✅ Added | `scripts/build_master_results_table.py` creates a 64-row result table and 28-row headline table from current artifacts |
 | Operational benchmark path | ✅ Initial NMME run complete | CPC NMME lead-1 precipitation anomaly + isotonic calibration is tied with climatology (`BSS = +0.002`, CI crossing zero) |
@@ -121,6 +124,38 @@ The project implements a complete, reproducible pipeline for **1-month-ahead dro
 > Earth country-intersection mask retaining 87.29%; that is a useful regional
 > checkpoint but not a hydrologic or livelihood-zone boundary.
 >
+> **Temporal robustness is now directly tested.**
+> `scripts/run_temporal_robustness_audit.py` retrains tabular XGBoost across
+> five rolling chronological holdouts. Against train-period monthly climatology,
+> none of the five holdouts has positive BSS (`2005–2008: -0.089`,
+> `2009–2012: -0.004`, `2013–2016: -0.077`, `2017–2020: -0.010`,
+> `2021–2026: -0.025`; all CIs cross zero). This means the weak-skill
+> conclusion is not solely an artifact of the 2021–2026 test window. However,
+> event-block diagnostics show the main canonical failure is severe
+> underprediction during the 2021–2022 drought (`bias = -0.120`, BSS = -0.067),
+> while 2023 and 2024–2026 are closer to climatology.
+>
+> **PRISM validation strengthens the data-source argument but adds a caveat.**
+> `scripts/validate_chirps_prism_cvalley.py` downloads official PRISM monthly
+> precipitation, clips it to the DWR Central Valley basin union, computes SPI-1
+> with a 1991–2020 baseline, and compares it with CHIRPS. CHIRPS and PRISM
+> monthly dry fractions are strongly aligned in the test period (`Pearson r =
+> 0.816`, `Spearman r = 0.720`), but CHIRPS is drier on average (`test bias
+> CHIRPS - PRISM = +0.046`). Evaluated against PRISM SPI-1 dry fraction, the
+> current XGB-Spatial probabilities are again tied with climatology
+> (`BSS = -0.003`, `Spearman = 0.530`).
+>
+> **SPI-12 regionalization is useful as mechanism evidence, not as forecast
+> proof.** `scripts/build_regionalization_mechanism_tables.py` now compiles
+> zone-level PCA/run-theory/teleconnection summaries and joins them to the
+> existing multi-region forecast probabilities. Horn of Africa, Murray-Darling,
+> and Southern Great Plains show strong zone-level SPI-12 teleconnection
+> correlations (e.g., Horn zone 0 Niño3.4 lag-6 `r = 0.542`, Murray-Darling zone
+> 0 Niño3.4 lag-1 `r = -0.460`, Southern Great Plains zone 3 Niño3.4 lag-6
+> `r = 0.501`). But zone-level SPI-1 forecast BSS remains mostly negative or
+> only weakly positive in isolated zones, supporting a target-timescale mismatch
+> interpretation.
+>
 > **XGB-Spatial is the best current ML option** because it has the best ranking
 > skill (ROC-AUC = 0.743) and the best calibrated Brier Score. Current evidence
 > still points to information-content limits, not model-capacity limits.
@@ -153,7 +188,7 @@ This is a scientifically valid and publishable finding — but only if the analy
 - No target leakage: SPI-1[t+1] depends only on pr[t+1], which is unknown from features at t
 
 **Limitations:**
-- Test period (2021–2026) coincidentally includes an extreme drought (2021–22) followed by an extreme wet reversal (2023). This is good for case-study value but means the test set is not climatologically representative — it over-represents extreme events relative to the training distribution.
+- Test period (2021–2026) coincidentally includes an extreme drought (2021–22) followed by an extreme wet reversal (2023). This is good for case-study value but means the test set is not climatologically representative. This is now partly controlled by the rolling temporal audit, which shows no positive tabular BSS point estimate in five chronological holdouts, but event-block inference within 2021–2026 remains limited by only 12–27 months per block.
 - The 30-year gamma-fit baseline (1991–2020) may not capture non-stationarity driven by climate change, potentially biasing SPI values in the 2021–2026 test period.
 
 ### 2.3 What the completed regional expansion now offers
@@ -440,20 +475,23 @@ This narrative transforms a "negative result" into a **methodological and scient
    checkpoint is effectively tied with climatology (`BSS = +0.002`, CI crossing
    zero).
 
-### Next experiments (priority order)
+### Next experiments / writing priorities
 
-1. **Use the master result table as the paper source of truth**
+1. **Use the master and support tables as the paper source of truth**
    Build paper tables from `results/report/master_results_headline.csv`; do not
-   manually copy numbers from older prose.
+   manually copy numbers from older prose. Use `results/temporal/`,
+   `results/validation/prism_*`, and `results/regionalization/zone_forecast_diagnostics.csv`
+   as supporting diagnostics.
 
-2. **Write the source-cited mask-methods subsection**
+2. **Write the source-cited data/mask-methods subsection**
    Include the boundary sources, selection logic, retained-cell fractions, and why
    each masked run is a cleaner scientific checkpoint than a rectangular bbox. State
    explicitly that Horn is country-intersection geometry, not a hydrologic/livelihood mask.
+   Add the PRISM validation method as an independent U.S. precipitation-data check.
 
 3. **Promote mechanism diagnostics into publication figures**
-   The current BSS CI, monthly dry-fraction, signal-vs-skill, feature-group, and mask
-   retention plots are now central to the paper narrative.
+   The BSS CI, monthly dry-fraction, signal-vs-skill, feature-group, mask retention,
+   SPI-12 regionalization, and PRISM comparison plots are now central to the paper narrative.
 
 4. **Do not add more regions before writing**
    Five checkpoints are enough for the generalization claim; the immediate risk is
@@ -487,7 +525,9 @@ These are the changes that most improve the scientific credibility of the projec
 2. **Monthly-level inference.** Skill is always summarized over independent test months, not pixels, which avoids pseudo-replication and inflated significance.
 3. **Calibration with validation-only selection.** Isotonic and Platt calibration are fit on the validation split only, then frozen before test evaluation.
 4. **Multi-region generalization checks.** Central Valley is no longer treated as a one-off result; the same pipeline has been run across Great Plains, Spain, Murray-Darling, and Horn of Africa checkpoints.
-5. **Conditional-skill diagnostics.** ENSO- and season-stratified BSS is now computed and saved in `results/seasonal/seasonal_monthly_scores_stratified_bss.csv` so the paper can distinguish global skill from regime-specific hints.
+5. **Temporal robustness controls.** Five rolling Central Valley holdouts now test whether the 2021–2026 result is an artifact of a single unusual test period.
+6. **Independent precipitation-product validation.** PRISM SPI-1 validation checks whether the CHIRPS target itself is driving the conclusion.
+7. **Conditional-skill diagnostics.** ENSO- and season-stratified BSS is now computed and saved in `results/seasonal/seasonal_monthly_scores_stratified_bss.csv` so the paper can distinguish global skill from regime-specific hints.
 
 ### What the new seasonal stratification actually says
 

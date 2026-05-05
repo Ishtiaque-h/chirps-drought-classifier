@@ -37,7 +37,7 @@ graph TD;
     G --> H["Model suite: LogReg / RF / XGBoost / XGBoost-Spatial / ConvLSTM"];
     H --> I["Skill evaluation (monthly BSS / HSS, bootstrap CI)"];
     H --> J["SHAP explainability"];
-    H --> K["Cross-dataset validation (ERA5-Land)"];
+    H --> K["Cross-dataset validation (ERA5-Land / PRISM)"];
     H --> L["Spatial skill maps / Case studies"];
 ```
 
@@ -51,6 +51,10 @@ SPI guidance
 ([WMO-No. 1090](https://library.wmo.int/idurl/4/39629)),
 and Murphy's Brier Score decomposition
 ([Murphy, 1973](https://ui.adsabs.harvard.edu/abs/1973JApMe..12..595M/abstract)).
+Independent U.S. precipitation validation uses PRISM monthly precipitation from
+the PRISM Climate Group at Oregon State University
+([official data portal](https://prism.oregonstate.edu/?id=US);
+[Daly et al., 2008](https://doi.org/10.1002/joc.1688)).
 
 **Temporal split (strictly chronological, no shuffling):**
 
@@ -388,6 +392,8 @@ SubX is the alternative subseasonal benchmark; cite Pegion et al. (2019)
 - **Spatial skill maps** — per-pixel accuracy over 2021-2026
 - **Case studies** — 2021–22 drought and 2023 atmospheric rivers
 - **Cross-dataset validation** — ERA5-Land SPI-1 comparison
+- **Independent U.S. precipitation validation** — PRISM SPI-1 comparison over the DWR Central Valley basin mask
+- **Temporal robustness audit** — rolling chronological Central Valley holdouts and 2021-2026 event-block diagnostics
 - **Qualitative validation** — USDM D1+ plausibility check (not a metric)
 
 ---
@@ -398,7 +404,8 @@ SubX is the alternative subseasonal benchmark; cite Pegion et al. (2019)
 - **Small test set:** 63 months yields wide confidence intervals; positive skill claims require a confidence interval that excludes zero.
 - **Regional geometry:** Central Valley, Southern Great Plains, Murray-Darling, Spain, and Horn of Africa now have source-cited geometry checkpoints; Horn still uses political-country geometry rather than a basin or livelihood-zone mask.
 - **Limited exogenous drivers:** Corrected Niño3.4 anomaly lags are included; PDO is excluded from the active checkpoint because recent PDO values are missing. Regional/gridded ERA5-Land temperature/VPD and regional ERA5-Land soil moisture have been tested separately, but none beat climatology.
-- **Test period non-representative:** 2021–2026 is extreme (historic drought → extreme wet).
+- **Test period non-representative:** 2021–2026 is extreme (historic drought -> extreme wet). This is now partly controlled by `results/temporal/`: five rolling tabular holdouts all remain at or below climatology, but the canonical event-block analysis still has only 12-27 months per block.
+- **CHIRPS/PRISM differences:** PRISM validation shows strong test-period agreement (`Pearson r = 0.816`, `Spearman r = 0.720`) but CHIRPS is drier on average over the basin (`CHIRPS - PRISM dry-fraction bias = +0.046`), so target-data uncertainty should be acknowledged.
 
 ---
 
@@ -406,12 +413,11 @@ SubX is the alternative subseasonal benchmark; cite Pegion et al. (2019)
 
 Highest-impact directions (see [`ANALYSIS.md`](ANALYSIS.md) for full roadmap):
 
-1. **Write a source-cited mask-methods subsection** — The boundary sources, selection logic, retained-cell fractions, and Horn caveat should be explicit before figure polishing.
-2. **Turn mechanism diagnostics into figures/tables for the paper narrative** — The current `results/multiregion/` artifacts are now the strongest evidence for region-dependent predictability.
+1. **Write the source-cited data/mask-methods subsection** — Include CHIRPS, PRISM, WMO SPI, boundary sources, retained-cell fractions, and the Horn country-mask caveat.
+2. **Turn mechanism diagnostics into figures/tables for the paper narrative** — `results/multiregion/`, `results/temporal/`, `results/validation/prism_*`, and `results/regionalization/` are now the core evidence.
 3. **Stop expanding regions for now** — Five hydroclimate checkpoints are enough to support the generalization claim; additional regions would add cost before the narrative is tightened.
 4. **Only extend operational benchmarks if needed** — The first CPC NMME lead-1 anomaly benchmark is also tied with climatology; a follow-up should use NMME probabilistic terciles, full hindcast NetCDF/GRIB support, or SubX only if the paper needs a stronger operational comparison.
-5. **Add targeted event-scale predictors only after the paper tables are stable** — Atmospheric-river or subseasonal circulation features are more physically aligned with Central Valley monthly extremes than more lagged land-surface fields.
-6. **Seasonal target variants** — SPI-3 lead-3 is a positive but uncertain hint; only extend it with spatial features, forecast precipitation inputs, or additional regions if it serves the paper's scope.
+5. **Reframe the target only if pursuing positive skill** — SPI-12 regionalization shows teleconnection signal at longer drought-memory timescales, so SPI-3/SPI-6/SPI-12 seasonal or zone-level targets are more promising than another ML architecture on SPI-1 lead-1.
 
 ---
 
@@ -470,6 +476,9 @@ python scripts/analyze_multiregion_mechanisms.py
 python scripts/evaluate_regional_forecast.py     # regional (Central Valley) dominant class accuracy
 python scripts/xgb_shap_forecast_analysis.py --model both  # SHAP interpretation
 python scripts/validate_era5_spi.py              # cross-dataset validation
+python scripts/validate_chirps_prism_cvalley.py  # PRISM basin validation
+python scripts/run_temporal_robustness_audit.py  # rolling holdout sensitivity
+python scripts/build_regionalization_mechanism_tables.py
 python scripts/validate_usdm.py                  # USDM plausibility check
 python scripts/plot_spatial_skill.py             # per-pixel skill map
 python scripts/plot_case_study.py                # 2021-2026 case study
@@ -483,7 +492,9 @@ python scripts/plot_case_study.py                # 2021-2026 case study
 - **[results/report/](results/report/)** — Includes season/ENSO-stratified BSS CSV tables
 - **[results/spatial/](results/spatial/)** — Per-pixel accuracy maps
 - **[outputs/](outputs/)** — Full model artifacts, probability arrays, feature-importance plots, and detailed SHAP dependence plots
-- **[results/validation/](results/validation/)** — ERA5-Land and USDM cross-dataset validation
+- **[results/validation/](results/validation/)** — ERA5-Land, PRISM, and USDM validation/consistency checks
+- **[results/temporal/](results/temporal/)** — Rolling temporal robustness and event-block diagnostics
+- **[results/regionalization/](results/regionalization/)** — SPI-12 regionalization and zone-level mechanism tables
 - **[results/regional/](results/regional/)** — Regional (Central Valley) forecast evaluation
 - **[results/multiregion/](results/multiregion/)** — Region-aware XGBoost comparison artifacts
 
