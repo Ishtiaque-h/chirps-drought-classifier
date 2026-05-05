@@ -1,0 +1,4 @@
+target_time,forecast_prob_dry,forecast_pr_anom,forecast_pr,source_model,init_time,lead_months,notes
+2017-01-01,,,,NMME_or_SubX_model_name,,1,"Fill exactly one of forecast_prob_dry, forecast_pr_anom, or forecast_pr."
+2017-02-01,,,,NMME_or_SubX_model_name,,1,Use target_time for the month being predicted.
+2017-03-01,,,,NMME_or_SubX_model_name,,1,Aggregate ensembles/lead windows before running this scorer.
