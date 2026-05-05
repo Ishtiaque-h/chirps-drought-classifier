@@ -32,4 +32,12 @@ BSS is monthly dry-fraction Brier Skill Score against calendar-month climatology
 | multi_region_selected_checkpoint | Murray-Darling Basin bounding box (basin-mask sensitivity) | SPI-1 dry fraction | 1 | tabular XGBoost | platt | 63 | 0.046 | -0.639 | -1.308 | -0.278 | robust_negative |
 | multi_region_selected_checkpoint | Southern Great Plains | SPI-1 dry fraction | 1 | spatial XGBoost | isotonic | 63 | 0.052 | -0.082 | -0.148 | -0.002 | robust_negative |
 | multi_region_selected_checkpoint | Southern Great Plains (basin-mask sensitivity) | SPI-1 dry fraction | 1 | spatial XGBoost | isotonic | 63 | 0.055 | 0.010 | -0.098 | 0.150 | positive_uncertain |
-| operational_dynamical_benchmark | California Central Valley | SPI-1 dry fraction | 1 | External precipitation forecast selected | selected | 63 | 0.064 | 0.002 | -0.437 | 0.247 | positive_uncertain |
+| operational_dynamical_benchmark | California Central Valley | SPI-1 dry fraction | 1 | CPC NMME anomaly forecast selected | selected | 63 | 0.064 | 0.002 | -0.438 | 0.239 | positive_uncertain |
+| operational_dynamical_benchmark | California Central Valley | SPI-1 dry fraction | 1 | CPC NMME probability forecast selected | selected | 52 | 0.067 | 0.131 | -0.304 | 0.338 | positive_uncertain |
+| operational_dynamical_benchmark | California Central Valley | SPI-1 dry fraction | 1 | CPC NMME probability forecast raw | raw | 52 | 0.096 | -0.248 | -1.223 | 0.095 | not_distinguishable_from_climatology |
+| operational_dynamical_benchmark | California Central Valley | SPI-3 dry fraction | 3 | CPC NMME anomaly forecast selected | selected | 59 | 0.080 | 0.086 | -0.225 | 0.261 | positive_uncertain |
+| operational_dynamical_benchmark | California Central Valley | SPI-3 dry fraction | 3 | CPC NMME probability forecast raw | raw | 51 | 0.094 | 0.007 | -0.549 | 0.243 | positive_uncertain |
+| operational_dynamical_benchmark | California Central Valley | SPI-3 dry fraction | 3 | CPC NMME probability forecast selected | selected | 51 | 0.115 | -0.212 | -1.148 | 0.176 | not_distinguishable_from_climatology |
+| operational_dynamical_benchmark | California Central Valley | SPI-6 dry fraction | 6 | CPC NMME anomaly forecast selected | selected | 62 | 0.171 | -0.344 | -1.130 | 0.113 | not_distinguishable_from_climatology |
+| operational_dynamical_benchmark | California Central Valley | SPI-6 dry fraction | 6 | CPC NMME probability forecast raw | raw | 49 | 0.101 | 0.035 | -0.430 | 0.255 | positive_uncertain |
+| operational_dynamical_benchmark | California Central Valley | SPI-6 dry fraction | 6 | CPC NMME probability forecast selected | selected | 49 | 0.147 | -0.409 | -1.693 | 0.163 | not_distinguishable_from_climatology |
