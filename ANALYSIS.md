@@ -36,8 +36,9 @@ The project implements a complete, reproducible pipeline for **1-month-ahead dro
 | Temporal robustness audit | ✅ Added | Five rolling Central Valley holdouts show no positive tabular BSS point estimates; 2021–2026 is not the only weak window |
 | SPI-12 regionalization mechanism tables | ✅ Added | Zone-level run metrics, climate-index correlations, and forecast diagnostics are compiled for paper tables |
 | Region geometry audit | ✅ Source-cited masks added | Natural Earth country masks plus DWR, EPA, Murray-Darling Basin Authority/data.gov.au, and MITECO masks quantify rectangular-box sensitivity and add masked priority-region runs |
-| Master results table | ✅ Added | `scripts/build_master_results_table.py` creates a 64-row result table and 28-row headline table from current artifacts |
-| Operational benchmark path | ✅ Initial NMME run complete | CPC NMME lead-1 precipitation anomaly + isotonic calibration is tied with climatology (`BSS = +0.002`, CI crossing zero) |
+| Master results table | ✅ Added | `scripts/build_master_results_table.py` creates a 77-row result table and 36-row headline table from current artifacts |
+| Paper evidence pack | ✅ Added | `scripts/build_paper_evidence_pack.py` consolidates the master, seasonal, temporal, mask, PRISM, and regionalization evidence into manuscript-facing tables and figures under `results/paper/` |
+| Operational benchmark path | ✅ NMME anomaly + probability benchmarks complete | CPC NMME anomaly and official below-normal probability benchmarks now cover SPI-1 lead-1, SPI-3 lead-3, and SPI-6 lead-6; the best selected probability row is SPI-1 lead-1 (`BSS = +0.131`) and the best raw probability row is SPI-6 lead-6 (`BSS = +0.035`), but all confidence intervals cross zero |
 
 ### Key results (corrected ENSO + spatial checkpoint — 2026-05-01)
 
@@ -361,7 +362,7 @@ The regional mask analyses use source-cited public boundary datasets:
 | **1** | **Write source-cited mask methods** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | The paper should explicitly cite Natural Earth, DWR, EPA, MDBA/data.gov.au, and MITECO boundary sources, report retained-cell fractions, and caveat Horn's country mask. |
 | **2** | **Turn mechanism diagnostics into paper figures** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | The five-region, geometry-sensitive comparison is now the main scientific story and should be presented before adding more features. |
 | **3** | **Perform final consistency review of claims** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | Ensure every positive point estimate is framed as uncertain and every rectangular result is labeled as a sensitivity rather than a final regional claim. |
-| **4** | **Operational benchmark extension only if needed** | ⭐⭐⭐ | ⭐⭐ | The first CPC NMME lead-1 anomaly benchmark is also tied with climatology; next operational work should use probabilistic terciles, full GRIB/hindcast support, or SubX only if it serves the paper scope. |
+| **4** | **Operational benchmark extension only if needed** | ⭐⭐⭐ | ⭐⭐ | CPC NMME anomaly and probability benchmarks now include SPI-1 lead-1, SPI-3 lead-3, and SPI-6 lead-6; any next operational work should use full ensemble/hindcast support or SubX only if it serves the paper scope. |
 | **5** | **Atmospheric-river or subseasonal circulation predictors** | ⭐⭐⭐⭐ | ⭐⭐ | Central Valley monthly extremes are event-driven; AR/circulation predictors are more physically targeted than more lagged land-surface tuning. |
 | **6** | **Seasonal target variants with more information** | ⭐⭐⭐ | ⭐⭐⭐ | SPI-3 lead-3 is a positive but uncertain hint; revisit with spatial features, operational precipitation forecasts, or additional regions if needed. |
 | **7** | **Gridded/SMAP soil-moisture sensitivity** | ⭐⭐ | ⭐⭐ | Regional ERA5-Land soil moisture overfits; only pursue this if a spatial or independent-observation formulation is needed for completeness. |
@@ -475,13 +476,18 @@ This narrative transforms a "negative result" into a **methodological and scient
 22. ✅ **Operational/dynamical benchmark added** —
    `scripts/build_nmme_cpc_forecast_csv.py` preprocesses CPC NMME real-time
    multi-model precipitation anomalies, and
+   `scripts/build_nmme_cpc_prob_forecast_csv.py` preprocesses official CPC NMME
+   below-normal precipitation probabilities.
    `scripts/run_operational_precip_benchmark.py` scores them with the same
-   validation-only calibration and monthly BSS protocol. NetCDF coverage starts
-   at target month 2018-05, so calibration uses 32 validation months
-   (2018-05 to 2020-12). The raw NMME dry signal has modest rank correlation
-   with observed monthly dry fraction (`Spearman ≈ 0.267`), but the selected
-   checkpoint is effectively tied with climatology (`BSS = +0.002`, CI crossing
-   zero).
+   validation-only calibration and monthly BSS protocol. The anomaly SPI-3
+   lead-3 row remains the strongest anomaly-based hint (`BSS = +0.086`, CI
+   crossing zero). The official probability rows add a cleaner probabilistic
+   benchmark, but are still not robust: selected SPI-1 lead-1 has
+   `BSS = +0.131` with a CI crossing zero, raw SPI-6 lead-6 has
+   `BSS = +0.035` with a CI crossing zero, and isotonic calibration degrades the
+   SPI-3/SPI-6 probability rows because the 2019-2020 validation overlap is
+   short. CPC probability coverage is also partial for Central Valley dry-season
+   targets.
 
 ### Next experiments / writing priorities
 
@@ -497,18 +503,23 @@ This narrative transforms a "negative result" into a **methodological and scient
    explicitly that Horn is country-intersection geometry, not a hydrologic/livelihood mask.
    Add the PRISM validation method as an independent U.S. precipitation-data check.
 
-3. **Promote mechanism diagnostics into publication figures**
-   The BSS CI, monthly dry-fraction, signal-vs-skill, feature-group, mask retention,
-   SPI-12 regionalization, and PRISM comparison plots are now central to the paper narrative.
+3. **Use `results/paper/` as the manuscript evidence pack**
+   `scripts/build_paper_evidence_pack.py` now creates a 59-row master evidence
+   table, 36-row headline table, source-cited mask-methods table, temporal
+   robustness table, seasonal signal audit, regionalization mechanism table, and
+   five paper-facing figures. This is now the highest-level evidence source for
+   manuscript drafting.
 
 4. **Do not add more regions before writing**
    Five checkpoints are enough for the generalization claim; the immediate risk is
    narrative inconsistency, not lack of regional coverage.
 
-5. **Extend operational benchmarking only if it clarifies the paper**
-   The first CPC NMME lead-1 anomaly checkpoint is tied with climatology. A
-   follow-up should use NMME probabilistic terciles, full GRIB/hindcast support,
-   or SubX only if the paper needs a stronger operational comparison.
+5. **Do not extend operational benchmarking again unless it clarifies the paper**
+   CPC NMME anomaly and probability benchmarks now cover SPI-1 lead-1, SPI-3
+   lead-3, and SPI-6 lead-6. The operational point estimates remain uncertain,
+   and the probability validation window is short. A further follow-up should use
+   full ensemble/hindcast support or SubX only if the paper needs a stronger
+   operational comparison.
 
 6. **Treat seasonal regional results as a calibration/target-design audit**
    The expanded seasonal table has one robust-positive BSS row, but its

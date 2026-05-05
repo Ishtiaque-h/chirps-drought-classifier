@@ -356,6 +356,42 @@ python scripts/build_nmme_cpc_forecast_csv.py --copy-report
 python scripts/run_operational_precip_benchmark.py \
   --forecast-csv outputs/nmme_cpc_cvalley_lead1_forecast.csv \
   --copy-report
+python scripts/build_nmme_cpc_forecast_csv.py \
+  --lead-months 3 \
+  --start-target 2018-07 \
+  --out-file outputs/nmme_cpc_cvalley_lead3_forecast.csv \
+  --copy-report
+python scripts/run_operational_precip_benchmark.py \
+  --forecast-csv outputs/nmme_cpc_cvalley_lead3_forecast.csv \
+  --dataset data/processed/dataset_seasonal_spi3_lead3.parquet \
+  --target-spi 3 \
+  --lead-months 3 \
+  --output-prefix operational_nmme_cpc_spi3_lead3 \
+  --copy-report
+python scripts/build_nmme_cpc_forecast_csv.py \
+  --lead-months 6 \
+  --start-target 2018-10 \
+  --out-file outputs/nmme_cpc_cvalley_lead6_forecast.csv \
+  --copy-report
+python scripts/run_operational_precip_benchmark.py \
+  --forecast-csv outputs/nmme_cpc_cvalley_lead6_forecast.csv \
+  --dataset data/processed/dataset_seasonal_spi6_lead6.parquet \
+  --target-spi 6 \
+  --lead-months 6 \
+  --output-prefix operational_nmme_cpc_spi6_lead6 \
+  --copy-report
+python scripts/build_nmme_cpc_prob_forecast_csv.py \
+  --lead-months 3 \
+  --dataset data/processed/dataset_seasonal_spi3_lead3.parquet \
+  --out-file outputs/nmme_cpc_prob_cvalley_lead3_forecast.csv \
+  --copy-report
+python scripts/run_operational_precip_benchmark.py \
+  --forecast-csv outputs/nmme_cpc_prob_cvalley_lead3_forecast.csv \
+  --dataset data/processed/dataset_seasonal_spi3_lead3.parquet \
+  --target-spi 3 \
+  --lead-months 3 \
+  --output-prefix operational_nmme_cpc_prob_spi3_lead3 \
+  --copy-report
 ```
 
 The forecast CSV should contain `target_time` plus one of
@@ -364,29 +400,46 @@ NMME, GEFS, ECMWF/SEAS5, or similar precipitation forecasts be scored with the
 same validation-only calibration and monthly BSS protocol used everywhere else
 in the project.
 
-The first implemented operational checkpoint uses CPC NMME real-time
-multi-model ensemble-mean precipitation anomalies at lead 1 over the Central
-Valley bounding box. NetCDF coverage starts at target month May 2018 in this
-environment, so validation calibration uses 32 months (2018-05 to 2020-12) and
-test evaluation uses 63 months (2021-01 to 2026-03):
+The implemented operational checkpoints now include both CPC NMME real-time
+multi-model precipitation anomalies and official CPC NMME below-normal
+precipitation probabilities over the Central Valley bounding box. The
+probability files start in 2019 and have missing Central Valley values for some
+dry-season targets, so their test coverage is smaller than the anomaly
+benchmarks.
 
-| Operational benchmark | Test BS | BSS vs. climatology | 95% CI |
+| Operational benchmark | Test months | BSS vs. climatology | 95% CI |
 |---|---:|---:|---|
-| CPC NMME precipitation anomaly + isotonic | 0.06412 | +0.00248 | [−0.43291, +0.23914] |
+| CPC NMME SPI-1 lead-1 probability + isotonic | 52 | +0.131 | [−0.304, +0.338] |
+| CPC NMME SPI-3 lead-3 anomaly + isotonic | 59 | +0.086 | [−0.225, +0.261] |
+| CPC NMME SPI-6 lead-6 probability raw | 49 | +0.035 | [−0.430, +0.255] |
+| CPC NMME SPI-3 lead-3 probability raw | 51 | +0.007 | [−0.549, +0.243] |
+| CPC NMME SPI-1 lead-1 anomaly + isotonic | 63 | +0.002 | [−0.438, +0.239] |
+| CPC NMME SPI-6 lead-6 anomaly + isotonic | 62 | −0.344 | [−1.130, +0.113] |
+| CPC NMME SPI-3 lead-3 probability + isotonic | 51 | −0.212 | [−1.148, +0.176] |
+| CPC NMME SPI-6 lead-6 probability + isotonic | 49 | −0.409 | [−1.693, +0.163] |
 
-This is another practical tie with climatology, not a positive-skill result.
-The raw NMME dry signal has modest test-period rank correlation with observed
-monthly dry fraction (Spearman ≈ 0.267), but the calibrated probabilities still
-do not reduce Brier error reliably.
+The operational benchmark is scientifically useful, but it does not create a
+robust positive-skill result. The official raw probabilities have weak positive
+SPI-3/SPI-6 point estimates, while validation-only isotonic calibration helps
+SPI-1 but overfits the short probability validation window for SPI-3/SPI-6.
 Artifacts are saved at
 [results/report/nmme_cpc_cvalley_lead1_forecast.csv](results/report/nmme_cpc_cvalley_lead1_forecast.csv),
 [results/report/operational_precip_benchmark_monthly_scores.csv](results/report/operational_precip_benchmark_monthly_scores.csv),
+[results/report/operational_precip_benchmark_scores.txt](results/report/operational_precip_benchmark_scores.txt),
+[results/report/operational_nmme_cpc_spi3_lead3_monthly_scores.csv](results/report/operational_nmme_cpc_spi3_lead3_monthly_scores.csv),
 and
-[results/report/operational_precip_benchmark_scores.txt](results/report/operational_precip_benchmark_scores.txt).
+[results/report/operational_nmme_cpc_spi6_lead6_monthly_scores.csv](results/report/operational_nmme_cpc_spi6_lead6_monthly_scores.csv),
+plus the probability benchmark files
+[results/report/operational_nmme_cpc_prob_spi1_lead1_monthly_scores.csv](results/report/operational_nmme_cpc_prob_spi1_lead1_monthly_scores.csv),
+[results/report/operational_nmme_cpc_prob_spi3_lead3_monthly_scores.csv](results/report/operational_nmme_cpc_prob_spi3_lead3_monthly_scores.csv),
+and
+[results/report/operational_nmme_cpc_prob_spi6_lead6_monthly_scores.csv](results/report/operational_nmme_cpc_prob_spi6_lead6_monthly_scores.csv).
 
 Use the CPC/NMME data page
 ([NOAA CPC](https://www.cpc.ncep.noaa.gov/products/NMME/data.html)), NCEI NMME
 access notes ([NOAA NCEI](https://www.ncei.noaa.gov/products/weather-climate-models/north-american-multi-model)),
+the CPC probability NetCDF archive
+([NOAA CPC FTP](https://ftp.cpc.ncep.noaa.gov/NMME/prob/netcdf/)),
 and cite Kirtman et al. (2014)
 ([doi:10.1175/BAMS-D-12-00050.1](https://doi.org/10.1175/BAMS-D-12-00050.1)).
 SubX is the alternative subseasonal benchmark; cite Pegion et al. (2019)
@@ -425,11 +478,10 @@ SubX is the alternative subseasonal benchmark; cite Pegion et al. (2019)
 
 Highest-impact directions (see [`ANALYSIS.md`](ANALYSIS.md) for full roadmap):
 
-1. **Write the source-cited data/mask-methods subsection** — Include CHIRPS, PRISM, WMO SPI, boundary sources, retained-cell fractions, and the Horn country-mask caveat.
-2. **Turn mechanism diagnostics into figures/tables for the paper narrative** — `results/multiregion/`, `results/temporal/`, `results/validation/prism_*`, and `results/regionalization/` are now the core evidence.
-3. **Stop expanding regions for now** — Five hydroclimate checkpoints are enough to support the generalization claim; additional regions would add cost before the narrative is tightened.
-4. **Only extend operational benchmarks if needed** — The first CPC NMME lead-1 anomaly benchmark is also tied with climatology; a follow-up should use NMME probabilistic terciles, full hindcast NetCDF/GRIB support, or SubX only if the paper needs a stronger operational comparison.
-5. **Reframe the target only if pursuing positive skill** — SPI-12 regionalization shows teleconnection signal at longer drought-memory timescales, but the current SPI-3/SPI-6 regional seasonal audit does not yet show reliable event tracking. The next fair target-reframing step should add independent forecast precipitation/circulation inputs or zone-level targets, not only tune the same lagged-observation model.
+1. **Draft from the paper evidence pack** — `results/paper/` now contains the consolidated master evidence table, headline table, source-cited mask-methods table, temporal robustness table, seasonal signal audit, regionalization mechanism table, and five manuscript-facing figures.
+2. **Stop expanding regions for now** — Five hydroclimate checkpoints are enough to support the generalization claim; additional regions would add cost before the narrative is tightened.
+3. **Only extend operational benchmarks if needed** — CPC NMME anomaly and probability benchmarks now cover SPI-1 lead-1, SPI-3 lead-3, and SPI-6 lead-6. A further follow-up should use full hindcast/ensemble NetCDF or SubX only if the paper needs a stronger operational comparison.
+4. **Reframe the target only if pursuing positive skill** — SPI-12 regionalization shows teleconnection signal at longer drought-memory timescales, but the current SPI-3/SPI-6 regional seasonal audit does not yet show reliable event tracking. The next fair target-reframing step should add independent forecast precipitation/circulation inputs or zone-level targets, not only tune the same lagged-observation model.
 
 ---
 
@@ -497,6 +549,8 @@ python scripts/build_regionalization_mechanism_tables.py
 python scripts/validate_usdm.py                  # USDM plausibility check
 python scripts/plot_spatial_skill.py             # per-pixel skill map
 python scripts/plot_case_study.py                # 2021-2026 case study
+python scripts/build_master_results_table.py
+python scripts/build_paper_evidence_pack.py
 ```
 
 ### Results (reproduced outputs)
@@ -505,6 +559,7 @@ python scripts/plot_case_study.py                # 2021-2026 case study
 
 - **[results/report/](results/report/)** — Main skill table, calibration study, reliability diagrams, SHAP summaries, seasonal SPI-3, met-feature, and soil-moisture experiments
 - **[results/report/](results/report/)** — Includes season/ENSO-stratified BSS CSV tables
+- **[results/paper/](results/paper/)** — Consolidated paper evidence pack: master/headline tables, mask methods, temporal robustness, seasonal signal audit, regionalization mechanism table, and manuscript-facing figures
 - **[results/spatial/](results/spatial/)** — Per-pixel accuracy maps
 - **[outputs/](outputs/)** — Full model artifacts, probability arrays, feature-importance plots, and detailed SHAP dependence plots
 - **[results/validation/](results/validation/)** — ERA5-Land, PRISM, and USDM validation/consistency checks
