@@ -1,0 +1,2 @@
+n_test_months,prism_obs_dry_mean,chirps_obs_dry_mean,xgb_prob_dry_mean,prism_clim_dry_mean,xgb_bs_vs_prism,prism_clim_bs,xgb_bss_vs_prism_climatology,chirps_label_bs_vs_prism,chirps_label_bss_vs_prism_climatology,xgb_prism_spearman
+63,0.13502183871311388,0.1808673022545855,0.13310911438006504,0.09766842031942703,0.07499224194493809,0.0747317925119969,-0.0034851222510068336,0.031511366432544624,0.5783405512789483,0.5298721724938118
