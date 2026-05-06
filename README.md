@@ -7,6 +7,8 @@ We build a leakage-free forecasting pipeline to predict monthly drought classes 
 **Key finding:** Corrected ENSO-anomaly features and local spatial context bring XGBoost-Spatial almost exactly to climatology (calibrated BSS = +0.005), but the confidence interval still crosses zero. Ranking signal is real (XGBoost-Spatial ROC-AUC = 0.74), yet reliable probability skill remains statistically indistinguishable from the climatological base rate. This is not just a model-capacity problem; it points to a **predictability barrier** for 1-month-ahead SPI-1 in California's Mediterranean hydroclimate.
 
 > Full research assessment, literature context, and strategic roadmap: [`ANALYSIS.md`](ANALYSIS.md)
+> Current narrative synthesis and manuscript strategy: [`final_report.md`](final_report.md)
+> Documentation map and current source-of-truth guide: [`docs/README.md`](docs/README.md)
 
 ---
 

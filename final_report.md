@@ -1,4 +1,48 @@
-# Final Report (Working Draft)
+# Final Report: CHIRPS Drought Forecasting Project (Working Draft)
+
+Last updated: 2026-05-05
+
+This report is the narrative synthesis for manuscript planning. The numerical
+source of truth remains the generated CSV tables in `results/paper/` and
+`results/report/`; regenerate those before changing any quantitative claim.
+
+## Current Research Position
+
+The strongest defensible claim is not that the current ML system is a broadly
+skillful drought forecaster. The defensible claim is:
+
+> A leakage-free, monthly block-evaluated drought-forecasting benchmark shows
+> that lag-based ML can detect drought-relevant ranking signal, but it rarely
+> converts that signal into robust calibrated probability skill over
+> climatology for 1-month-ahead meteorological SPI-1. The result persists under
+> corrected climate indices, source-cited regional masks, temporal robustness
+> checks, independent PRISM validation, seasonal target experiments, and
+> operational NMME comparisons.
+
+This is scientifically useful if framed as a predictability and evaluation
+audit. It is weak if framed as a new high-performing ML model.
+
+## Current Evidence State
+
+- Best canonical Central Valley checkpoint: XGB-Spatial with validation-only
+  isotonic calibration gives BSS `+0.005`, CI `[-0.062, +0.073]`.
+- Temporal robustness: 0 of 5 rolling Central Valley holdouts has positive BSS.
+- PRISM validation: CHIRPS and PRISM dry-fraction timing agrees strongly, but
+  the current XGB-Spatial probabilities remain tied with climatology against
+  PRISM (`BSS = -0.003`).
+- Multi-region evaluation: no source-cited mask checkpoint gives robust
+  positive selected BSS across Central Valley, Southern Great Plains,
+  Murray-Darling, Mediterranean Spain, and Horn of Africa.
+- Seasonal/regional exception: Mediterranean Spain SPI-6 lead-6 with Nino3.4
+  features has robust positive BSS (`+0.078`), but the signal audit flags it as
+  calibration shift rather than event tracking (`r = 0.041`, variance ratio
+  `0.104`).
+- Operational benchmark: CPC NMME probability and anomaly rows produce positive
+  point estimates in some cases, but all current CIs cross zero.
+- Regionalization: SPI-12 zones reveal strong teleconnection signals in some
+  regions, but those mechanisms do not reliably become calibrated SPI-1
+  forecast skill.
+
 
 ## Related Research
 
@@ -17,6 +61,121 @@
 
 ### Agriculture relevance
 - Central Valley agricultural scale motivates the societal impact framing. Drought indices are commonly linked to crop yield outcomes, reinforcing a potential small extension that connects drought probabilities to yield anomalies.
+
+## Literature Review
+
+The collected related-work index is
+`literature/related_works_index.csv`. Local PDFs are stored under
+`literature/papers/` when command-line download was allowed. NOAA, MDPI, and
+ScienceDirect direct PDF downloads blocked local requests for several papers,
+but their full-text source pages remain linked in the index.
+
+### Forecast Verification and Operational Baselines
+
+Becker and van den Dool (2016) provide the appropriate NMME probability-forecast
+benchmarking frame: Brier skill, reliability, and resolution should be assessed
+against cross-validated climatology. This validates our use of BSS and
+reliability-oriented calibration checks for CPC NMME probability products.
+
+Carrao et al. (2018) show that seasonal SPI forecast skill depends on region,
+season, lead time, and SPI accumulation period, and that skill should be judged
+against climatological benchmarks. This supports our decision to treat positive
+seasonal rows as conditional evidence, not as broad proof of skill.
+
+Su et al. (2023) directly strengthens our western-U.S. predictability argument:
+SubX-driven drought onset and termination skill is usable mainly at weeks 1-2,
+limited by week 3, and mostly absent by week 4 for many drought severities. A
+monthly SPI-1 lead-1 target is therefore expected to be difficult.
+
+### Memory, Target Choice, and Physical Predictability
+
+Sutanto and Van Lanen (2022) show that hydrological drought forecasts outperform
+meteorological ones where catchment memory is strong. This is important because
+our main target, SPI-1, has little physical memory and depends on next-month
+precipitation. It supports a stronger future hypothesis: skill is more likely
+for memory-bearing targets such as root-zone soil moisture, streamflow drought,
+SPI-6/SPI-12, or event duration/recovery than for SPI-1 dry fraction.
+
+Lesinger and Tian (2025) show a successful modern direction: recursive deep
+learning plus dynamic-model forecasts can skillfully predict root-zone soil
+moisture drought at subseasonal leads. The key inputs are antecedent root-zone
+soil moisture and dynamic-model forecast information. This does not suggest
+that a bigger neural net on CHIRPS lags will solve our current problem; it
+suggests a target/input pivot if we want a positive forecast model.
+
+Lesinger et al. (2024) similarly supports using land-surface variables and
+dynamic forecast inputs. Their SubX flash-drought study shows that evaporative
+demand, soil moisture, and flash-drought predictability degrade with lead and
+vary by target.
+
+### Machine Learning Drought Forecasting
+
+Hwang et al. (2019), SubseasonalClimateUSA, DroughtSet, and DroughtCast all
+point in the same direction: successful ML forecast papers generally use richer
+inputs than lagged precipitation alone, including dynamic forecasts, soil
+moisture, temperature, humidity/VPD, remote sensing, static geography, and
+explicit benchmark comparisons. This supports our current limitation statement:
+the project is not underpowered because it lacks yet another architecture; it is
+limited because the canonical target/input combination is low-information.
+
+The 2025 ML drought review by Osman et al. reinforces three reviewer-relevant
+gaps: input-variable choice, lead-time dependence, and regional transferability.
+Our project now addresses regional transferability and lead-time sensitivity
+better than many ML-only drought papers, but it still lacks a fully developed
+forecast-informed land-surface benchmark.
+
+### SHAP, Regionalization, and Uncertainty
+
+Ozupek et al. (2025) supports using SHAP/LIME for drought interpretability, but
+also warns indirectly that lagged drought-index terms often dominate. Our SHAP
+results should therefore be presented as model-behavior diagnostics and checked
+against ablations, not as causal attribution.
+
+Molosiwa et al. (2026) is the closest methodological support for our CHIRPS
+SPI-12 regionalization path. It justifies using long-term CHIRPS SPI,
+homogeneous drought zones, run-theory summaries, and teleconnection diagnostics.
+For our paper, regionalization is strongest as mechanism evidence explaining
+where teleconnection signal exists and why it often fails to become SPI-1 skill.
+
+Schreck et al. (2024) shows evidential deep learning can be useful in
+Earth-system applications when uncertainty is evaluated with calibration and
+error-association diagnostics. Shen et al. (2024) provides the caution: EDL
+uncertainty can be unreliable without rigorous validation. Therefore EDL should
+not become a central claim unless we compare it against simpler calibrated
+probability and ensemble baselines.
+
+## Strengthened Hypothesis Options
+
+### Primary Manuscript Hypothesis
+
+Strict evaluation reveals a predictable gap between apparent ML signal and
+robust calibrated drought probability skill. In lag-only meteorological SPI-1
+forecasting, ranking signal can exist without positive Brier skill once
+climatology, temporal blocking, calibration, masks, independent precipitation
+validation, and test-period uncertainty are enforced.
+
+This hypothesis is already well supported by the current project outputs.
+
+### Stronger Positive-Skill Hypothesis
+
+Drought predictability improves when the target and inputs contain physical
+memory and forecast information: root-zone soil moisture, streamflow drought,
+SPI-6/SPI-12, dynamic-model forecasts, and antecedent land-surface states should
+outperform CHIRPS-only SPI-1 in regions/seasons with stronger memory or
+teleconnection coupling.
+
+This is scientifically stronger if the goal is a positive forecast model, but it
+requires a clear pivot and additional data engineering.
+
+### Regionalization Hypothesis
+
+SPI-12 regionalization can identify teleconnection-sensitive drought regimes,
+but teleconnection sensitivity alone is insufficient for calibrated SPI-1
+forecast skill. Forecast skill requires target-scale alignment and event
+tracking, not only strong climate-index correlation.
+
+This is partially supported now and useful for discussion.
+
 
 ### Positioning Against Prior Work (What This Study Adds)
 
@@ -123,6 +282,43 @@ all-month anomaly benchmark.
 - **Secondary**: "Operational Forecast Inputs vs Lag-Only ML" — compare NMME/SubX precipitation forecasts to the lagged-observation ML benchmark
 - **Supporting**: "Regional Drought Teleconnections" — Step 3 regionalization standalone
 - **Most defensible next positive-skill direction**: if more operational work is needed, use full NMME ensemble/hindcast members or SubX rather than another lag-only ML architecture. Current NMME anomaly and probability checks remain uncertain.
+
+## Recommendation
+
+Do not add another standalone neural architecture now. The most valuable next
+step is one of these two paths:
+
+1. If the paper is framed as an evaluation/predictability audit, add a compact
+   evaluation-inflation experiment showing how pixel-level or leakage-prone
+   evaluation would overstate skill relative to the current monthly
+   leakage-free protocol. This would make the negative result more publishable.
+
+2. If the paper needs a stronger positive forecast component, pivot to a
+   forecast-informed memory target: SubX/GEFS/ECMWF/NMME predictors plus
+   root-zone soil moisture or SPI-6/SPI-12/event-transition targets. Use the
+   current CHIRPS SPI-1 results as the low-memory baseline.
+
+EDL, ConvLSTM tuning, and SHAP expansion are secondary. They should support the
+chosen research claim, not define it.
+
+## Citation Links to Carry Forward
+
+- CHIRPS v3: https://doi.org/10.1038/s41597-026-07096-4
+- CHIRPS SPI-12 regionalization analogue: https://doi.org/10.1007/s00704-026-06154-6
+- NMME probabilistic BSS/reliability: https://doi.org/10.1175/JCLI-D-14-00862.1
+- ECMWF S4 seasonal SPI forecasting: https://doi.org/10.3390/cli6020048
+- Western U.S. SubX drought skill: https://doi.org/10.1175/JHM-D-22-0103.1
+- SubX flash drought skill: https://doi.org/10.1175/JHM-D-23-0124.1
+- Catchment memory and drought forecast skill: https://doi.org/10.1038/s41598-022-06553-5
+- Hybrid DL-dynamic soil-moisture drought forecasts: https://doi.org/10.1038/s41467-025-62761-3
+- DroughtCast: https://doi.org/10.3389/fdata.2021.773478
+- Subseasonal ML western U.S.: https://arxiv.org/abs/1809.07394
+- SubseasonalClimateUSA: https://openreview.net/forum?id=pWkrU6raMt
+- DroughtSet: https://arxiv.org/abs/2412.15075
+- XAI drought forecasting: https://doi.org/10.1007/s00477-025-03007-y
+- EDL for Earth-system uncertainty: https://doi.org/10.48550/arXiv.2309.13207
+- EDL caution: https://doi.org/10.48550/arXiv.2402.06160
+- ML drought forecasting review: https://doi.org/10.1016/j.crm.2025.100758
 
 ## References
 

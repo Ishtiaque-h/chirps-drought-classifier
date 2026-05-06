@@ -3,6 +3,14 @@
 > **Comprehensive evaluation and strategic roadmap for the chirps-drought-classifier project**
 > Prepared as a combined ML scientist and peer-reviewer assessment.
 
+Current documentation map: [`docs/README.md`](docs/README.md). Manuscript-facing
+claims should be checked against `results/paper/` before being copied into a
+paper draft.
+
+Current narrative synthesis and literature-informed manuscript strategy:
+[`final_report.md`](final_report.md). Tracked related works and collected PDFs:
+[`literature/related_works_index.csv`](literature/related_works_index.csv).
+
 ---
 
 ## 1. Current State of the Project
