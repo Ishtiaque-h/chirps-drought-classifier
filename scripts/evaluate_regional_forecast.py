@@ -20,7 +20,6 @@ import numpy as np
 import pandas as pd
 import xgboost as xgb
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 from feature_config import get_feature_columns
 
 DATA    = Path("data/processed/dataset_forecast.parquet")

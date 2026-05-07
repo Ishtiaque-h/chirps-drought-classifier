@@ -1,15 +1,16 @@
 #!/usr/bin/env python
 """
-Download ERA5-Land monthly volumetric soil water layers for Central Valley.
+Download ERA5-Land monthly volumetric soil water layers for a configured region.
 
 This supports isolated soil-moisture feature experiments without changing the
 canonical CHIRPS/SPI forecast pipeline.
 
 Output:
-  data/processed/era5_land_soil_moisture_monthly_cvalley_<START_YEAR>_<CURRENT_YEAR>.nc
+  data/processed/era5_land_soil_moisture_monthly_<region>_<START_YEAR>_<CURRENT_YEAR>.nc
 """
 from __future__ import annotations
 
+from argparse import ArgumentParser, Namespace
 from datetime import datetime, timezone
 from pathlib import Path
 import glob
@@ -21,19 +22,42 @@ import cdsapi
 import pandas as pd
 import xarray as xr
 
+from region_config import resolve_region
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = PROJECT_ROOT / "data" / "processed"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 START_YEAR = 1991
-AREA_BBOX = [40.6, -122.5, 35.4, -119.0]  # N, W, S, E
 VARIABLES = [
     "volumetric_soil_water_layer_1",
     "volumetric_soil_water_layer_2",
     "volumetric_soil_water_layer_3",
     "volumetric_soil_water_layer_4",
 ]
+
+
+def parse_args() -> Namespace:
+    parser = ArgumentParser(description=__doc__)
+    parser.add_argument("--region", default="cvalley")
+    parser.add_argument("--start-year", type=int, default=START_YEAR)
+    parser.add_argument(
+        "--end-year",
+        type=int,
+        default=None,
+        help=(
+            "Final year to download. Defaults to the current available ERA5-Land year. "
+            "Use 2025 to avoid current-year ERA5T access restrictions."
+        ),
+    )
+    parser.add_argument(
+        "--out-file",
+        type=Path,
+        default=None,
+        help="Defaults to data/processed/era5_land_soil_moisture_monthly_<region>_<start>_<current>.nc.",
+    )
+    return parser.parse_args()
 
 
 def get_current_year_and_available_months() -> tuple[int, list[str]]:
@@ -82,6 +106,7 @@ def download_request(
     years: list[str],
     months: list[str],
     out_path: Path,
+    area_bbox: list[float],
 ) -> None:
     if not years or not months:
         return
@@ -94,44 +119,59 @@ def download_request(
             "year": years,
             "month": months,
             "time": "00:00",
-            "area": AREA_BBOX,
-            "format": "netcdf",
+            "area": area_bbox,
+            "data_format": "netcdf",
         },
         str(out_path),
     )
 
 
 def main() -> None:
+    args = parse_args()
+    region = resolve_region(args.region)
+    area_bbox = [region.lat_max, region.lon_min, region.lat_min, region.lon_max]  # N, W, S, E
     current_year, current_year_months = get_current_year_and_available_months()
-    historical_years = [str(y) for y in range(START_YEAR, current_year)]
+    end_year = args.end_year or current_year
+    if end_year > current_year:
+        raise ValueError(f"--end-year {end_year} is in the future relative to current year {current_year}.")
+    historical_last_year = min(end_year, current_year - 1)
+    historical_years = [str(y) for y in range(args.start_year, historical_last_year + 1)]
+    include_current_year = end_year >= current_year
     all_months = [f"{m:02d}" for m in range(1, 13)]
 
-    payload_hist = DATA_DIR / f"era5_land_soil_moisture_monthly_cvalley_{START_YEAR}_{current_year - 1}.zip"
-    payload_curr = DATA_DIR / f"era5_land_soil_moisture_monthly_cvalley_{current_year}.zip"
-    target_file = DATA_DIR / f"era5_land_soil_moisture_monthly_cvalley_{START_YEAR}_{current_year}.nc"
+    payload_hist = DATA_DIR / f"era5_land_soil_moisture_monthly_{region.slug}_{args.start_year}_{historical_last_year}.zip"
+    payload_curr = DATA_DIR / f"era5_land_soil_moisture_monthly_{region.slug}_{current_year}.zip"
+    target_file = args.out_file or (
+        DATA_DIR / f"era5_land_soil_moisture_monthly_{region.slug}_{args.start_year}_{end_year}.nc"
+    )
 
-    temp_hist = DATA_DIR / f"temp_era5_soil_{START_YEAR}_{current_year - 1}"
-    temp_curr = DATA_DIR / f"temp_era5_soil_{current_year}"
+    temp_hist = DATA_DIR / f"temp_era5_soil_{region.slug}_{args.start_year}_{historical_last_year}"
+    temp_curr = DATA_DIR / f"temp_era5_soil_{region.slug}_{current_year}"
 
     extracted_files: list[str] = []
     client = cdsapi.Client()
 
     print("Starting ERA5-Land soil-moisture downloads from Copernicus CDS...")
+    print(f"Region: {region.slug} ({region.name})")
+    print(f"Area bbox [N, W, S, E]: {area_bbox}")
     print(f"Variables: {VARIABLES}")
-    print(f"Project start year: {START_YEAR}")
+    print(f"Project start year: {args.start_year}")
+    print(f"Requested end year: {end_year}")
     print(f"Current year: {current_year}")
     print(f"Current-year available months: {current_year_months or 'none yet'}")
 
     try:
         if historical_years:
-            print(f"Downloading historical ERA5-Land soil moisture: {START_YEAR} to {current_year - 1}")
-            download_request(client, historical_years, all_months, payload_hist)
+            print(f"Downloading historical ERA5-Land soil moisture: {args.start_year} to {current_year - 1}")
+            download_request(client, historical_years, all_months, payload_hist, area_bbox)
             extracted_files.extend(extracted_or_plain_netcdfs(payload_hist, temp_hist))
 
-        if current_year_months:
+        if include_current_year and current_year_months:
             print(f"Downloading current-year ERA5-Land soil months: {current_year_months}")
-            download_request(client, [str(current_year)], current_year_months, payload_curr)
+            download_request(client, [str(current_year)], current_year_months, payload_curr, area_bbox)
             extracted_files.extend(extracted_or_plain_netcdfs(payload_curr, temp_curr))
+        elif include_current_year:
+            print("No current-year monthly means appear available yet.")
 
         if not extracted_files:
             raise RuntimeError("No NetCDF files were produced by CDS downloads.")
