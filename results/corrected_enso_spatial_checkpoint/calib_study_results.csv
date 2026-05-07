@@ -1,3 +1,0 @@
-model,best_calibration,val_BS_selected,test_BS,test_BSS,reliability,resolution,uncertainty,test_BS_95CI,test_BSS_95CI,p_vs_clim,p_vs_XGB
-XGB,isotonic,0.05857,0.06839,-0.06395,0.007,0.00984,0.071,"[0.0341, 0.1080]","[-0.2165, 0.0492]",0.257,
-XGB-Spatial,isotonic,0.06056,0.06394,0.00525,0.00414,0.00998,0.071,"[0.0314, 0.1027]","[-0.0622, 0.0733]",0.881,0.097
