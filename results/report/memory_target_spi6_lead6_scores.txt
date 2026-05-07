@@ -1,0 +1,26 @@
+Memory Target Experiment: SPI-6 Lead-6
+========================================================================
+Design: features at t predict leakage-safe memory target at t+lead.
+Primary question: does adding ERA5-Land soil-memory improve calibrated BSS?
+
+Feature sets:
+  lag_climate: 12 features
+    ['spi1_lag1', 'spi1_lag2', 'spi1_lag3', 'spi3_lag1', 'spi6_lag1', 'pr_lag1', 'pr_lag2', 'pr_lag3', 'month_sin', 'month_cos', 'nino34_lag1', 'nino34_lag2']
+  soil_memory: 20 features
+    ['spi1_lag1', 'spi1_lag2', 'spi1_lag3', 'spi3_lag1', 'spi6_lag1', 'pr_lag1', 'pr_lag2', 'pr_lag3', 'month_sin', 'month_cos', 'nino34_lag1', 'nino34_lag2', 'swvl1_anom_lag1', 'swvl1_anom_lag2', 'swvl2_anom_lag1', 'swvl2_anom_lag2', 'swvl3_anom_lag1', 'swvl3_anom_lag2', 'rootzone_sm_anom_lag1', 'rootzone_sm_anom_lag2']
+
+CPC NMME coverage audit:
+  CPC NMME probability: targets 2019-07 to 2026-02; train=0, val=15, test=49; no overlap with 1991-2016 training period; use as external benchmark unless hindcasts are added
+  CPC NMME anomaly: targets 2018-10 to 2026-03; train=0, val=27, test=62; no overlap with 1991-2016 training period; use as external benchmark unless hindcasts are added
+
+Selected/persistence rows:
+  lag_climate            XGBoost                          selected  n=62 BS=0.12192 BSS=+0.03964 95% CI [-0.02045, +0.08193] rho=+0.004 amp=0.076
+  soil_memory            XGBoost                          selected  n=62 BS=0.14696 BSS=-0.15761 95% CI [-0.40990, +0.01211] rho=-0.102 amp=0.314
+  external_operational   CPC NMME anomaly forecast        selected  n=62 BS=0.17061 BSS=-0.34393 95% CI [-1.18954, +0.10446] rho=+0.171 amp=0.636
+  external_operational   CPC NMME probability forecast    selected  n=49 BS=0.14676 BSS=-0.40863 95% CI [-1.76553, +0.16804] rho=+0.361 amp=0.612
+  lag_climate            target-consistent persistence    none      n=62 BS=0.24745 BSS=-0.94918 95% CI [-2.01879, -0.32917] rho=-0.163 amp=1.019
+  soil_memory            target-consistent persistence    none      n=62 BS=0.24745 BSS=-0.94918 95% CI [-2.01879, -0.32917] rho=-0.163 amp=1.019
+
+Outputs:
+  /Users/ishtisdream/chirps-drought-classifier/outputs/memory_target_spi6_lead6_summary.csv
+  /Users/ishtisdream/chirps-drought-classifier/outputs/memory_target_spi6_lead6_scores.txt

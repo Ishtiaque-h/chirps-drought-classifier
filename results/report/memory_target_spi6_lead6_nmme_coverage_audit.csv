@@ -1,0 +1,3 @@
+source,forecast_csv,available,first_target,last_target,train_months,validation_months,test_months,strict_split_training_usable,interpretation
+CPC NMME probability,results/report/nmme_cpc_prob_cvalley_lead6_forecast.csv,True,2019-07,2026-02,0,15,49,False,no overlap with 1991-2016 training period; use as external benchmark unless hindcasts are added
+CPC NMME anomaly,results/report/nmme_cpc_cvalley_lead6_forecast.csv,True,2018-10,2026-03,0,27,62,False,no overlap with 1991-2016 training period; use as external benchmark unless hindcasts are added

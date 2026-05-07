@@ -1,0 +1,34 @@
+Forecast-Informed Land-Surface Benchmark
+====================================================================
+Design: CFSv2 monthly forecast soil moisture mapped to ERA5-Land root-zone dry-fraction probability.
+Region: Mediterranean Spain bounding box (mediterranean_spain)
+Lead: 1 month(s)
+Observed target: ERA5-Land root-zone soil moisture dry fraction, q=0.20 thresholds from 1991-2016 by calendar month and grid cell.
+Forecast source: NOAA NCEI THREDDS CFSv2 monthly means, flxf soilw, first-meter approximation from the first three soil layers.
+Run hours: 0 6 12 18 UTC on latest available init day
+Validation months: 46 (2017-01 to 2020-11)
+Test months: 39 (2021-01 to 2025-09)
+Validation BS by method: {'cfsv2_raw_isotonic': 0.034307054635589675, 'cfsv2_anom_isotonic': 0.019118472848100487, 'persistence_raw': 0.021240166094330774, 'persistence_isotonic': 0.01522276659045173}
+Selected CFSv2 calibration: cfsv2_anom_isotonic
+Selected persistence calibration: persistence_isotonic
+Climatology BS: 0.04652
+Spearman corr(CFSv2 selected prob, observed dry fraction): 0.497
+Spearman corr(CFSv2 raw dry signal, observed dry fraction): 0.608
+Spearman corr(CFSv2 anomaly dry signal, observed dry fraction): 0.520
+Spearman corr(persistence selected prob, observed dry fraction): 0.618
+CFSv2 selected probability amplitude ratio: 1.014
+Persistence selected probability amplitude ratio: 0.836
+
+Monthly dry-fraction Brier Skill Score vs climatology:
+  cfsv2_raw_isotonic                 BS=0.04467 BSS=0.03973 95% CI [-0.52679, 0.39201]
+  cfsv2_anom_isotonic                BS=0.05307 BSS=-0.14070 95% CI [-1.40829, 0.44228]
+  cfsv2_selected                     BS=0.05307 BSS=-0.14070 95% CI [-1.37471, 0.43835]
+  persistence_raw                    BS=0.05032 BSS=-0.08168 95% CI [-1.23107, 0.58847]
+  persistence_isotonic               BS=0.04423 BSS=0.04936 95% CI [-0.88740, 0.59645]
+  persistence_selected               BS=0.04423 BSS=0.04936 95% CI [-0.89708, 0.57650]
+
+CFSv2 selected skill against same-target persistence references:
+  vs persistence_raw      : -0.05457
+  vs persistence_selected : -0.19993
+
+Monthly scores: /Users/ishtisdream/chirps-drought-classifier/outputs/landsurface_cfsv2_rzsm_mediterranean_spain_lead1_allcycles_monthly_scores.csv

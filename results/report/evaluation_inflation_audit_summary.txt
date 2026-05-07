@@ -1,0 +1,16 @@
+Evaluation Inflation Audit
+========================================================================
+Invalid rows are methodological stress tests, not candidate forecasts.
+
+overlap_spi3_lead1             monthly invalid_overlapping_target     BSS=+0.6739 95% CI [+0.4070, +0.8205] n=57 cal=isotonic status=invalid_protocol
+overlap_spi3_lead1             pixel   invalid_overlapping_target     BSS=+0.4997 95% CI [+0.4968, +0.5025] n=388,484 cal=isotonic status=invalid_pixel_inference
+random_spi1_rows               monthly invalid_random_row_split       BSS=+0.9952 95% CI [+0.9933, +0.9965] n=417 cal=isotonic status=invalid_protocol
+random_spi1_rows               pixel   invalid_random_row_split       BSS=+0.6486 95% CI [+0.6454, +0.6518] n=426,310 cal=isotonic status=invalid_pixel_inference
+strict_spi1_chrono             monthly valid_primary_protocol         BSS=-0.0227 95% CI [-0.1174, +0.0730] n=63 cal=isotonic status=not_distinguishable_from_climatology
+strict_spi1_chrono             pixel   valid_primary_protocol         BSS=-0.0187 95% CI [-0.0198, -0.0177] n=429,378 cal=isotonic status=invalid_pixel_inference
+strict_spi3_lead3              monthly valid_target_aligned_control   BSS=-0.0859 95% CI [-0.2554, +0.0462] n=59 cal=isotonic status=not_distinguishable_from_climatology
+strict_spi3_lead3              pixel   valid_target_aligned_control   BSS=-0.0461 95% CI [-0.0473, -0.0449] n=402,116 cal=isotonic status=invalid_pixel_inference
+
+Outputs:
+  outputs/evaluation_inflation_audit.csv
+  outputs/evaluation_inflation_audit_monthly_scores.csv
