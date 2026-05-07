@@ -1,9 +1,9 @@
 # Final Report: CHIRPS Drought Forecasting Project (Working Draft)
 
-Last updated: 2026-05-05
+Last updated: 2026-05-06
 
 This report is the narrative synthesis for manuscript planning. The numerical
-source of truth remains the generated CSV tables in `results/paper/` and
+source of truth remains the generated CSV tables in `results/report/paper/` and
 `results/report/`; regenerate those before changing any quantitative claim.
 
 ## Current Research Position
@@ -17,7 +17,11 @@ skillful drought forecaster. The defensible claim is:
 > climatology for 1-month-ahead meteorological SPI-1. The result persists under
 > corrected climate indices, source-cited regional masks, temporal robustness
 > checks, independent PRISM validation, seasonal target experiments, and
-> operational NMME comparisons.
+> operational NMME/CFSv2 precipitation comparisons. A separate forecast-informed
+> CFSv2 root-zone soil-moisture benchmark is robustly positive in Central
+> Valley, but regional replication is mixed and same-target persistence can be
+> stronger. This suggests target reframing toward land-surface drought is
+> promising, but not yet a broad CFSv2 added-value claim.
 
 This is scientifically useful if framed as a predictability and evaluation
 audit. It is weak if framed as a new high-performing ML model.
@@ -39,6 +43,28 @@ audit. It is weak if framed as a new high-performing ML model.
   `0.104`).
 - Operational benchmark: CPC NMME probability and anomaly rows produce positive
   point estimates in some cases, but all current CIs cross zero.
+- Forecast-informed land-surface benchmark: Central Valley CFSv2 RZSM remains
+  robustly positive under strict four-cycle aggregation (`BSS = +0.511`, CI
+  `[+0.292, +0.676]`), but it does not beat raw persistence on point BS.
+  Southern Great Plains CFSv2 is positive but uncertain (`+0.413`, CI crosses
+  zero) and weaker than persistence; Mediterranean Spain is below climatology
+  (`-0.141`).
+- Memory-target checkpoint: Central Valley SPI-6 lead-6 lag/climate XGBoost has
+  a positive but uncertain selected point estimate (`BSS = +0.040`, CI
+  `[-0.020, +0.082]`), but it has essentially no monthly event tracking
+  (`r = 0.004`, amplitude ratio `0.076`). Adding ERA5-Land soil-memory lags
+  worsens selected BSS to `-0.158`, despite soil variables dominating gain.
+- CPC NMME real-time products cannot yet be used as trained ML features under
+  the strict split: SPI-6 lead-6 probability coverage starts at target
+  2019-07 and anomaly coverage at 2018-10, leaving zero overlap with the
+  1991-2016 training period. They remain external benchmarks unless hindcasts
+  are added.
+- Evaluation-inflation audit: the strict chronological monthly SPI-1 audit row
+  stays near climatology (`BSS = -0.023`, CI `[-0.117, +0.073]`), while
+  invalid shortcuts look highly skillful: random row split monthly `BSS =
+  +0.995`, and overlapping SPI-3 lead-1 monthly `BSS = +0.674`. Pixel-level
+  inference also produces artificially tiny intervals because it treats
+  hundreds of thousands of spatially autocorrelated pixels as independent.
 - Regionalization: SPI-12 zones reveal strong teleconnection signals in some
   regions, but those mechanisms do not reliably become calibrated SPI-1
   forecast skill.
@@ -66,15 +92,19 @@ audit. It is weak if framed as a new high-performing ML model.
 
 The collected related-work index is
 `literature/related_works_index.csv`. Local PDFs are stored under
-`literature/papers/` when command-line download was allowed. NOAA, MDPI, and
-ScienceDirect direct PDF downloads blocked local requests for several papers,
-but their full-text source pages remain linked in the index.
+`literature/papers/` 
+For a paper-by-paper support map and implementable next hypotheses, see
+`literature/literature_synthesis_memo.md`. For the protocol-comparability
+audit requested before finalizing the manuscript claim, see
+`literature/literature_protocol_audit.csv` and
+`literature/literature_protocol_audit.md`.
 
 ### Forecast Verification and Operational Baselines
 
 Becker and van den Dool (2016) provide the appropriate NMME probability-forecast
 benchmarking frame: Brier skill, reliability, and resolution should be assessed
-against cross-validated climatology. This validates our use of BSS and
+against cross-validated climatology, and the Brier score admits the standard
+reliability/resolution decomposition. This validates our use of BSS and
 reliability-oriented calibration checks for CPC NMME probability products.
 
 Carrao et al. (2018) show that seasonal SPI forecast skill depends on region,
@@ -85,7 +115,9 @@ seasonal rows as conditional evidence, not as broad proof of skill.
 Su et al. (2023) directly strengthens our western-U.S. predictability argument:
 SubX-driven drought onset and termination skill is usable mainly at weeks 1-2,
 limited by week 3, and mostly absent by week 4 for many drought severities. A
-monthly SPI-1 lead-1 target is therefore expected to be difficult.
+monthly SPI-1 lead-1 target is therefore expected to be difficult. Importantly,
+their evaluation is explicitly probabilistic (including debiased Brier skill
+score), aligning with our BSS-first framing.
 
 ### Memory, Target Choice, and Physical Predictability
 
@@ -106,7 +138,16 @@ suggests a target/input pivot if we want a positive forecast model.
 Lesinger et al. (2024) similarly supports using land-surface variables and
 dynamic forecast inputs. Their SubX flash-drought study shows that evaporative
 demand, soil moisture, and flash-drought predictability degrade with lead and
-vary by target.
+vary by target; in their abstract, lead week-1 forcing-variable ACC is moderate
+to high (~0.70–0.95), but by weeks 3–4 predictability is low for all forcing
+variables (ACC < 0.5).
+
+Malloy and Kirtman (2023) strengthens the timescale-mismatch framing for
+teleconnections: they find the lag between BSISO-related circulation anomalies
+and Great Plains rainfall anomalies is about 2 weeks, and explicitly describe
+this as a subseasonal “forecast of opportunity.” This supports our caution that
+teleconnection signal can be real but episodic and not automatically transferrable
+to stable 1-month-ahead SPI-1 probability skill.
 
 ### Machine Learning Drought Forecasting
 
@@ -121,8 +162,19 @@ limited because the canonical target/input combination is low-information.
 The 2025 ML drought review by Osman et al. reinforces three reviewer-relevant
 gaps: input-variable choice, lead-time dependence, and regional transferability.
 Our project now addresses regional transferability and lead-time sensitivity
-better than many ML-only drought papers, but it still lacks a fully developed
-forecast-informed land-surface benchmark.
+better than many ML-only drought papers, includes NOAA NCEI CFSv2
+forecast-informed precipitation benchmarks, and now adds the more relevant
+land-surface benchmark implied by recent root-zone soil-moisture work. The
+remaining limitation is not simple replication anymore: the four-cycle and
+added-region checks show mixed CFSv2 added value and strong persistence.
+
+The protocol audit adds an important guardrail: prior positive studies should
+not be dismissed as leaky unless their methods are audited in detail. Many are
+simply different tasks. CHIRPS/SPI studies often target annual SPI-12 or
+multi-month SPI regression, while operational and modern ML studies use
+dynamic forecasts, land-surface states, remote sensing, benchmark datasets, or
+deterministic metrics. The manuscript should therefore compare protocols rather
+than claim the broader literature is invalid.
 
 ### SHAP, Regionalization, and Uncertainty
 
@@ -182,8 +234,8 @@ This is partially supported now and useful for discussion.
 The literature supports three core points that make this study publishable if stated clearly:
 
 1. **Subseasonal limits are real.** Subseasonal drought skill drops after weeks 3-4 in multiple regions, which is consistent with the weak 1-month-ahead skill we observe here (Su et al., 2023; Masukwedza et al., 2025). This frames the result as an expected physical limit rather than a model failure.
-2. **Most studies emphasize monitoring, not forecast skill.** Many CHIRPS-based drought papers focus on multi-index monitoring, SPI/SPEI trends, and regionalization (Funk et al., 2015; Funk et al., 2026; WMO SPI guide). Our work turns that monitoring foundation into a leakage-safe forecast test and shows where predictability breaks.
-3. **Reliability and uncertainty matter more than point accuracy.** Reviews emphasize probabilistic calibration and uncertainty quantification, but they rarely show that improved reliability does not automatically yield positive skill (AghaKouchak et al., 2023; Klotz et al., 2022; Xu et al., 2022). We explicitly separate ranking skill from calibrated probability skill and show that calibration cannot create resolution where the signal is weak.
+2. **Protocol comparability matters.** The literature audit shows that prior positive drought-ML studies often differ in target accumulation scale, lead time, input information, split design, metric, and baseline. Our work tests a narrower hard case rather than refuting CHIRPS/SPI drought forecasting in general.
+3. **Reliability and uncertainty matter more than point accuracy.** Reviews emphasize probabilistic calibration and uncertainty quantification, but our results show that improved reliability does not automatically yield positive skill. We explicitly separate ranking skill from calibrated probability skill and show that calibration cannot create resolution where the signal is weak.
 
 In short, this project is positioned as a **predictability audit**: it tests whether ML adds reliable probability skill over climatology under leakage-safe targets, monthly-level inference, and source-cited regional masks. That methodological framing is the scientific claim, not a particular model’s accuracy.
 
@@ -201,12 +253,18 @@ The compiled mechanism table now shows strong SPI-12 teleconnection structure in
 ## Comprehensive ML Assessment: Project State & Predictability Barriers
 
 ### Overview
-The May 2026 reproducibility checkpoint includes the canonical Central Valley benchmark, calibration study, EDL uncertainty experiment, feature-extension experiments, leakage-safe seasonal targets, five-region geometry-sensitive evaluation, temporal robustness audit, PRISM validation, operational benchmark, and SPI-12 regionalization diagnostics. The current manuscript-facing source of truth is `results/paper/`, generated by `scripts/build_paper_evidence_pack.py`; the canonical monthly SPI-1 source table remains `results/report/master_results_headline.csv`. The critical finding is: **no canonical monthly SPI-1 experiment produces robust positive BSS over climatology**. The separate seasonal regional audit has one robust-positive SPI-6 row, but the diagnostic table shows it is mainly a calibration-shift result rather than temporal event tracking.
+The May 2026 reproducibility checkpoint includes the canonical Central Valley benchmark, calibration study, EDL uncertainty experiment, feature-extension experiments, leakage-safe seasonal targets, five-region geometry-sensitive evaluation, temporal robustness audit, PRISM validation, operational precipitation benchmarks, a forecast-informed land-surface benchmark, and SPI-12 regionalization diagnostics. The current manuscript-facing source of truth is `results/report/paper/`, generated by `scripts/generate_manuscript_results.py`; the canonical monthly SPI-1 source table remains `results/report/master_results_headline.csv`. The critical finding is: **no canonical monthly SPI-1 experiment produces robust positive BSS over climatology**. The new positive result is different and narrower: land-surface root-zone dry fraction is predictable, but the current CFSv2 monthly-mean extraction does not establish added value over persistence.
 
 ### Performance Hierarchy (Monthly Brier Skill Score vs Climatology)
 
 | Model | Test Set | BSS | Key Finding |
 |-------|----------|-----|------------|
+| CFSv2 RZSM anomaly selected | 42 mo | **+0.630** | Robust positive land-surface target result; not a precipitation-SPI claim |
+| CFSv2 RZSM four-cycle selected | 39 mo | **+0.511** | Central Valley all-cycle replication remains robust positive |
+| Southern Great Plains RZSM persistence raw | 39 mo | **+0.695** | Strongest land-surface row; persistence dominates CFSv2 |
+| Southern Great Plains CFSv2 RZSM four-cycle | 39 mo | **+0.413** | Positive but uncertain; worse than persistence |
+| Mediterranean Spain CFSv2 RZSM four-cycle | 39 mo | -0.141 | Added-region non-replication |
+| ERA5-Land RZSM persistence raw | 42 mo | **+0.537** | Strong same-target memory baseline, but CI crosses zero |
 | CPC NMME SPI-1 lead-1 probability + isotonic | 52 mo | **+0.131** | Largest operational point estimate, but partial coverage and CI crosses zero |
 | CPC NMME SPI-3 lead-3 precipitation anomaly | 59 mo | **+0.086** | Strongest forecast-informed hint, but CI crosses zero |
 | Mediterranean Spain SPI-6 lead-6 Niño3.4-only | 62 mo | **+0.078** | Robust BSS, but audit flags calibration shift (`r = 0.041`, low variance), not event tracking |
@@ -216,6 +274,7 @@ The May 2026 reproducibility checkpoint includes the canonical Central Valley be
 | Southern Great Plains ecoregion mask | 63 mo | **+0.010** | Positive regional hint, but CI crosses zero |
 | XGB-Spatial + isotonic calibration | 63 mo | **+0.005** | Best Central Valley probability checkpoint, but CI crosses zero |
 | CPC NMME lead-1 precipitation anomaly | 63 mo | **+0.002** | Operational benchmark is also tied with climatology; CI crosses zero |
+| NCEI CFSv2 SPI-3 lead-3 raw accumulated precipitation | 55 mo | -0.030 | True lead-window CFSv2 precipitation benchmark; near climatology, CI crosses zero |
 | Random Forest raw | 63 mo | -0.068 | Strongest raw Central Valley Brier score among classical models |
 | XGBoost-Spatial raw | 63 mo | -0.115 | Strong ranking signal, weak calibrated probability skill |
 | EDL MLP selected | 63 mo | -0.116 | Uncertainty experiment underperforms climatology |
@@ -244,26 +303,41 @@ EDL decomposition shows high uncertainty, but the current EDL result should be f
 
 ### Operational Benchmark Path
 
-The operational comparison now uses two CPC NMME real-time products: multi-model
-ensemble-mean precipitation anomalies and official below-normal precipitation
-probabilities. Both are scored against the same monthly dry-fraction
-climatology after optional validation-only calibration:
+The operational comparison now uses CPC NMME real-time products, official CPC
+below-normal precipitation probabilities, and a NOAA NCEI THREDDS CFSv2
+individual-run precipitation extraction. All are scored against the same
+monthly dry-fraction climatology after optional validation-only calibration:
 
 ```bash
-python scripts/build_nmme_cpc_forecast_csv.py --copy-report
+python scripts/prepare_cpc_nmme_precip_anomaly_inputs.py --copy-report
 python scripts/run_operational_precip_benchmark.py \
   --forecast-csv outputs/nmme_cpc_cvalley_lead1_forecast.csv \
   --copy-report
-python scripts/build_nmme_cpc_prob_forecast_csv.py \
+python scripts/prepare_cpc_nmme_precip_probability_inputs.py \
   --lead-months 3 \
   --dataset data/processed/dataset_seasonal_spi3_lead3.parquet \
   --out-file outputs/nmme_cpc_prob_cvalley_lead3_forecast.csv \
+  --copy-report
+python scripts/prepare_ncei_cfsv2_precip_forecast_inputs.py \
+  --target-spi 3 \
+  --lead-months 3 \
+  --run-hours 18 \
   --copy-report
 ```
 
 The anomaly NetCDF coverage starts at target month 2018-05, so calibration uses 32 validation months (2018-05 to 2020-12) and evaluation uses 63 test months (2021-01 to 2026-03). The selected isotonic NMME anomaly benchmark has `BSS = +0.002` with a confidence interval crossing zero. The raw NMME dry signal has modest rank correlation with observed monthly dry fraction (`Spearman ≈ 0.267`), but that signal does not translate into robust Brier skill. This is scientifically useful because it shows that even adding a real dynamical precipitation forecast input does not yet produce robust monthly dry-fraction probability skill in this Central Valley setup. SubX remains the corresponding subseasonal benchmark if the target is reframed around weeks 3-4.
 
 Seasonal NMME anomaly checkpoints add a more target-aligned operational test. They are produced with `--lead-months 3` / `--target-spi 3` and `--lead-months 6` / `--target-spi 6` using the seasonal datasets. SPI-3 lead-3 improves the point estimate (`BSS = +0.086`, CI crossing zero), while SPI-6 lead-6 is below climatology (`BSS = -0.344`, CI crossing zero). This is scientifically useful because it shows that forecast-informed precipitation helps most at the SPI-3 seasonal target, but still does not produce robust positive probability skill.
+
+The new NCEI CFSv2 extraction is stricter about lead-window alignment for
+SPI-3 lead-3: it accumulates individual-run CFSv2 precipitation over the full
+target SPI-3 window before scoring. The raw accumulated precipitation row is
+near climatology (`BSS = -0.030`, CI `[-0.166, +0.059]`), while the forecast
+anomaly row is worse (`BSS = -0.303`, CI `[-1.202, +0.200]`). This reduces the
+remaining operational-precipitation ambiguity: a true lead-window dynamical
+precipitation input still does not yield robust Central Valley SPI-3 probability
+skill. The NCEI 6-hour individual-run aggregation starts in 2016 and has about
+a five-month horizon, so it is not a complete SPI-6 lead-6 accumulation source.
 
 Official CPC probability checkpoints are a stronger probabilistic benchmark but
 do not change the conclusion. The selected SPI-1 lead-1 probability row has
@@ -276,12 +350,70 @@ benchmark also has missing Central Valley dry-season targets, so it is a
 partial-coverage operational comparison rather than a replacement for the
 all-month anomaly benchmark.
 
+The forecast-informed land-surface benchmark is the first robust positive
+operational-style result, but the replication changes the interpretation.
+`scripts/run_landsurface_forecast_benchmark.py` extracts NCEI CFSv2
+monthly-mean `flxf` soil-water forecasts, approximates 0-100 cm root-zone soil
+moisture from the first three CFSv2 soil layers, and verifies against an
+ERA5-Land root-zone soil-moisture dry-fraction target. The original Central
+Valley 18 UTC row has `BSS = +0.630`; the stricter four-cycle Central Valley
+replication remains robustly positive (`BSS = +0.511`, CI
+`[+0.292, +0.676]`). However, CFSv2 does not beat raw persistence on point BS
+in the four-cycle Central Valley subset, Southern Great Plains persistence is
+much stronger than CFSv2, and Mediterranean Spain does not replicate. This is
+best described as land-surface target predictability with uncertain added value
+from CFSv2 beyond persistence. The explicit added-value diagnostic in
+`results/report/paper/table09_landsurface_added_value.csv` confirms this:
+overall Central Valley CFSv2 is nearly tied with raw persistence (`delta BS =
++0.001`, CI crossing zero), Southern Great Plains persistence is robustly
+better (`delta BS = +0.020`, CI `[+0.003, +0.036]`), and Mediterranean Spain
+does not show CFSv2 skill over climatology or persistence.
+
+The first memory-target checkpoint is now complete. `scripts/run_memory_target_experiment.py`
+tests Central Valley SPI-6 lead-6 with lag/climate features and then with
+ERA5-Land soil-water/root-zone anomaly lags. Lag/climate XGBoost reaches a
+positive but uncertain selected BSS (`+0.040`, CI `[-0.020, +0.082]`), but the
+monthly Spearman correlation is near zero and the calibrated probability
+amplitude is strongly damped. Soil-memory features dominate gain but degrade
+the validation-selected test result (`BSS = -0.158`, CI `[-0.410, +0.012]`).
+This means the literature-informed hypothesis is only partially supported for
+lag-only targets: longer-memory SPI helps the Brier point estimate slightly,
+but observed soil-memory lags alone do not supply robust event-tracking
+forecast skill. The positive land-surface result needs dynamic forecast soil
+moisture, not just lagged ERA5-Land memory.
+
+The transition-target checkpoint is useful, but replication weakens it as a
+positive claim. `scripts/run_transition_target_experiment.py` derives SPI-1
+lead-1 onset and termination events from the existing forecast tables and now
+reports an eligible-pixel evaluation so current-state gating is not counted as
+forecast skill. The rectangular Central Valley onset run is small but
+robust-positive after eligible-only training (`BSS = +0.104`, CI
+`[+0.025, +0.167]`, monthly Spearman `0.402`). However, the signal does not
+survive the Central Valley basin mask (`BSS = -0.027`, CI crossing zero), is
+robustly negative in the Southern Great Plains basin mask (`BSS = -0.084`, CI
+`[-0.147, -0.016]`), and remains near climatology in Mediterranean Spain
+(`BSS = -0.035`, CI crossing zero). Termination also does not beat the
+eligible-state climatology (`BSS = -0.031`, CI crossing zero). This should
+therefore be treated as a target-design diagnostic, not a headline positive
+SPI result.
+
+The evaluation-inflation audit is now the strongest methodological support for
+the paper. `scripts/run_evaluation_inflation_audit.py` shows that invalid
+protocols can manufacture excellent-looking skill: random row splitting gives
+monthly `BSS = +0.995`, and an overlapping SPI-3 lead-1 target gives monthly
+`BSS = +0.674`. The valid strict SPI-1 monthly audit row remains tied with
+climatology (`BSS = -0.023`). This directly supports the manuscript framing:
+many drought-ML workflows can overstate predictability if they split spatial
+pixels randomly, score at pixel level, or let SPI accumulation windows overlap
+between features and targets.
+
 ### Paper Narrative Recommendations
 
 - **Primary** (Recommended): "Limits of Lag-Based ML for Monthly Drought Forecasting" — rigorous negative result and multi-region predictability audit
-- **Secondary**: "Operational Forecast Inputs vs Lag-Only ML" — compare NMME/SubX precipitation forecasts to the lagged-observation ML benchmark
+- **Secondary**: "Land-Surface Drought Predictability vs Persistence" — use CFSv2 root-zone soil-moisture forecasts and same-target persistence to show that target reframing can produce skill where precipitation SPI does not, while testing whether dynamic forecasts add value over land memory
+- **Exploratory target-design diagnostic**: "Drought-Onset Transitions" — rectangular Central Valley onset has a small positive checkpoint, but the signal does not survive basin/regional replication
 - **Supporting**: "Regional Drought Teleconnections" — Step 3 regionalization standalone
-- **Most defensible next positive-skill direction**: if more operational work is needed, use full NMME ensemble/hindcast members or SubX rather than another lag-only ML architecture. Current NMME anomaly and probability checks remain uncertain.
+- **Most defensible next positive-skill direction**: move to a richer hindcast/ensemble land-surface forecast archive if the paper needs a stronger positive component; the current CFSv2 monthly-mean extraction does not show robust added value over persistence.
 
 ## Recommendation
 
@@ -291,12 +423,14 @@ step is one of these two paths:
 1. If the paper is framed as an evaluation/predictability audit, add a compact
    evaluation-inflation experiment showing how pixel-level or leakage-prone
    evaluation would overstate skill relative to the current monthly
-   leakage-free protocol. This would make the negative result more publishable.
+   leakage-free protocol. This step is now complete and should become a central
+   methods/results table rather than another appendix-only diagnostic.
 
-2. If the paper needs a stronger positive forecast component, pivot to a
-   forecast-informed memory target: SubX/GEFS/ECMWF/NMME predictors plus
-   root-zone soil moisture or SPI-6/SPI-12/event-transition targets. Use the
-   current CHIRPS SPI-1 results as the low-memory baseline.
+2. If the paper needs a stronger positive forecast component, the next step is
+   not more regional replication of the same CFSv2 extraction. The completed
+   four-cycle and added-region checks show that persistence is a major baseline.
+   A fuller hindcast/ensemble or SubX/GEFS/ECMWF land-surface path is needed to
+   test dynamic added value beyond land memory.
 
 EDL, ConvLSTM tuning, and SHAP expansion are secondary. They should support the
 chosen research claim, not define it.

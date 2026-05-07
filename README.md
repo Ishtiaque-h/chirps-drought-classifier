@@ -20,7 +20,7 @@ Predicting drought 1 month ahead using only past precipitation is a hard problem
 ## Why This Matters
 
 - **Agricultural stakes are real.** Central Valley (35.4°–40.6°N, 122.5°–119.0°W) produces roughly 25% of the U.S. food supply; drought losses reach billions per year. [`[USGS]`](https://ca.water.usgs.gov/projects/central-valley/about-central-valley.html) One-month-ahead early warning enables pre-season irrigation scheduling and crop-stress mitigation.
-- **Most published drought ML overstates skill.** Label leakage through SPI accumulation windows, spatial pseudo-replication, and missing baselines inflate reported accuracy. This project eliminates all three — and shows what remains. 
+- **Drought-ML skill is often hard to compare across protocols.** SPI accumulation-window overlap, spatial pseudo-replication, and missing climatology baselines can inflate apparent skill. This project audits those risks directly and shows what remains under the strict monthly protocol.
 - **Negative results have scientific value.** Demonstrating a predictability ceiling with rigorous evidence helps the community redirect effort toward problems where ML *can* add value (e.g., seasonal horizons, exogenous climate drivers). Operational drought early-warning relies on understanding what is and isn't predictable.
 
 ---
@@ -80,7 +80,7 @@ the PRISM Climate Group at Oregon State University
 | `nino34_lag1/2` *(active corrected checkpoint)* | ENSO Niño3.4 monthly anomaly at feature month and previous month |
 | `pdo_lag1/2` *(optional, not active checkpoint)* | Pacific Decadal Oscillation state at feature month and previous month |
 
-**Leakage-free target design:** The target is `SPI-1[t+1]`, which depends *only* on `pr[t+1]` — unknown at prediction time. All features are derived from time *t* or earlier. There is **zero accumulation-window overlap** between features and target. This eliminates the data leakage present in SPI-3-based targets (where 2 of 3 accumulation months overlap with features).
+**Leakage-free target design:** The target is `SPI-1[t+1]`, which depends *only* on `pr[t+1]` — unknown at prediction time. All features are derived from time *t* or earlier. There is **zero accumulation-window overlap** between features and target. The evaluation-inflation audit separately shows how an overlapping SPI-3 lead-1 target can create apparent skill from shared accumulation months.
 
 By default the pipeline can run with endogenous CHIRPS-only features. The current corrected checkpoint uses Niño3.4 anomaly lags (`--climate-features nino34`) and excludes PDO because the NOAA PDO file has missing recent months after August 2025. Climate features remain leakage-safe because all model features are at time *t* or earlier.
 
@@ -124,15 +124,17 @@ All primary metrics are computed at the **monthly level** (63 independent test m
 Paper-ready summary tables are now generated from the current artifacts:
 
 ```bash
-python scripts/build_master_results_table.py
+python scripts/generate_master_results.py
 ```
 
 The consolidated outputs are
 [results/report/master_results_table.csv](results/report/master_results_table.csv)
 and the compact manuscript table
 [results/report/master_results_headline.csv](results/report/master_results_headline.csv).
-As of the current run, that table contains **no robust positive BSS result**:
-all positive point estimates have confidence intervals crossing zero.
+For the canonical SPI-1 precipitation target, the table contains **no robust
+positive BSS result**: all positive SPI point estimates have confidence
+intervals crossing zero. The separate CFSv2 root-zone soil-moisture benchmark
+is the first robust-positive land-surface target result and is reported below.
 
 ### Skill Scores (63 test months, monthly level)
 
@@ -150,7 +152,7 @@ Current corrected checkpoint: Niño3.4 anomaly lags + all tabular baselines retr
 | ConvLSTM *(corrected target)* | 0.0872 | −0.36 | 0.09 | 0.59 |
 
 > Raw BSS > 0 would mean the model beats climatology. No raw model crosses this threshold.
-> Post-hoc isotonic calibration brings XGBoost-Spatial to **BSS = +0.005** (95% CI [−0.062, +0.073]), which is statistically indistinguishable from climatology. Full intervals are in [results/report/forecast_skill_bss_hss_table.csv](results/report/forecast_skill_bss_hss_table.csv) and [results/report/calib_study_results.csv](results/report/calib_study_results.csv).
+> Post-hoc isotonic calibration brings XGBoost-Spatial to **BSS = +0.005** (95% CI [−0.062, +0.073]), which is statistically indistinguishable from climatology. Manuscript-facing intervals are consolidated in [results/report/paper/table02_headline_results.csv](results/report/paper/table02_headline_results.csv).
 
 - **XGBoost BSS = −0.27:** Corrected Niño3.4 anomalies help relative to the contaminated ENSO/PDO run, but do not beat climatology.
 - **XGBoost-Spatial raw BSS = −0.12:** Spatial neighborhood features improve over non-spatial XGBoost and raise ROC-AUC to 0.74.
@@ -199,10 +201,9 @@ lead-6 persistence baseline is now target-consistent (`spi6_lag1`, not the old
 SPI-3 proxy).
 
 The same runner now supports source-cited regional masks and climate-feature
-schemas, including the Horn of Africa country-mask caveat. The compiled table is
-[`results/seasonal/seasonal_regional_longlead_summary.csv`](results/seasonal/seasonal_regional_longlead_summary.csv),
-with a companion signal audit at
-[`results/seasonal/seasonal_regional_signal_audit.csv`](results/seasonal/seasonal_regional_signal_audit.csv).
+schemas, including the Horn of Africa country-mask caveat. The manuscript-facing
+seasonal audit is consolidated in
+[`results/report/paper/table05_seasonal_signal_audit.csv`](results/report/paper/table05_seasonal_signal_audit.csv).
 The only robust-positive regional seasonal row so far is Mediterranean Spain
 SPI-6 lead-6 with Niño3.4-only features (`BSS = +0.078`, 95% CI
 `[+0.004, +0.162]`), but the signal audit classifies it as a calibration-shift
@@ -250,9 +251,78 @@ but test-period monthly dry-probability correlation is near zero or negative.
 That is a strong overfitting warning: regional soil moisture does not add
 usable SPI-1 lead-1 probability skill in this setup.
 
+### Memory-Target Checkpoint
+
+Because the related literature suggests better skill for memory-bearing drought
+targets, the project now includes a Central Valley SPI-6 lead-6 checkpoint:
+
+```bash
+python scripts/run_memory_target_experiment.py --target-spi 6 --lead-months 6 --copy-report
+```
+
+| SPI-6 lead-6 checkpoint | Test months | BSS vs. climatology | 95% CI | Diagnostic |
+|---|---:|---:|---:|---|
+| Lag/climate XGBoost selected | 62 | +0.040 | [−0.020, +0.082] | `r = 0.004`, amplitude ratio `0.076` |
+| Soil-memory XGBoost selected | 62 | −0.158 | [−0.410, +0.012] | soil variables dominate gain but do not generalize |
+| CPC NMME anomaly selected | 62 | −0.344 | [−1.190, +0.104] | external benchmark only |
+| CPC NMME probability selected | 49 | −0.409 | [−1.766, +0.168] | partial coverage |
+| SPI-6 persistence | 62 | −0.949 | [−2.019, −0.329] | robustly worse than climatology |
+
+This is an important negative/suggestive result. Longer-memory SPI-6 improves
+the lag/climate point estimate, but the selected probabilities mostly track a
+calibration shift rather than month-to-month drought events. ERA5-Land
+soil-memory lags do not solve the problem. The NMME coverage audit also shows
+that the real-time CPC archive has zero overlap with the 1991-2016 training
+period, so a trained forecast-informed ML model needs hindcast or ensemble
+archives, not only the real-time files currently cached here.
+
+### Forecast-Informed Land-Surface Benchmark
+
+The strongest positive direction is now a separate land-surface target, not the
+canonical SPI-1 precipitation target. `scripts/run_landsurface_forecast_benchmark.py`
+verifies NOAA NCEI CFSv2 monthly-mean `flxf` soil-water forecasts against an
+ERA5-Land 0-100 cm root-zone soil-moisture dry-fraction target. Dry thresholds
+and climatology use the 1991-2016 train period; CFSv2 forecast signals are
+mapped to dry-fraction probability with validation-only isotonic calibration.
+
+```bash
+python scripts/run_landsurface_forecast_benchmark.py \
+  --start-target 2017-01 \
+  --copy-report
+
+python scripts/run_landsurface_forecast_benchmark.py \
+  --region cvalley \
+  --run-hours 0 6 12 18 \
+  --start-target 2017-01 \
+  --copy-report
+```
+
+| Land-surface checkpoint | Test months | BSS vs. climatology | 95% CI | Diagnostic |
+|---|---:|---:|---:|---|
+| Central Valley CFSv2 RZSM selected, 18 UTC | 42 | +0.630 | [+0.477, +0.762] | strongest CFSv2 row |
+| Central Valley CFSv2 RZSM selected, 4-cycle mean | 39 | +0.511 | [+0.292, +0.676] | strict all-cycle replication |
+| Central Valley RZSM persistence selected, 4-cycle months | 39 | +0.468 | [+0.264, +0.605] | persistence also robust |
+| Southern Great Plains CFSv2 RZSM selected, 4-cycle mean | 39 | +0.413 | [-0.010, +0.633] | positive but uncertain; worse than persistence |
+| Southern Great Plains RZSM persistence raw | 39 | +0.695 | [+0.414, +0.851] | strongest land-memory row |
+| Mediterranean Spain CFSv2 RZSM selected, 4-cycle mean | 39 | -0.141 | [-1.344, +0.468] | no replication |
+
+This is now a more nuanced result. Root-zone soil-moisture dry fraction is much
+more predictable than SPI-1 in some regions, and CFSv2 RZSM remains robustly
+positive in Central Valley after the four-cycle replication. But the added
+regions show mixed CFSv2 value: Southern Great Plains is dominated by
+persistence, and Mediterranean Spain does not replicate. The defensible claim is
+therefore target reframing toward land-surface drought, not broad CFSv2 added
+value, precipitation SPI skill, all leads, all regions, or deployment readiness.
+The explicit added-value diagnostic is saved at
+[`results/report/paper/table09_landsurface_added_value.csv`](results/report/paper/table09_landsurface_added_value.csv);
+it shows no robust overall CFSv2 improvement over raw persistence, and Southern
+Great Plains persistence is robustly better.
+Detailed coverage-gap files are generated locally under `results/report/` when
+the benchmark is rerun.
+
 ### Regional Forecast Evaluation
 
-Beyond pixel-level skill, we evaluate the model's ability to predict the **dominant drought class at the Central Valley scale**. For each month, we compute the fraction of pixels predicted as dry/normal/wet and compare the dominant class to observations. See [results/regional/](results/regional/) for dominant-class accuracy and class fraction time series.
+Beyond pixel-level skill, we evaluate the model's ability to predict the **dominant drought class at the Central Valley scale**. For each month, we compute the fraction of pixels predicted as dry/normal/wet and compare the dominant class to observations. These local diagnostic outputs are generated under `results/regional/`; the manuscript-facing conclusions are consolidated in `results/report/paper/`.
 
 ### Multi-Region Evaluation Path
 
@@ -282,8 +352,10 @@ The runner clips CHIRPS, computes region-specific SPI, builds the same
 SPI-1[t+1] forecast table, and evaluates monthly dry-fraction BSS. Parallel SPI
 fitting is available through `--spi-n-jobs`; `--grid-stride` is available only
 for smoke tests and should not be treated as a scientific result.
-The compact comparison table is saved at
-[results/multiregion/regional_mechanism_summary.csv](results/multiregion/regional_mechanism_summary.csv).
+The manuscript-facing multi-region and mechanism evidence is consolidated in
+[`results/report/paper/table02_headline_results.csv`](results/report/paper/table02_headline_results.csv),
+[`results/report/paper/table03_mask_methods.csv`](results/report/paper/table03_mask_methods.csv),
+and [`results/report/paper/table06_regionalization_mechanism.csv`](results/report/paper/table06_regionalization_mechanism.csv).
 The mask audits and reproducible mechanism analysis are:
 
 ```bash
@@ -294,8 +366,7 @@ python scripts/analyze_multiregion_mechanisms.py
 
 They write the region-mask diagnostics, BSS comparison, monthly dry-fraction
 traces, signal-vs-skill scatter, feature-group gain summary, and a short
-interpretation report under
-[results/multiregion/](results/multiregion/).
+interpretation report under local generated result folders.
 
 Current regional result:
 
@@ -354,11 +425,11 @@ Central Valley NMME run is:
 
 ```bash
 python scripts/run_operational_precip_benchmark.py --write-template
-python scripts/build_nmme_cpc_forecast_csv.py --copy-report
+python scripts/prepare_cpc_nmme_precip_anomaly_inputs.py --copy-report
 python scripts/run_operational_precip_benchmark.py \
   --forecast-csv outputs/nmme_cpc_cvalley_lead1_forecast.csv \
   --copy-report
-python scripts/build_nmme_cpc_forecast_csv.py \
+python scripts/prepare_cpc_nmme_precip_anomaly_inputs.py \
   --lead-months 3 \
   --start-target 2018-07 \
   --out-file outputs/nmme_cpc_cvalley_lead3_forecast.csv \
@@ -370,7 +441,7 @@ python scripts/run_operational_precip_benchmark.py \
   --lead-months 3 \
   --output-prefix operational_nmme_cpc_spi3_lead3 \
   --copy-report
-python scripts/build_nmme_cpc_forecast_csv.py \
+python scripts/prepare_cpc_nmme_precip_anomaly_inputs.py \
   --lead-months 6 \
   --start-target 2018-10 \
   --out-file outputs/nmme_cpc_cvalley_lead6_forecast.csv \
@@ -382,7 +453,7 @@ python scripts/run_operational_precip_benchmark.py \
   --lead-months 6 \
   --output-prefix operational_nmme_cpc_spi6_lead6 \
   --copy-report
-python scripts/build_nmme_cpc_prob_forecast_csv.py \
+python scripts/prepare_cpc_nmme_precip_probability_inputs.py \
   --lead-months 3 \
   --dataset data/processed/dataset_seasonal_spi3_lead3.parquet \
   --out-file outputs/nmme_cpc_prob_cvalley_lead3_forecast.csv \
@@ -402,12 +473,15 @@ NMME, GEFS, ECMWF/SEAS5, or similar precipitation forecasts be scored with the
 same validation-only calibration and monthly BSS protocol used everywhere else
 in the project.
 
-The implemented operational checkpoints now include both CPC NMME real-time
-multi-model precipitation anomalies and official CPC NMME below-normal
-precipitation probabilities over the Central Valley bounding box. The
+The implemented operational checkpoints now include CPC NMME real-time
+multi-model precipitation anomalies, official CPC NMME below-normal
+precipitation probabilities, and a NOAA NCEI THREDDS CFSv2 individual-run
+precipitation extraction over the Central Valley bounding box. The CPC
 probability files start in 2019 and have missing Central Valley values for some
 dry-season targets, so their test coverage is smaller than the anomaly
-benchmarks.
+benchmarks. The NCEI CFSv2 extraction uses true lead-window precipitation for
+SPI-3 lead-3, but the accessible 6-hour individual-run aggregation starts in
+2016 and is too short-horizon for a complete SPI-6 accumulation window.
 
 | Operational benchmark | Test months | BSS vs. climatology | 95% CI |
 |---|---:|---:|---|
@@ -416,32 +490,34 @@ benchmarks.
 | CPC NMME SPI-6 lead-6 probability raw | 49 | +0.035 | [−0.430, +0.255] |
 | CPC NMME SPI-3 lead-3 probability raw | 51 | +0.007 | [−0.549, +0.243] |
 | CPC NMME SPI-1 lead-1 anomaly + isotonic | 63 | +0.002 | [−0.438, +0.239] |
+| NCEI CFSv2 SPI-3 lead-3 accumulated precipitation + isotonic | 55 | −0.030 | [−0.166, +0.059] |
+| NCEI CFSv2 SPI-3 lead-3 precipitation anomaly + isotonic | 55 | −0.303 | [−1.202, +0.200] |
 | CPC NMME SPI-6 lead-6 anomaly + isotonic | 62 | −0.344 | [−1.130, +0.113] |
 | CPC NMME SPI-3 lead-3 probability + isotonic | 51 | −0.212 | [−1.148, +0.176] |
 | CPC NMME SPI-6 lead-6 probability + isotonic | 49 | −0.409 | [−1.693, +0.163] |
 
-The operational benchmark is scientifically useful, but it does not create a
-robust positive-skill result. The official raw probabilities have weak positive
-SPI-3/SPI-6 point estimates, while validation-only isotonic calibration helps
-SPI-1 but overfits the short probability validation window for SPI-3/SPI-6.
+The precipitation operational benchmark is scientifically useful, but it does
+not create a robust positive-skill result. The official raw probabilities have
+weak positive SPI-3/SPI-6 point estimates, while validation-only isotonic
+calibration helps SPI-1 but overfits the short probability validation window
+for SPI-3/SPI-6. The separate land-surface benchmark above is the first robust
+positive forecast-informed result, and it changes the candidate paper claim
+toward root-zone soil-moisture drought rather than precipitation SPI.
 Artifacts are saved at
-[results/report/nmme_cpc_cvalley_lead1_forecast.csv](results/report/nmme_cpc_cvalley_lead1_forecast.csv),
-[results/report/operational_precip_benchmark_monthly_scores.csv](results/report/operational_precip_benchmark_monthly_scores.csv),
-[results/report/operational_precip_benchmark_scores.txt](results/report/operational_precip_benchmark_scores.txt),
-[results/report/operational_nmme_cpc_spi3_lead3_monthly_scores.csv](results/report/operational_nmme_cpc_spi3_lead3_monthly_scores.csv),
-and
-[results/report/operational_nmme_cpc_spi6_lead6_monthly_scores.csv](results/report/operational_nmme_cpc_spi6_lead6_monthly_scores.csv),
-plus the probability benchmark files
-[results/report/operational_nmme_cpc_prob_spi1_lead1_monthly_scores.csv](results/report/operational_nmme_cpc_prob_spi1_lead1_monthly_scores.csv),
-[results/report/operational_nmme_cpc_prob_spi3_lead3_monthly_scores.csv](results/report/operational_nmme_cpc_prob_spi3_lead3_monthly_scores.csv),
-and
-[results/report/operational_nmme_cpc_prob_spi6_lead6_monthly_scores.csv](results/report/operational_nmme_cpc_prob_spi6_lead6_monthly_scores.csv).
+local `results/report/` files when the benchmark scripts are run. Public
+manuscript-facing operational and land-surface rows are consolidated in
+[`results/report/paper/table02_headline_results.csv`](results/report/paper/table02_headline_results.csv)
+and [`results/report/paper/table09_landsurface_added_value.csv`](results/report/paper/table09_landsurface_added_value.csv).
 
 Use the CPC/NMME data page
 ([NOAA CPC](https://www.cpc.ncep.noaa.gov/products/NMME/data.html)), NCEI NMME
 access notes ([NOAA NCEI](https://www.ncei.noaa.gov/products/weather-climate-models/north-american-multi-model)),
 the CPC probability NetCDF archive
 ([NOAA CPC FTP](https://ftp.cpc.ncep.noaa.gov/NMME/prob/netcdf/)),
+the NCEI THREDDS CFSv2 precipitation catalog
+([NOAA NCEI THREDDS](https://www.ncei.noaa.gov/thredds/catalog/model-nmme_cfs_v2_pr_6h_agg/files/catalog.html)),
+the NCEI CFSv2 monthly means catalog
+([NOAA NCEI THREDDS](https://www.ncei.noaa.gov/thredds/catalog/model-cfs_v2_for_mm/catalog.html)),
 and cite Kirtman et al. (2014)
 ([doi:10.1175/BAMS-D-12-00050.1](https://doi.org/10.1175/BAMS-D-12-00050.1)).
 SubX is the alternative subseasonal benchmark; cite Pegion et al. (2019)
@@ -461,7 +537,35 @@ SubX is the alternative subseasonal benchmark; cite Pegion et al. (2019)
 - **Cross-dataset validation** — ERA5-Land SPI-1 comparison
 - **Independent U.S. precipitation validation** — PRISM SPI-1 comparison over the DWR Central Valley basin mask
 - **Temporal robustness audit** — rolling chronological Central Valley holdouts and 2021-2026 event-block diagnostics
+- **Evaluation-inflation audit** — invalid random row splits, pixel-level inference, and overlapping SPI targets tested as methodological stress cases
 - **Qualitative validation** — USDM D1+ plausibility check (not a metric)
+
+### Evaluation-Inflation Audit
+
+The project now directly tests how much apparent skill can be created by common
+but invalid evaluation shortcuts:
+
+```bash
+python scripts/run_evaluation_inflation_audit.py --copy-report
+```
+
+| Audit row | Inference | BSS vs. climatology | 95% CI | Status |
+|---|---|---:|---:|---|
+| Strict SPI-1 lead-1 chronological | monthly | −0.023 | [−0.117, +0.073] | valid primary protocol |
+| Random SPI-1 row split | monthly | +0.995 | [+0.993, +0.997] | invalid split |
+| Overlapping SPI-3 lead-1 | monthly | +0.674 | [+0.407, +0.820] | invalid target |
+| Strict SPI-1 lead-1 chronological | pixel | −0.019 | [−0.020, −0.018] | invalid pixel inference |
+
+This is central to the paper claim. Randomly splitting spatial pixels across
+train/validation/test or allowing SPI accumulation windows to overlap can make
+the task look highly predictable. The strict monthly, chronological,
+leakage-free protocol removes that inflation.
+
+The literature protocol audit at
+[`literature/literature_protocol_audit.csv`](literature/literature_protocol_audit.csv)
+keeps this critique narrow: prior drought-ML studies are often not directly
+comparable because target scale, lead time, inputs, validation split, metrics,
+and baselines differ. We do not claim that the broader literature is invalid.
 
 ---
 
@@ -470,7 +574,7 @@ SubX is the alternative subseasonal benchmark; cite Pegion et al. (2019)
 - **1-month lead is fundamentally hard:** Monthly precipitation is dominated by chaotic synoptic weather; SPI-1 autocorrelation is weak.
 - **Small test set:** 63 months yields wide confidence intervals; positive skill claims require a confidence interval that excludes zero.
 - **Regional geometry:** Central Valley, Southern Great Plains, Murray-Darling, Spain, and Horn of Africa now have source-cited geometry checkpoints; Horn still uses political-country geometry rather than a basin or livelihood-zone mask.
-- **Limited exogenous drivers:** Corrected Niño3.4 anomaly lags are included; PDO is excluded from the active checkpoint because recent PDO values are missing. Regional/gridded ERA5-Land temperature/VPD and regional ERA5-Land soil moisture have been tested separately, but none beat climatology.
+- **Limited exogenous drivers:** Corrected Niño3.4 anomaly lags are included; PDO is excluded from the active checkpoint because recent PDO values are missing. Regional/gridded ERA5-Land temperature/VPD and regional ERA5-Land soil-memory lags do not beat climatology for SPI-1. The separate CFSv2 forecast-informed root-zone soil-moisture target is robust against climatology in Central Valley, but added-region checks are mixed and the current added-value audit does not show robust improvement over same-target persistence.
 - **Test period non-representative:** 2021–2026 is extreme (historic drought -> extreme wet). This is now partly controlled by `results/temporal/`: five rolling tabular holdouts all remain at or below climatology, but the canonical event-block analysis still has only 12-27 months per block.
 - **CHIRPS/PRISM differences:** PRISM validation shows strong test-period agreement (`Pearson r = 0.816`, `Spearman r = 0.720`) but CHIRPS is drier on average over the basin (`CHIRPS - PRISM dry-fraction bias = +0.046`), so target-data uncertainty should be acknowledged.
 
@@ -480,10 +584,10 @@ SubX is the alternative subseasonal benchmark; cite Pegion et al. (2019)
 
 Highest-impact directions (see [`ANALYSIS.md`](ANALYSIS.md) for full roadmap):
 
-1. **Draft from the paper evidence pack** — `results/paper/` now contains the consolidated master evidence table, headline table, source-cited mask-methods table, temporal robustness table, seasonal signal audit, regionalization mechanism table, and five manuscript-facing figures.
+1. **Draft from the paper evidence pack** — `results/report/paper/` now contains the consolidated master evidence table, headline table, source-cited mask-methods table, temporal robustness table, seasonal signal audit, regionalization mechanism table, and five manuscript-facing figures.
 2. **Stop expanding regions for now** — Five hydroclimate checkpoints are enough to support the generalization claim; additional regions would add cost before the narrative is tightened.
-3. **Only extend operational benchmarks if needed** — CPC NMME anomaly and probability benchmarks now cover SPI-1 lead-1, SPI-3 lead-3, and SPI-6 lead-6. A further follow-up should use full hindcast/ensemble NetCDF or SubX only if the paper needs a stronger operational comparison.
-4. **Reframe the target only if pursuing positive skill** — SPI-12 regionalization shows teleconnection signal at longer drought-memory timescales, but the current SPI-3/SPI-6 regional seasonal audit does not yet show reliable event tracking. The next fair target-reframing step should add independent forecast precipitation/circulation inputs or zone-level targets, not only tune the same lagged-observation model.
+3. **Do not overclaim the land-surface result** — The CFSv2 RZSM benchmark remains robustly positive for Central Valley under four-cycle aggregation, but the added-value diagnostic shows no robust overall improvement over raw persistence, Southern Great Plains is persistence-dominated, and Mediterranean Spain does not replicate. Any next operational check needs a fuller land-surface hindcast archive.
+4. **Keep the precipitation-SPI claim separate** — SPI-12 regionalization and the SPI-6 lead-6 memory checkpoint show longer-timescale signal, but not reliable SPI event tracking. The positive land-surface result supports a target reframing, not a rescue of the canonical SPI-1 model.
 
 ---
 
@@ -530,8 +634,6 @@ python scripts/build_region_masks.py --copy-report
 python scripts/run_multiregion_xgb_experiment.py --region mediterranean_spain --model both --country-mask --rebuild-dataset --copy-report
 python scripts/build_basin_masks.py --copy-report
 python scripts/run_seasonal_longlead_experiment.py --list-regions
-python scripts/build_seasonal_regional_summary.py
-python scripts/audit_seasonal_regional_signal.py
 python scripts/run_multiregion_xgb_experiment.py --region cvalley --model both --basin-mask --rebuild-dataset --copy-report
 python scripts/run_multiregion_xgb_experiment.py --region southern_great_plains --model both --basin-mask --rebuild-dataset --copy-report
 python scripts/run_multiregion_xgb_experiment.py --region murray_darling --prepare-grid-only --rebuild-pr --rebuild-spi --spi-n-jobs 8
@@ -547,29 +649,23 @@ python scripts/xgb_shap_forecast_analysis.py --model both  # SHAP interpretation
 python scripts/validate_era5_spi.py              # cross-dataset validation
 python scripts/validate_chirps_prism_cvalley.py  # PRISM basin validation
 python scripts/run_temporal_robustness_audit.py  # rolling holdout sensitivity
-python scripts/build_regionalization_mechanism_tables.py
 python scripts/validate_usdm.py                  # USDM plausibility check
 python scripts/plot_spatial_skill.py             # per-pixel skill map
 python scripts/plot_case_study.py                # 2021-2026 case study
-python scripts/build_master_results_table.py
-python scripts/build_paper_evidence_pack.py
+python scripts/generate_master_results.py
+python scripts/generate_manuscript_results.py
 ```
 
 ### Results (reproduced outputs)
 
-**Key results are saved to the `results/` folder by category:**
+**Committed manuscript-facing results:**
 
-- **[results/report/](results/report/)** — Main skill table, calibration study, reliability diagrams, SHAP summaries, seasonal SPI-3, met-feature, and soil-moisture experiments
-- **[results/report/](results/report/)** — Includes season/ENSO-stratified BSS CSV tables
-- **[results/paper/](results/paper/)** — Consolidated paper evidence pack: master/headline tables, mask methods, temporal robustness, seasonal signal audit, regionalization mechanism table, and manuscript-facing figures
-- **[results/spatial/](results/spatial/)** — Per-pixel accuracy maps
-- **[outputs/](outputs/)** — Full model artifacts, probability arrays, feature-importance plots, and detailed SHAP dependence plots
-- **[results/validation/](results/validation/)** — ERA5-Land, PRISM, and USDM validation/consistency checks
-- **[results/temporal/](results/temporal/)** — Rolling temporal robustness and event-block diagnostics
-- **[results/seasonal/](results/seasonal/)** — Seasonal long-lead and regional seasonal signal audits
-- **[results/regionalization/](results/regionalization/)** — SPI-12 regionalization and zone-level mechanism tables
-- **[results/regional/](results/regional/)** — Regional (Central Valley) forecast evaluation
-- **[results/multiregion/](results/multiregion/)** — Region-aware XGBoost comparison artifacts
+- **[results/report/paper/](results/report/paper/)** — consolidated evidence pack: master/headline tables, mask methods, temporal robustness, seasonal signal audit, regionalization mechanism table, transition diagnostics, land-surface added-value table, and manuscript-facing figures.
+- **[results/report/master_results_table.csv](results/report/master_results_table.csv)** and **[results/report/master_results_headline.csv](results/report/master_results_headline.csv)** — compact source tables feeding the paper pack.
+
+Bulk experiment outputs, model artifacts, downloaded data, and local diagnostic
+folders are intentionally ignored by git. They can be regenerated from the
+scripts when needed.
 
 ---
 
