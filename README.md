@@ -580,17 +580,6 @@ and baselines differ. We do not claim that the broader literature is invalid.
 
 ---
 
-## Next Steps
-
-Highest-impact directions (see [`ANALYSIS.md`](ANALYSIS.md) for full roadmap):
-
-1. **Draft from the paper evidence pack** — `results/report/paper/` now contains the consolidated master evidence table, headline table, source-cited mask-methods table, temporal robustness table, seasonal signal audit, regionalization mechanism table, and five manuscript-facing figures.
-2. **Stop expanding regions for now** — Five hydroclimate checkpoints are enough to support the generalization claim; additional regions would add cost before the narrative is tightened.
-3. **Do not overclaim the land-surface result** — The CFSv2 RZSM benchmark remains robustly positive for Central Valley under four-cycle aggregation, but the added-value diagnostic shows no robust overall improvement over raw persistence, Southern Great Plains is persistence-dominated, and Mediterranean Spain does not replicate. Any next operational check needs a fuller land-surface hindcast archive.
-4. **Keep the precipitation-SPI claim separate** — SPI-12 regionalization and the SPI-6 lead-6 memory checkpoint show longer-timescale signal, but not reliable SPI event tracking. The positive land-surface result supports a target reframing, not a rescue of the canonical SPI-1 model.
-
----
-
 ## Reproducing Results
 
 ### Prerequisites
@@ -658,14 +647,8 @@ python scripts/generate_manuscript_results.py
 
 ### Results (reproduced outputs)
 
-**Committed manuscript-facing results:**
-
 - **[results/report/paper/](results/report/paper/)** — consolidated evidence pack: master/headline tables, mask methods, temporal robustness, seasonal signal audit, regionalization mechanism table, transition diagnostics, land-surface added-value table, and manuscript-facing figures.
 - **[results/report/master_results_table.csv](results/report/master_results_table.csv)** and **[results/report/master_results_headline.csv](results/report/master_results_headline.csv)** — compact source tables feeding the paper pack.
-
-Bulk experiment outputs, model artifacts, downloaded data, and local diagnostic
-folders are intentionally ignored by git. They can be regenerated from the
-scripts when needed.
 
 ---
 
