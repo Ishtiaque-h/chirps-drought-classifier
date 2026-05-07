@@ -1,28 +1,93 @@
-# Data (keep structure, ignore contents)
-data/*
+# Local Python environments
+.venv/
+venv/
+env/
+chirps_env/
+
+# Python packaging/build
+build/
+dist/
+*.egg-info/
+
+# Python tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Data (keep structure, ignore generated/downloaded contents)
+data/**
+!data/
 !data/.gitkeep
 !data/raw/
 !data/processed/
-data/raw/*
 !data/raw/.gitkeep
-data/processed/*
 !data/processed/.gitkeep
 
-# Outputs (figures, models)
-outputs/*
+# Runtime outputs (models, figures, one-off scores)
+outputs/**
+!outputs/
 !outputs/.gitkeep
 
+# Generated results: keep curated report artifacts, ignore bulk experiment artifacts
+results/**
+!results/
+!results/README.md
+!results/report/
+!results/report/**
+
+# Literature: keep indices/notes, ignore downloaded PDFs
+literature/papers/**
+!literature/papers/
+!literature/papers/.gitkeep
+
 # Jupyter noise
-notebooks/.ipynb_checkpoints/
+**/.ipynb_checkpoints/
 
 # Python build/cache
 __pycache__/
 *.pyc
+*.pyo
+
+# Local report assembly helpers; keep them in the workspace but do not publish
+# unless they become part of the final reproducibility protocol.
+scripts/build_seasonal_regional_summary.py
+scripts/audit_seasonal_regional_signal.py
+scripts/summarize_transition_experiments.py
+scripts/diagnose_landsurface_added_value.py
+scripts/build_regionalization_mechanism_tables.py
+scripts/SCRIPT_AUDIT.md
 
 # OS/editor
 .DS_Store
 .vscode/
 .idea/
 
-# Environment
-*env/
+# Dotenv / local config
+.env
+.env.*
+!.env.example
+
+# Logs / temp files
+*.log
+*.tmp
+*.swp
+
+# VS Code workspace files
+*.code-workspace
+
+# Large/generated data artifacts
+*.nc
+*.nc4
+*.grib
+*.grb
+*.parquet
+*.npz
+*.npy
+*.pt
+*.pth
+*.pkl
+*.joblib
