@@ -47,10 +47,10 @@ The project implements a complete, reproducible pipeline for **1-month-ahead dro
 | Temporal robustness audit | ✅ Added | Five rolling Central Valley holdouts show no positive tabular BSS point estimates; 2021–2026 is not the only weak window |
 | SPI-12 regionalization mechanism tables | ✅ Added | Zone-level run metrics, climate-index correlations, and forecast diagnostics are compiled for paper tables |
 | Region geometry audit | ✅ Source-cited masks added | Natural Earth country masks plus DWR, EPA, Murray-Darling Basin Authority/data.gov.au, and MITECO masks quantify rectangular-box sensitivity and add masked priority-region runs |
-| Master results table | ✅ Added | `scripts/generate_master_results.py` creates a 120-row result table and 55-row headline table from current artifacts |
+| Master results table | ✅ Added | `scripts/generate_master_results.py` creates a 183-row result table and 88-row headline table from current artifacts |
 | Paper evidence pack | ✅ Added | `scripts/generate_manuscript_results.py` consolidates the master, seasonal, temporal, mask, PRISM, and regionalization evidence into manuscript-facing tables and figures under `results/report/paper/` |
 | Operational benchmark path | ✅ NMME anomaly + probability benchmarks complete | CPC NMME anomaly and official below-normal probability benchmarks now cover SPI-1 lead-1, SPI-3 lead-3, and SPI-6 lead-6; the best selected probability row is SPI-1 lead-1 (`BSS = +0.131`) and the best raw probability row is SPI-6 lead-6 (`BSS = +0.035`), but all confidence intervals cross zero |
-| Forecast-informed land-surface path | ✅ Added-value diagnostic complete | Central Valley CFSv2 RZSM remains robustly positive vs climatology (`BSS = +0.511`), but added value over raw persistence is not robust; Southern Great Plains persistence is robustly better |
+| Forecast-informed land-surface path | ✅ GEFSv12 hindcast added, replicated, transfer-tested, constrained, rare-event scored, persistence-regime audited, cross-product checked, persistence-residual gated, and modern/native archive extension audited | Central Valley CFSv2 RZSM remains robustly positive vs climatology (`BSS = +0.511` in the four-cycle replication); the five-region GEFSv12+persistence stack is robust-positive vs climatology in 4/5 regions and robustly improves selected persistence in 3/5; leave-one-region-out calibration is robust-positive in 5/5 regions and robustly improves transferred persistence in 4/5; monotonic XGBoost improves mean BSS but not universal added value; rare-event q0.80/q0.90 diagnostics show meaningful AP lift with region-dependent event-BSS; the persistence-regime diagnostic shows the largest stack gain when dry memory and wetter GEFSv12 forecasts disagree; the persistence-residual selector confirms that validation-safe monotonic/guarded/threshold rows improve raw persistence in only 2/5 leave-one-region-out regions and pooled monotonic in 3/5, so this is not a universal adaptive selector; SMAP cross-product transfer narrows the claim because direct GEFS transfer is weak/mixed, but validation-only base-rate corrections recover GEFS transfer signal; prediction-base-rate shifting reaches 10/10 robust-positive source-region rows, dry-rate shifting gives more robust persistence-relative added value, and complex target-specific adaptation is weaker on frozen SMAP test months; operational GEFS is accessible, but both the SOILW 0.1-1 m smoke test and the top-layer-compatible SOILL 0-1 m test are robustly negative in Central Valley 2024-2025, and diagnostics show no forecast candidate robustly beats raw persistence on validation; Central Valley SMAP L4 multi-snapshot targets now cover 2020-01 to 2026-03, and SMAP scoring confirms raw persistence is robust (`BSS = +0.825`) while selected operational GEFS stays negative; year-held-out calibration gives weak positive GEFS/persistence stack point estimates versus SMAP climatology but still loses to raw SMAP persistence, so the persistence guard falls back to persistence; C3S seasonal-original single levels is accessible and structurally verified; compact C3S/ECMWF system 51 VSM benchmarks do not provide a positive added-value extension: Central Valley selected C3S is positive but non-robust (`+0.107`, CI `[-0.149, +0.283]`) and loses to selected persistence (`-0.523`), Mediterranean Spain selected C3S is below climatology (`-0.307`, CI `[-0.710, +0.024]`) and also loses to selected persistence (`-0.366`), and Southern Great Plains selected C3S is positive but non-robust (`+0.085`, CI `[-0.089, +0.232]`) while losing strongly to selected persistence (`-1.092`); SubX/IRI currently returns authentication pages in this environment |
 
 ### Key results (corrected ENSO + spatial checkpoint — 2026-05-01)
 
@@ -58,7 +58,10 @@ The project implements a complete, reproducible pipeline for **1-month-ahead dro
 > recent missing PDO values are not forward-filled, and Niño3.4 absolute SST is
 > converted to monthly anomalies using the 1991–2020 climatology. The active
 > corrected checkpoint uses Niño3.4 anomaly lags only; PDO is excluded because
-> recent PDO values are missing after August 2025.
+> recent PDO values are missing after August 2025. A common-valid-period
+> sensitivity without PDO tail forward-fill now shows that PDO does not rescue
+> Central Valley SPI-1 skill: spatial PDO-only BSS is `-0.114`, and
+> Niño3.4+PDO is robustly negative (`-1.385`, CI below zero).
 >
 > **The best model is now a practical tie with climatology.** Raw XGB-Spatial
 > remains below climatology, but validation-selected isotonic calibration gives a
@@ -111,8 +114,35 @@ The project implements a complete, reproducible pipeline for **1-month-ahead dro
 > (`BSS = +0.511`, CI `[+0.292, +0.676]`), but it no longer beats raw
 > persistence on point BS. Southern Great Plains CFSv2 is positive but
 > uncertain (`+0.413`, CI crossing zero) and is much weaker than persistence;
-> Mediterranean Spain is below climatology (`-0.141`). This supports target
-> reframing toward land-surface drought, not broad CFSv2 added value.
+> Mediterranean Spain is below climatology (`-0.141`). A NOAA GEFSv12
+> public-reforecast RZSM checkpoint uses 11-member Wednesday long reforecasts,
+> 2000-2016 hindcast calibration, and 2017-2019 frozen testing. The five-region
+> GEFSv12+persistence stack is robust-positive against climatology in 4/5
+> regions and robustly improves selected persistence by paired delta BS in 3/5
+> regions. Leave-one-region-out calibration-transfer is stronger: robust-positive
+> in 5/5 regions and robustly better than transferred persistence in 4/5, with
+> mean stack BSS `+0.638`. A monotonic XGBoost dry-fraction variant increases
+> mean BSS (`+0.669` under leave-one-region-out) but still has only 3/5 robust
+> added-value rows. Rare-event q0.80/q0.90 diagnostics show meaningful PR-AUC
+> lift, but event-BSS remains region/threshold dependent. This supports target
+> reframing toward land-surface drought and transferability of calibration, but
+> not universal dynamic-model added value or deployment readiness.
+> A persistence-regime diagnostic now clarifies the added-value mechanism:
+> under leave-one-region-out calibration, the stack improves transferred
+> persistence overall (`delta BS = -0.0063`, CI `[-0.0101, -0.0028]`) and has
+> its largest robust gain when antecedent dry memory is high but GEFSv12
+> forecasts wetter-than-normal root-zone moisture (`delta BS = -0.0249`, CI
+> `[-0.0431, -0.0101]`). The first independent-target validation is now
+> complete for the two U.S. regions: against NLDAS Noah `SoilM_0_100cm`
+> dry fraction, the validation-selected GEFSv12/persistence stack is
+> robust-positive and robustly improves selected persistence in both Central
+> Valley and Southern Great Plains. This reduces the ERA5-Land-only target
+> vulnerability for U.S. checkpoints. A GLDAS Noah `RootMoist_inst`
+> model-product sensitivity now covers all five regions: the
+> validation-selected stack is robust-positive in 5/5 regions and robustly
+> improves selected persistence in 3/5 regions. This supports target-product
+> robustness, but GLDAS is still a model product; it is not the same as global
+> independent satellite validation.
 >
 > **The first memory-target checkpoint is suggestive but not event-tracking
 > skill.** `scripts/run_memory_target_experiment.py` tests Central Valley
@@ -287,7 +317,7 @@ This is a scientifically valid and publishable finding — but only if the analy
 |---------|--------|-----------|-------------|
 | **ENSO index (Niño 3.4)** | NOAA | Implemented as monthly anomalies. It improves calibrated XGB-Spatial to a near-tie with climatology but does not produce statistically reliable positive skill. | Complete |
 | **Temperature / VPD anomalies** | ERA5-Land or CPC | Temperature modulates drought severity through evapotranspiration; VPD amplifies agricultural drought even when precipitation is near-normal. Regional and gridded initial tests add signal but do not beat climatology. | Complete initial tests |
-| **Pacific Decadal Oscillation (PDO)** | NOAA | Low-frequency modulation of California precipitation on decadal timescales. | High — freely available monthly time series |
+| **Pacific Decadal Oscillation (PDO)** | NOAA | Low-frequency modulation of California precipitation on decadal timescales. | Sensitivity complete — common-valid-period PDO-only and Niño3.4+PDO do not improve Central Valley SPI-1 BSS |
 | **Atmospheric River count/intensity** | e.g., Gershunov et al. catalog | Central Valley precipitation extremes are driven by atmospheric rivers; their frequency and intensity are potentially predictable at sub-seasonal lead times. | Medium — requires catalog preprocessing |
 
 **Medium-priority additions:**
@@ -345,7 +375,7 @@ This is a **publishable scientific finding** — but only if framed correctly an
 | # | Research Question | Impact | Feasibility |
 |---|-------------------|--------|-------------|
 | 1 | **Does the predictability barrier generalize across hydroclimatic regimes?** Train and evaluate the exact same pipeline in 2–3 additional regions. If the barrier holds, this is a strong negative result with broad implications. If it breaks in some regimes, characterize what makes them different. | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
-| 2 | **Do additional exogenous drivers improve skill beyond corrected ENSO?** Temperature/VPD and regional soil moisture are now negative initial tests; remaining Central Valley candidates include atmospheric-river/circulation predictors, vegetation indices, or a carefully handled historical PDO subset. | ⭐⭐⭐⭐ | ⭐⭐ |
+| 2 | **Do additional exogenous drivers improve skill beyond corrected ENSO?** Temperature/VPD, regional soil moisture, and common-valid PDO sensitivity are negative for SPI-1. Remaining Central Valley candidates should be physically event-informed, such as atmospheric-river/circulation predictors, rather than more low-frequency climate-index variants. | ⭐⭐⭐⭐ | ⭐⭐ |
 | 3 | **How does skill vary with lead time and temporal aggregation?** Evaluate at seasonal (3-month) and quarterly horizons. SPI-3 as target may be more predictable at seasonal lead. | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
 | 4 | **Is there conditional skill?** Do models outperform climatology specifically during ENSO warm/cold phases, or during winter (wet season) vs. summer? Stratified BSS analysis. | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
 | 5 | **Transfer learning: can a model trained on one region predict drought in an analogous region?** Train on Central Valley, test on Ebro Basin (or vice versa). | ⭐⭐⭐⭐ | ⭐⭐⭐ |
@@ -369,7 +399,7 @@ The finding that ML does not reliably outperform climatology at 1-month lead is 
 - Su et al. (2023, *Journal of Hydrometeorology*) found that subseasonal drought onset/termination skill over the coastal western United States degrades sharply by week 4 ([doi:10.1175/JHM-D-22-0103.1](https://doi.org/10.1175/JHM-D-22-0103.1)).
 - AghaKouchak et al. (2023, *Nature Reviews Earth & Environment*) frame drought as a cascading, impact-dependent hazard, supporting the need to test more than a single precipitation-index forecast target before making broad operational claims ([doi:10.1038/s43017-023-00457-2](https://doi.org/10.1038/s43017-023-00457-2)).
 - Dikshit et al. (2021, *Journal of Environmental Management*) show that deep-learning drought forecasting can help for SPEI-style targets under different predictor/target designs, which is useful context but not direct evidence that the stricter SPI-1 lead-1 CHIRPS setup here should beat climatology ([doi:10.1016/j.jenvman.2021.111979](https://doi.org/10.1016/j.jenvman.2021.111979)).
-- NMME/CFSv2 provides a more appropriate benchmark than another ML-only architecture because it supplies actual forecast fields, not only lagged observed predictors. NOAA CPC documents NMME data access and citation requirements ([CPC NMME data](https://www.cpc.ncep.noaa.gov/products/NMME/data.html)), NCEI describes NMME as a global multi-model seasonal forecast archive with precipitation variables ([NCEI NMME](https://www.ncei.noaa.gov/products/weather-climate-models/north-american-multi-model)), and Kirtman et al. (2014) is the core NMME reference ([doi:10.1175/BAMS-D-12-00050.1](https://doi.org/10.1175/BAMS-D-12-00050.1)). The project now includes a NOAA NCEI THREDDS CFSv2 individual-run SPI-3 lead-3 precipitation extraction and a monthly-mean CFSv2 `flxf` soil-moisture benchmark ([NCEI monthly means catalog](https://www.ncei.noaa.gov/thredds/catalog/model-cfs_v2_for_mm/catalog.html)). The precipitation benchmark remains non-robust; the root-zone soil-moisture benchmark shows stronger land-surface predictability, but CFSv2 added value over persistence is not established.
+- NMME/CFSv2/GEFSv12 provides a more appropriate benchmark than another ML-only architecture because these sources supply actual forecast fields, not only lagged observed predictors. NOAA CPC documents NMME data access and citation requirements ([CPC NMME data](https://www.cpc.ncep.noaa.gov/products/NMME/data.html)), NCEI describes NMME as a global multi-model seasonal forecast archive with precipitation variables ([NCEI NMME](https://www.ncei.noaa.gov/products/weather-climate-models/north-american-multi-model)), and Kirtman et al. (2014) is the core NMME reference ([doi:10.1175/BAMS-D-12-00050.1](https://doi.org/10.1175/BAMS-D-12-00050.1)). The project now includes a NOAA NCEI THREDDS CFSv2 individual-run SPI-3 lead-3 precipitation extraction, a monthly-mean CFSv2 `flxf` soil-moisture benchmark ([NCEI monthly means catalog](https://www.ncei.noaa.gov/thredds/catalog/model-cfs_v2_for_mm/catalog.html)), and a NOAA GEFSv12 reforecast RZSM benchmark using the public AWS archive and Guan et al. (2022) as the dataset reference ([doi:10.1175/MWR-D-21-0245.1](https://doi.org/10.1175/MWR-D-21-0245.1)). The precipitation benchmark remains non-robust; root-zone soil-moisture benchmarks show stronger land-surface predictability, but broad dynamic-model added value over persistence is not established.
 - SubX is the analogous subseasonal benchmark path if the paper emphasizes weeks 3-4 or monthly aggregation from subseasonal forecasts; cite Pegion et al. (2019) ([doi:10.1175/BAMS-D-18-0270.1](https://doi.org/10.1175/BAMS-D-18-0270.1)).
 
 ### 6.2 Gaps this project could fill
@@ -408,7 +438,7 @@ The regional mask analyses use source-cited public boundary datasets:
 | **1** | **Write source-cited mask methods** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | The paper should explicitly cite Natural Earth, DWR, EPA, MDBA/data.gov.au, and MITECO boundary sources, report retained-cell fractions, and caveat Horn's country mask. |
 | **2** | **Turn mechanism diagnostics into paper figures** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | The five-region, geometry-sensitive comparison is now the main scientific story and should be presented before adding more features. |
 | **3** | **Perform final consistency review of claims** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | Ensure every positive point estimate is framed as uncertain and every rectangular result is labeled as a sensitivity rather than a final regional claim. |
-| **4** | **Land-surface hindcast/ensemble benchmark** | ⭐⭐⭐⭐⭐ | ⭐⭐ | Four-cycle and regional RZSM replication plus added-value diagnostics are complete: Central Valley is robustly positive against climatology, Southern Great Plains is persistence-dominated, and Mediterranean Spain fails. The next useful step is a fuller hindcast/ensemble land-surface archive, not more tuning of this CFSv2 monthly-mean extraction. |
+| **4** | **Land-surface hindcast/ensemble benchmark** | ⭐⭐⭐⭐⭐ | ⭐⭐ | GEFSv12 RZSM now adds a true public-reforecast benchmark with five-region stack, lead/valid-day sensitivity, leave-one-region-out transfer, monotonic constraints, and rare-event diagnostics; the signal is strong vs climatology but persistence remains a hard regional baseline. |
 | **5** | **Atmospheric-river or subseasonal circulation predictors** | ⭐⭐⭐⭐ | ⭐⭐ | Central Valley monthly extremes are event-driven; AR/circulation predictors are more physically targeted than more lagged land-surface tuning. |
 | **6** | **Seasonal target variants with more information** | ⭐⭐⭐ | ⭐⭐⭐ | SPI-3 lead-3 is a positive but uncertain hint; revisit with spatial features, operational precipitation forecasts, or additional regions if needed. |
 | **7** | **Gridded/SMAP soil-moisture sensitivity** | ⭐⭐ | ⭐⭐ | Regional ERA5-Land soil moisture overfits; only pursue this if a spatial or independent-observation formulation is needed for completeness. |
@@ -517,8 +547,9 @@ This narrative transforms a "negative result" into a **methodological and scient
 21. ✅ **Master result table added** —
    `scripts/generate_master_results.py` writes
    `results/report/master_results_table.csv` and
-   `results/report/master_results_headline.csv`. The current table has no robust
-   positive BSS result.
+   `results/report/master_results_headline.csv`. Canonical SPI-1 rows still
+   have no robust positive BSS result; robust positives now occur only in
+   land-surface/diagnostic rows.
 22. ✅ **Operational/dynamical benchmark added** —
    `scripts/prepare_cpc_nmme_precip_anomaly_inputs.py` preprocesses CPC NMME real-time
    multi-model precipitation anomalies, and
@@ -534,34 +565,198 @@ This narrative transforms a "negative result" into a **methodological and scient
    SPI-3/SPI-6 probability rows because the 2019-2020 validation overlap is
    short. CPC probability coverage is also partial for Central Valley dry-season
    targets.
+23. ✅ **PDO common-valid-period sensitivity added** —
+   `scripts/run_climate_index_sensitivity_experiment.py` compares CHIRPS/SPI-only,
+   Niño3.4-only, PDO-only, and Niño3.4+PDO variants after dropping months where
+   any climate-index lag is unavailable. On the shared 2021-01 to 2025-09 test
+   window, PDO-only is negative and uncertain for spatial XGBoost (`BSS =
+   -0.114`) and Niño3.4+PDO is robustly negative (`BSS = -1.385`, CI below
+   zero). This closes the immediate concern that excluding PDO may have hidden a
+   positive Central Valley SPI-1 signal.
+24. ✅ **GEFSv12 RZSM hindcast benchmark added** —
+   `scripts/run_gefsv12_landsurface_benchmark.py` extracts NOAA GEFSv12
+   reforecast `soilw_bgrnd` root-zone soil moisture from the public AWS archive
+   using byte-range GRIB reads. The main Central Valley run uses all 11
+   Wednesday long-reforecast members, observed thresholds through 2016,
+   hindcast calibration over 2000-2016, and a frozen 2017-2019 test. Selected
+   GEFSv12 BSS is robustly positive in Southern Great Plains (`+0.753`, CI
+   `[+0.618, +0.843]`) and Mediterranean Spain (`+0.540`, CI `[+0.090,
+   +0.757]`), and positive but uncertain in Central Valley (`+0.351`, CI
+   `[-0.204, +0.656]`). Same-target persistence remains a serious baseline:
+   Southern Great Plains GEFSv12 beats persistence on point BSS, while
+   Mediterranean Spain persistence is stronger; paired delta-BS intervals cross
+   zero in both regions.
+25. ✅ **GEFSv12 Southern Great Plains lead/valid-day sensitivity added** —
+   `scripts/run_gefsv12_landsurface_sensitivity.py` sweeps target-month valid
+   days 5, 10, 15, and 20 plus 0/1-week initialization lag under the same
+   hindcast-calibrated protocol. All 8 rows are robust-positive versus
+   climatology (`BSS = +0.621` to `+0.753`), and 7/8 beat selected persistence
+   on point BSS. The one exception is the longest-lead corner
+   (day 20, lag 1 week), which remains robust versus climatology but is
+   essentially tied with persistence.
+26. ✅ **GEFSv12+persistence stack benchmark added** —
+   `scripts/run_gefsv12_landsurface_stack_benchmark.py` reads the completed
+   GEFSv12 hindcast forecast files, refits validation-only isotonic mappings,
+   and selects a convex GEFSv12/persistence blend by validation Brier score.
+   On the frozen 2017-2019 test period, the five-region validation-selected
+   stack is robust-positive versus climatology in 4/5 regions and improves
+   selected persistence by paired delta BS in 3/5. Murray-Darling remains
+   persistence-dominated despite high climatology-relative BSS.
+27. ✅ **Worst-corner GEFSv12 stack sensitivity added** —
+   The Southern Great Plains day20/+1w extraction, the weakest single-source
+   GEFSv12 row from the lead/valid-day grid, remains robust-positive after
+   stacking (`BSS = +0.670`, CI `[+0.401, +0.852]`). Its paired added value over
+   selected persistence is uncertain (`delta BS = -0.0029`, CI `[-0.0081,
+   +0.0017]`), which keeps the claim conservative.
+28. ✅ **Land-surface domain transfer and constrained model added** —
+   `scripts/run_landsurface_domain_transfer_benchmark.py` evaluates local,
+   pooled, and leave-one-region-out calibration transfer, plus a monotonic
+   XGBoost dry-fraction model constrained by GEFSv12 dry anomaly and same-target
+   persistence. Leave-one-region-out stack calibration is robust-positive in
+   5/5 regions and robustly improves transferred persistence in 4/5; monotonic
+   XGBoost has higher mean BSS but only 3/5 robust added-value rows.
+29. ✅ **Rare-event land-surface formulation added** —
+   The same benchmark defines validation-period q0.80/q0.90 regional extensive
+   dry-event thresholds and reports AP, event-BSS, and reliability/resolution.
+   Leave-one-region-out q0.80 stack/monotonic rows have about 3x mean AP lift
+   and 3/5 robust event-BSS rows; q0.90 has larger AP lift but very small event
+   counts and fewer robust event-BSS rows.
+30. ✅ **Land-surface persistence-regime diagnostic added** —
+   `scripts/analyze_landsurface_persistence_regimes.py` stratifies
+   leave-one-region-out land-surface monthly scores by season, antecedent dry
+   fraction, GEFSv12 anomaly sign, and memory/forecast agreement. The stack
+   robustly improves transferred persistence overall (`delta BS = -0.0063`)
+   and most clearly helps when antecedent dry memory is high but GEFSv12
+   forecasts wetter-than-normal root-zone moisture (`delta BS = -0.0249`).
+31. ✅ **Independent land-surface target audit, NLDAS validation, GLDAS
+   sensitivity, and SMAP L4 validation added** —
+   `scripts/audit_landsurface_independent_targets.py` records candidate
+   external target products and local-file readiness. NLDAS Noah monthly soil
+   moisture is downloaded for 1991-2019 and scored for Central Valley and
+   Southern Great Plains using `scripts/run_nldas_landsurface_validation.py`.
+   `results/report/paper/table18_landsurface_nldas_validation.csv` shows the
+   validation-selected GEFSv12/persistence stack is robust-positive and
+   robustly improves selected persistence in both U.S. regions.
+   `results/report/paper/table19_landsurface_target_product_comparison.csv`
+   and `fig07_landsurface_target_product_comparison.png` provide the compact
+   ERA5-Land versus NLDAS target-product comparison. GLDAS Noah monthly
+   `RootMoist_inst` is downloaded for 2000-2019 and scored for all five
+   regions using `scripts/run_gldas_landsurface_validation.py`.
+   `results/report/paper/table20_landsurface_gldas_validation.csv` and
+   `table21_landsurface_era5_gldas_comparison.csv` show that the
+   validation-selected stack remains robust-positive in 5/5 regions under a
+   global model-product target, with robust added value over selected
+   persistence in 3/5. SMAP L4 SPL4SMGP `sm_rootzone_pctl` is now scored as a
+   short-record satellite-assimilated target check over 2015-2019. The
+   mid-month proxy in `table22_landsurface_smap_l4_validation.csv` is
+   robust-positive in 3/5 regions and robustly improves selected persistence in
+   1/5. The early/mid/late snapshot sensitivity in
+   `table23_landsurface_smap_l4_snapshot_sensitivity.csv` is robust-positive in
+   5/5 and robustly improves selected persistence in 2/5, so it reduces the
+   mid-month-proxy concern but still does not support universal dynamic added
+   value over persistence. A stricter cross-product transfer diagnostic in
+   `table24_landsurface_target_product_transfer.csv` scores ERA5-Land- and
+   GLDAS-calibrated probabilities against SMAP without SMAP recalibration:
+   GEFS-only rows contain the only robust-positive cross-product cases, but
+   source-product selected stacks are robust-positive in 0/10 and no compact
+   transfer row robustly improves SMAP same-target persistence. This supports a
+   transferable dynamical forecast signal only cautiously; calibration and
+   persistence blending are target-product dependent. The follow-up
+   calibration-transfer ladder in
+   `table25_landsurface_calibration_transfer_ladder.csv` shows that direct
+   source-calibrated GEFS transfer is robust-positive in 3/10 rows, while a
+   validation-only source-to-SMAP dry-rate shift raises GEFS transfer to 9/10
+   and robustly improves SMAP persistence in 3/10. Pooled ERA5-Land+GLDAS
+   source calibration gives robust-positive selected stacks in 3/5 SMAP
+   regions. This makes calibration/base-rate mismatch the more likely
+   cross-product failure mode than complete loss of forecast signal. The
+   follow-up adaptation benchmark in `table27_landsurface_target_product_adaptation_benchmark.csv`
+   uses validation months only. Product-specific prediction-base-rate shifting
+   makes GEFS robust-positive in 10/10 source-region rows, while the observed
+   source-to-SMAP dry-rate shift gives 9/10 and more robust added-value rows
+   over SMAP persistence (3/10 versus 2/10). Validation-selected seasonal and
+   complex target-specific selectors are weaker on frozen SMAP test months,
+   making base-rate calibration the publishable contribution and complex
+   adaptation a future direction. The SMAP product-residual benchmark
+   (`table34`/`table35`) tests the same methods against raw same-target SMAP
+   persistence: leading GEFS base-rate rows are robust-positive against SMAP
+   climatology in 9/10 to 10/10 rows, but robustly improve raw SMAP persistence
+   in only 3/10; threshold/base-rate gating has the same 3/10 added-value
+   ceiling, and all-candidate/stack-heavy selectors are weaker. This reinforces
+   target-product calibration as the method claim and rejects a stronger
+   mature-domain-adaptation claim for now. The year-by-year sensitivity table
+   (`table28_landsurface_base_rate_yearly_sensitivity.csv`) shows all leading
+   GEFS base-rate methods remain positive against SMAP climatology in 2017,
+   2018, and 2019, but 2019 is weak relative to SMAP persistence. The modern
+   operational-GEFS replication (`table36`) now checks Central Valley, Southern
+   Great Plains, and Mediterranean Spain for SOILW 0.1-1 m and SOILL 0-1 m
+   over 2021-2025. Selected operational GEFS is robust-positive in 0/6
+   region/soil-mode rows, robust-negative in 2/6, and positive on point BSS in
+   only 2/6; the best row is Mediterranean Spain SOILL (`BSS = +0.049`, CI
+   `[-1.032, +0.597]`) and still loses to raw persistence. This reduces the
+   Central-Valley-only concern. The follow-up native-RZSM archive audit
+   (`table37`/`table38`) identifies C3S seasonal-original single levels as the
+   cleanest next archive if licence access is resolved: ECMWF system 51 exposes
+   native `volumetric_soil_moisture` for 1981-2026, all months, and 24-5160 h
+   leads. After CDS licence acceptance, the corrected tiny retrieval probe
+   succeeds and returns a 51-member, 4-soil-layer NetCDF for the Central Valley
+   test box. SubX/IRI endpoints return authentication pages. The next clean
+   experiment was therefore a compact ECMWF system 51 VSM benchmark. It
+   confirms access but not a strong positive claim: Central Valley selected C3S
+   BSS is `+0.107` over complete 2021-2025 testing, with CI crossing zero, and
+   it loses to selected persistence (`BSS vs persistence = -0.523`).
+   Mediterranean Spain replication is weaker: selected C3S BSS is `-0.307`
+   and also loses to selected persistence (`-0.366`). Southern Great Plains is
+   the diagnostic control because GEFSv12 was strongest there; selected C3S is
+   still only positive-uncertain (`BSS = +0.085`, CI `[-0.089, +0.232]`) and
+   loses strongly to selected persistence (`-1.092`). This argues against a
+   C3S-specific persistence-residual selector as the next major method.
 
 ### Next experiments / writing priorities
 
-1. **Use the master and support tables as the paper source of truth**
+1. **Stop adding target products unless the manuscript specifically needs one**
+   NLDAS Noah monthly soil moisture now provides the first independent U.S.
+   target validation for Central Valley and Southern Great Plains, GLDAS
+   provides the five-region model-product sensitivity check, and SMAP L4
+   provides both mid-month and early/mid/late short-record satellite-assimilated
+   checks. GLEAM/ESA CCI should remain optional sensitivity checks.
+   Reproducible commands are:
+   `python scripts/download_nldas_noah_monthly.py --start 1991-01 --end 2019-12`
+   followed by
+   `python scripts/run_nldas_landsurface_validation.py --regions cvalley southern_great_plains --copy-report`,
+   and
+   `python scripts/download_gldas_noah_monthly.py --start 2000-01 --end 2019-12`
+   followed by
+   `python scripts/run_gldas_landsurface_validation.py --copy-report`, and
+   `python scripts/download_smap_l4_regional_subsets.py --out-dir data/raw/smap_l4_spl4smgp_midmonth --start 2015-04 --end 2019-12 --snapshot-days 5 15 25`
+   followed by
+   `python scripts/run_smap_l4_landsurface_validation.py --smap-dir data/raw/smap_l4_spl4smgp_midmonth --out-prefix landsurface_smap_l4_multi3snapshot_gefsv12_validation --target-tag multi3snapshot --copy-report`.
+
+2. **Use the master and support tables as the paper source of truth**
    Build paper tables from `results/report/master_results_headline.csv`; do not
    manually copy numbers from older prose. Use `results/temporal/`,
    `results/validation/prism_*`, and `results/report/regionalization/zone_forecast_diagnostics.csv`
    as supporting diagnostics.
 
-2. **Write the source-cited data/mask-methods subsection**
+3. **Write the source-cited data/mask-methods subsection**
    Include the boundary sources, selection logic, retained-cell fractions, and why
    each masked run is a cleaner scientific checkpoint than a rectangular bbox. State
    explicitly that Horn is country-intersection geometry, not a hydrologic/livelihood mask.
    Add the PRISM validation method as an independent U.S. precipitation-data check.
 
-3. **Use `results/report/paper/` as the manuscript evidence pack**
-   `scripts/generate_manuscript_results.py` now creates a 78-row master evidence
-   table, 55-row headline table, source-cited mask-methods table, temporal
-   robustness table, seasonal signal audit, regionalization mechanism table,
-   transition-target summary, land-surface added-value table, and five
-   paper-facing figures. This is now the highest-level evidence source for
-   manuscript drafting.
+4. **Use `results/report/paper/` as the manuscript evidence pack**
+   `scripts/generate_manuscript_results.py` now creates the master/headline
+   evidence tables plus mask, temporal, seasonal, regionalization, transition,
+   land-surface added-value, climate-index, GEFSv12 sensitivity, stack,
+   reliability, domain-transfer, rare-event, persistence-regime, and independent
+   target-audit tables. This is now the
+   highest-level evidence source for manuscript drafting.
 
-4. **Do not add more regions before writing**
+5. **Do not add more regions before writing**
    Five checkpoints are enough for the generalization claim; the immediate risk is
    narrative inconsistency, not lack of regional coverage.
 
-5. **Treat the land-surface benchmark as promising but persistence-limited**
+6. **Treat the land-surface benchmark as promising but persistence-limited**
    CPC NMME anomaly/probability benchmarks now cover SPI-1 lead-1, SPI-3
    lead-3, and SPI-6 lead-6, and NCEI CFSv2 now adds a true lead-window SPI-3
    lead-3 precipitation benchmark. The CFSv2 raw-amount row is near climatology
@@ -570,18 +765,22 @@ This narrative transforms a "negative result" into a **methodological and scient
    benchmark remains robustly positive in Central Valley under four-cycle
    aggregation, but `results/report/paper/table09_landsurface_added_value.csv`
    shows no robust overall added value over raw persistence. Southern Great
-   Plains persistence is robustly better than CFSv2. The next follow-up, if any,
-   needs a fuller hindcast/ensemble land-surface archive rather than more
-   tuning of this CFSv2 monthly-mean extraction.
+   Plains persistence is robustly better than CFSv2. The GEFSv12 RZSM
+   hindcast-calibrated rows now replicate robust climatology skill across
+   multiple regions. The Southern Great Plains lead/valid-day grid is stable,
+   and the five-region validation-selected GEFSv12+persistence stack supports a
+   cautious combined forecast-memory benchmark. Domain-transfer and rare-event
+   diagnostics strengthen the claim, but persistence dominance in Murray-Darling
+   and small 36-month tests remain important limitations.
 
-6. **Treat seasonal regional results as a calibration/target-design audit**
+7. **Treat seasonal regional results as a calibration/target-design audit**
    The expanded seasonal table has one robust-positive BSS row, but its
    near-zero correlation and low variance indicate calibration shift rather
    than useful event timing. A fair next seasonal test should use independent
    forecast precipitation or circulation predictors, not more tuning of the
    same lagged-observation tabular model.
 
-7. **Treat onset transitions as a target-design diagnostic**
+8. **Treat onset transitions as a target-design diagnostic**
    The corrected transition experiment shows a small robust-positive
    rectangular Central Valley onset result only after eligible-pixel scoring and
    eligible-only training (`BSS = +0.104`). It does not survive Central Valley

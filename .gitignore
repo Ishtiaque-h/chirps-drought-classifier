@@ -59,9 +59,6 @@ scripts/audit_seasonal_regional_signal.py
 scripts/summarize_transition_experiments.py
 scripts/diagnose_landsurface_added_value.py
 scripts/build_regionalization_mechanism_tables.py
-scripts/SCRIPT_AUDIT.md
-scripts/generate_master_results.py
-scripts/generate_manuscript_results.py
 
 # OS/editor
 .DS_Store

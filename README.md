@@ -82,7 +82,7 @@ the PRISM Climate Group at Oregon State University
 
 **Leakage-free target design:** The target is `SPI-1[t+1]`, which depends *only* on `pr[t+1]` — unknown at prediction time. All features are derived from time *t* or earlier. There is **zero accumulation-window overlap** between features and target. The evaluation-inflation audit separately shows how an overlapping SPI-3 lead-1 target can create apparent skill from shared accumulation months.
 
-By default the pipeline can run with endogenous CHIRPS-only features. The current corrected checkpoint uses Niño3.4 anomaly lags (`--climate-features nino34`) and excludes PDO because the NOAA PDO file has missing recent months after August 2025. Climate features remain leakage-safe because all model features are at time *t* or earlier.
+By default the pipeline can run with endogenous CHIRPS-only features. The current corrected checkpoint uses Niño3.4 anomaly lags (`--climate-features nino34`) and excludes PDO because the NOAA PDO file has missing recent months after August 2025. A common-valid-period sensitivity test now checks PDO fairly without forward-filling the missing tail; PDO-only and Niño3.4+PDO do not improve BSS over the CHIRPS/SPI baseline. Climate features remain leakage-safe because all model features are at time *t* or earlier.
 
 ---
 
@@ -295,16 +295,84 @@ python scripts/run_landsurface_forecast_benchmark.py \
   --run-hours 0 6 12 18 \
   --start-target 2017-01 \
   --copy-report
+
+python scripts/run_gefsv12_landsurface_benchmark.py \
+  --members c00 p01 p02 p03 p04 p05 p06 p07 p08 p09 p10 \
+  --start-target 2000-01 \
+  --end-target 2019-12 \
+  --normal-end-year 2016 \
+  --validation-start-year 2000 \
+  --validation-end-year 2016 \
+  --test-start-year 2017 \
+  --test-end-year 2019 \
+  --out-prefix landsurface_gefsv12_rzsm_day15_hindcastcal \
+  --copy-report
+
+python scripts/run_gefsv12_landsurface_benchmark.py \
+  --region southern_great_plains \
+  --soil-file data/processed/era5_land_soil_moisture_monthly_southern_great_plains_1991_2025.nc \
+  --members c00 p01 p02 p03 p04 p05 p06 p07 p08 p09 p10 \
+  --start-target 2000-01 \
+  --end-target 2019-12 \
+  --normal-end-year 2016 \
+  --validation-start-year 2000 \
+  --validation-end-year 2016 \
+  --test-start-year 2017 \
+  --test-end-year 2019 \
+  --out-prefix landsurface_gefsv12_rzsm_southern_great_plains_day15_hindcastcal \
+  --copy-report
+
+python scripts/run_gefsv12_landsurface_sensitivity.py \
+  --region southern_great_plains \
+  --start-target 2000-01 \
+  --end-target 2019-12 \
+  --validation-start-year 2000 \
+  --validation-end-year 2016 \
+  --test-start-year 2017 \
+  --test-end-year 2019 \
+  --normal-start-year 1991 \
+  --normal-end-year 2016 \
+  --valid-days 5 10 15 20 \
+  --init-lag-weeks 0 1 \
+  --out-prefix landsurface_gefsv12_rzsm_sgp_lead_validday_sensitivity_hindcastcal_grid \
+  --copy-report
+
+python scripts/run_gefsv12_landsurface_stack_benchmark.py \
+  --regions cvalley southern_great_plains mediterranean_spain murray_darling horn_of_africa \
+  --copy-report
+
+python scripts/run_landsurface_domain_transfer_benchmark.py --copy-report
+python scripts/analyze_landsurface_persistence_regimes.py --copy-report
+python scripts/audit_landsurface_independent_targets.py --copy-report
+
+# First independent land-surface target validation path.
+# Requires Earthdata/GES DISC credentials in ~/.netrc or --username with
+# EARTHDATA_PASSWORD set.
+python scripts/download_nldas_noah_monthly.py --start 1991-01 --end 2019-12
+python scripts/run_nldas_landsurface_validation.py \
+  --regions cvalley southern_great_plains \
+  --copy-report
 ```
 
 | Land-surface checkpoint | Test months | BSS vs. climatology | 95% CI | Diagnostic |
 |---|---:|---:|---:|---|
 | Central Valley CFSv2 RZSM selected, 18 UTC | 42 | +0.630 | [+0.477, +0.762] | strongest CFSv2 row |
 | Central Valley CFSv2 RZSM selected, 4-cycle mean | 39 | +0.511 | [+0.292, +0.676] | strict all-cycle replication |
+| Central Valley GEFSv12 RZSM selected, hindcast-calibrated | 36 | +0.351 | [-0.204, +0.656] | positive but uncertain; 2000-2016 calibration, 2017-2019 test |
+| Central Valley GEFSv12+persistence stack, validation-selected | 36 | +0.311 | [-0.122, +0.659] | improves selected persistence by paired delta BS, but CI crosses zero vs climatology |
 | Central Valley RZSM persistence selected, 4-cycle months | 39 | +0.468 | [+0.264, +0.605] | persistence also robust |
+| Central Valley RZSM persistence selected, GEFSv12 years | 36 | -0.009 | [-0.772, +0.542] | same-target persistence not skillful in 2017-2019 |
+| Southern Great Plains GEFSv12 RZSM selected, hindcast-calibrated | 36 | +0.753 | [+0.618, +0.843] | robust vs climatology; beats same-period persistence on point BSS |
+| Southern Great Plains GEFSv12+persistence stack, validation-selected | 36 | +0.748 | [+0.536, +0.883] | robust vs climatology and robust paired improvement over selected persistence |
+| Southern Great Plains RZSM persistence selected, GEFSv12 years | 36 | +0.625 | [+0.256, +0.839] | strong land-memory baseline |
 | Southern Great Plains CFSv2 RZSM selected, 4-cycle mean | 39 | +0.413 | [-0.010, +0.633] | positive but uncertain; worse than persistence |
 | Southern Great Plains RZSM persistence raw | 39 | +0.695 | [+0.414, +0.851] | strongest land-memory row |
+| Mediterranean Spain GEFSv12 RZSM selected, hindcast-calibrated | 36 | +0.540 | [+0.090, +0.757] | robust vs climatology; worse than same-period persistence |
+| Mediterranean Spain GEFSv12+persistence stack, validation-selected | 36 | +0.763 | [+0.600, +0.885] | robust vs climatology and robust paired improvement over selected persistence |
+| Mediterranean Spain RZSM persistence selected, GEFSv12 years | 36 | +0.657 | [+0.373, +0.840] | persistence is stronger than GEFSv12 |
 | Mediterranean Spain CFSv2 RZSM selected, 4-cycle mean | 39 | -0.141 | [-1.344, +0.468] | no replication |
+| Murray-Darling GEFSv12+persistence stack, validation-selected | 36 | +0.800 | [+0.715, +0.861] | robust vs climatology but persistence remains stronger/uncertain |
+| Horn of Africa GEFSv12+persistence stack, validation-selected | 36 | +0.556 | [+0.344, +0.700] | robust vs climatology; added value over persistence is uncertain |
 
 This is now a more nuanced result. Root-zone soil-moisture dry fraction is much
 more predictable than SPI-1 in some regions, and CFSv2 RZSM remains robustly
@@ -313,6 +381,141 @@ regions show mixed CFSv2 value: Southern Great Plains is dominated by
 persistence, and Mediterranean Spain does not replicate. The defensible claim is
 therefore target reframing toward land-surface drought, not broad CFSv2 added
 value, precipitation SPI skill, all leads, all regions, or deployment readiness.
+The GEFSv12 public reforecast adds a stronger hindcast-style check: after
+calibrating the 11-member Wednesday long reforecasts over 2000-2016, the
+validation-selected GEFSv12+persistence stack is robust-positive against
+climatology in 4/5 regions and robustly improves selected persistence by paired
+delta BS in 3/5 regions. Murray-Darling is the main caveat: the land-memory
+baseline is so strong that the stack is persistence-dominated even though its
+BSS vs climatology is high. The Southern Great Plains lead/valid-day
+sensitivity grid in `table11` strengthens the stability claim: all 8
+combinations are robustly positive against climatology (`BSS = +0.621` to
+`+0.753`), and 7/8 beat selected persistence on point BSS.
+
+The calibration-transfer check in `table14` is now the strongest domain-shift
+evidence: leave-one-region-out calibration is robust-positive in 5/5 regions
+and robustly improves transferred persistence in 4/5 regions (mean stack BSS
+`+0.638`). A monotonic XGBoost variant, constrained so dry probability cannot
+decrease with GEFSv12 dry anomaly or same-target persistence, has higher mean
+leave-one-region-out BSS (`+0.669`) but only 3/5 robust added-value rows. The
+rare-event formulation in `table15` is also promising but not universal:
+validation-defined q0.80 extensive dry events show mean AP lift around `3.1x`
+for the stack/monotonic models, while q0.90 events show larger AP lift but very
+small event counts and fewer robust event-BSS rows.
+
+The persistence-regime diagnostic in `table16` explains where the stack is
+most useful. Under leave-one-region-out calibration, the stack improves
+transferred persistence overall (`delta BS = -0.0063`, 95% CI `[-0.0101,
+-0.0028]`), and the largest robust gain occurs when antecedent dry memory is
+high but GEFSv12 forecasts wetter-than-normal root-zone moisture (`delta BS =
+-0.0249`, CI `[-0.0431, -0.0101]`). This is a physically interpretable
+added-information regime rather than a generic model-capacity claim.
+
+The independent-target audit in `table17` now finds NLDAS, GLDAS, and SMAP L4
+files available locally. `table18` reports completed U.S. NLDAS validation, and
+`table19`/`fig07` compare ERA5-Land and NLDAS targets directly. Against
+NLDAS-derived `SoilM_0_100cm` dry fraction, the validation-selected
+GEFSv12+persistence stack is robust-positive and robustly improves selected
+persistence in both Central Valley (`BSS = +0.444`, 95% CI `[+0.135, +0.681]`,
+delta BS `-0.0135`) and Southern Great Plains (`BSS = +0.795`, 95% CI
+`[+0.630, +0.898]`, delta BS `-0.0026`). A separate GLDAS Noah
+`RootMoist_inst` model-product sensitivity (`table20`, `table21`, `fig08`)
+covers all five regions over 2000-2019: the validation-selected stack is
+robust-positive in 5/5 regions and robustly improves selected persistence in
+3/5 regions. SMAP L4 SPL4SMGP `sm_rootzone_pctl` adds a short-record
+satellite-assimilated target check (`table22`): the validation-selected stack is
+robust-positive in 3/5 regions and robustly improves selected persistence in
+1/5. A compact early/mid/late snapshot sensitivity (`table23`) reduces the
+mid-month-proxy concern: the stack becomes robust-positive in 5/5 regions and
+robustly improves selected persistence in 2/5. This strengthens the
+land-surface target-reframing claim, but it also shows that dynamic-model added
+value over persistence is product- and region-dependent. A stricter
+cross-product transfer diagnostic (`table24`) scores ERA5-Land- and
+GLDAS-calibrated probabilities against the SMAP multi-snapshot target without
+SMAP recalibration. GEFS-only rows contain the only robust-positive
+cross-product transfer cases, while source-product selected stacks transfer
+robustly in 0/10 and no
+compact transfer row robustly beats SMAP same-target persistence. This is a
+guardrail against overclaiming portable calibration or universal stack added
+value. The follow-up calibration-transfer ladder (`table25`; compact
+manuscript summary in `table26` and `fig09`) shows why:
+direct source-calibrated GEFS transfer is robust-positive in 3/10 rows, but a
+validation-only source-to-SMAP dry-rate shift raises GEFS transfer to 9/10 and
+robustly improves SMAP persistence in 3/10. Pooled ERA5-Land+GLDAS source
+calibration gives robust-positive selected stacks in 3/5 SMAP regions. This
+points to calibration/base-rate mismatch as a major cross-product failure mode,
+while persistence-relative added value remains conditional. The formal
+adaptation benchmark (`table27`) strengthens the base-rate claim:
+product-specific prediction-base-rate shifting makes GEFS robust-positive in
+10/10 source-region rows, while the observed dry-rate shift gives 9/10 and
+more robust persistence-relative added-value rows (3/10 versus 2/10). The
+validation-selected seasonal/base-rate and complex target-specific selectors
+are weaker on frozen SMAP test months, so the current contribution should be
+base-rate calibration, not a complex adaptation model. The year-by-year
+sensitivity in `table28` shows why this remains a short-record claim:
+base-rate-corrected GEFS is positive against SMAP climatology in every
+2017-2019 test year, but persistence-relative added value weakens in 2019.
+The forecast-archive extension audit (`table29`) now checks the next modern
+evaluation path before any large download: operational GEFS public AWS files
+are available in 2021-2026 probes through forecast hour 840, but the probed
+`pgrb2b` fields are not a clean match to the GEFSv12/ERA5-Land root-zone
+setup. SOILW exposes 0.1-1 m subsurface layers, while SOILL can include 0-1 m
+but is liquid soil moisture rather than total soil water. ERA5-Land local
+targets cover 2021-2025 for Central Valley, Southern Great Plains, and
+Mediterranean Spain; Central Valley SMAP L4 multi-snapshot targets now cover
+2020-01 through 2026-03, while local GLDAS processed files still stop in 2019.
+Both
+compact 11-member Central Valley operational-GEFS tests fail as positive
+modern extensions: SOILW 0.1-1 m selected GEFS has `BSS = -3.429` over
+2024-2025 (CI `[-6.929, -0.692]`), and SOILL 0-1 m selected GEFS has
+`BSS = -2.862` (CI `[-6.009, -0.419]`), while raw persistence is `+0.439`.
+To avoid treating Central Valley as the only modern checkpoint, the same
+11-member protocol was replicated in Southern Great Plains and Mediterranean
+Spain for both soil modes. Across the resulting 6 region/soil-mode rows,
+selected operational GEFS is robust-positive in `0/6`, robust-negative in
+`2/6`, and positive on point BSS in only `2/6`. The best row is Mediterranean
+Spain SOILL 0-1 m (`BSS = +0.049`, CI `[-1.032, +0.597]`), still uncertain
+and below raw persistence (`+0.286`).
+The follow-up diagnostic (`table30`) shows why: no forecast candidate robustly
+beats raw persistence on validation, and the persistence-safe selector falls
+back to raw persistence. The next defensible action is not regional scale-up;
+it is a cleaner S2S/SubX archive with native RZSM variables or target-product-
+aware calibration design. The new SMAP L4 modern target
+check (`table31`) reinforces that decision: against Central Valley SMAP
+multi-snapshot dry fraction in 2024-2025, raw same-target persistence is
+robustly positive (`BSS = +0.825`, CI `[+0.598, +0.985]`), while selected
+operational GEFS remains negative for both SOILW 0.1-1 m (`BSS = -2.928`) and
+SOILL 0-1 m (`BSS = -1.960`). A year-held-out calibration stack reduces the
+failure to weak positive point estimates versus climatology (`BSS = +0.093`
+for SOILW and `+0.217` for SOILL), but both still lose to raw SMAP persistence.
+The persistence guard therefore falls back to raw persistence. SubX and
+ECMWF/S2S were then audited for a cleaner native-RZSM comparison. The new
+native-RZSM archive audit (`table37`/`table38`) identifies the C3S
+`seasonal-original-single-levels` archive as the best next path: ECMWF system
+51 exposes `volumetric_soil_moisture` from 1981-2026, all 12 start months,
+and 24-5160 h leads. After accepting the CDS licence, a tiny retrieval probe
+succeeds and downloads a 51-member, 4-soil-layer NetCDF (`vsw`) for the Central
+Valley test box. Three compact C3S benchmarks are now scored with 2019-2020
+validation and complete 2021-2025 testing (`table39`). Central Valley selected
+C3S anomaly-isotonic BSS is `+0.107`, but its CI crosses zero
+(`[-0.149, +0.283]`) and it is worse than same-target persistence
+(`BSS vs selected persistence = -0.523`; raw-persistence BSS `+0.572`, CI
+`[+0.093, +0.835]`). Mediterranean Spain selected C3S is below climatology
+(`BSS = -0.307`, CI `[-0.710, +0.024]`) and also loses to selected persistence
+(`BSS vs selected persistence = -0.366`). Southern Great Plains selected C3S is
+positive but non-robust (`BSS = +0.085`, CI `[-0.089, +0.232]`) and loses
+strongly to selected persistence (`BSS vs selected persistence = -1.092`;
+selected-persistence BSS `+0.562`, CI `[+0.371, +0.692]`). The C3S
+monthly-statistics dataset
+does not expose native volumetric soil moisture, and the probed SubX/IRI
+endpoints return authentication pages in this environment. The next action is
+therefore not additional operational-GEFS or C3S tuning; it is to consolidate
+the persistence-barrier/target-calibration result unless a genuinely different
+archive or target is introduced.
+GEFSv12 reforecast access follows the public
+NOAA/AWS archive and Guan et al. (2022)
+([doi:10.1175/MWR-D-21-0245.1](https://doi.org/10.1175/MWR-D-21-0245.1);
+[AWS registry](https://registry.opendata.aws/noaa-gefs-reforecast/)).
 The explicit added-value diagnostic is saved at
 [`results/report/paper/table09_landsurface_added_value.csv`](results/report/paper/table09_landsurface_added_value.csv);
 it shows no robust overall CFSv2 improvement over raw persistence, and Southern
@@ -503,6 +706,30 @@ calibration helps SPI-1 but overfits the short probability validation window
 for SPI-3/SPI-6. The separate land-surface benchmark above is the first robust
 positive forecast-informed result, and it changes the candidate paper claim
 toward root-zone soil-moisture drought rather than precipitation SPI.
+
+The current manuscript direction is therefore a target-product calibration
+claim, not an operational forecast-superiority claim. GEFSv12 RZSM contains
+transferable signal, but direct source-product calibration transfers weakly to
+SMAP. Validation-only base-rate adaptation recovers robust climatology-relative
+SMAP transfer in most source-region rows, while same-target persistence remains
+hard to beat and the modern operational GEFS/SMAP probe falls back to raw
+persistence.
+
+The SMAP product-residual benchmark makes this sharper. Against raw same-target
+SMAP persistence, base-rate-adapted GEFS rows remain robust-positive against
+SMAP climatology in 9/10 to 10/10 source-region rows, but robust added value
+over raw SMAP persistence appears in only 3/10 rows. The threshold/base-rate
+gate is robust-positive in 10/10 and robustly improves raw SMAP persistence in
+3/10, while all-candidate and stack-heavy selectors are weaker. This supports a
+calibration-transfer claim, not a mature domain-adaptation claim.
+
+The persistence-residual selector benchmark adds one more guardrail. Validation-
+safe gates against raw same-target persistence do improve some GEFSv12
+hindcast rows, but they mostly collapse to the monotonic forecast-memory model:
+leave-one-region-out monotonic/guarded/threshold rows have robust added value in
+2/5 regions, pooled monotonic XGB in 3/5, and Murray-Darling remains
+persistence-dominated. This supports a persistence-residual research framing,
+not a universal adaptive selector.
 Artifacts are saved at
 local `results/report/` files when the benchmark scripts are run. Public
 manuscript-facing operational and land-surface rows are consolidated in
@@ -574,7 +801,7 @@ and baselines differ. We do not claim that the broader literature is invalid.
 - **1-month lead is fundamentally hard:** Monthly precipitation is dominated by chaotic synoptic weather; SPI-1 autocorrelation is weak.
 - **Small test set:** 63 months yields wide confidence intervals; positive skill claims require a confidence interval that excludes zero.
 - **Regional geometry:** Central Valley, Southern Great Plains, Murray-Darling, Spain, and Horn of Africa now have source-cited geometry checkpoints; Horn still uses political-country geometry rather than a basin or livelihood-zone mask.
-- **Limited exogenous drivers:** Corrected Niño3.4 anomaly lags are included; PDO is excluded from the active checkpoint because recent PDO values are missing. Regional/gridded ERA5-Land temperature/VPD and regional ERA5-Land soil-memory lags do not beat climatology for SPI-1. The separate CFSv2 forecast-informed root-zone soil-moisture target is robust against climatology in Central Valley, but added-region checks are mixed and the current added-value audit does not show robust improvement over same-target persistence.
+- **Limited exogenous drivers and target validation:** Corrected Niño3.4 anomaly lags are included; PDO is excluded from the active checkpoint because recent PDO values are missing. The common-valid-period PDO sensitivity in [`results/report/paper/table10_climate_index_sensitivity.csv`](results/report/paper/table10_climate_index_sensitivity.csv) does not reveal a missed positive-skill signal: spatial PDO-only BSS is `-0.114` and Niño3.4+PDO is robustly negative (`-1.385`). Regional/gridded ERA5-Land temperature/VPD and regional ERA5-Land soil-memory lags do not beat climatology for SPI-1. The separate forecast-informed root-zone soil-moisture target is stronger: the five-region GEFSv12+persistence stack is robust-positive vs climatology in 4/5 regions, leave-one-region-out calibration is robust-positive in 5/5 regions, rare-event AP lift is meaningful, NLDAS validation supports the two U.S. regions, GLDAS sensitivity is robust-positive in all five regions, and SMAP L4 provides short-record satellite-assimilated support that improves under early/mid/late snapshot aggregation. This still does not imply deployment readiness, universal added value over persistence, precipitation-SPI skill, or fully independent long-record global target validation.
 - **Test period non-representative:** 2021–2026 is extreme (historic drought -> extreme wet). This is now partly controlled by `results/temporal/`: five rolling tabular holdouts all remain at or below climatology, but the canonical event-block analysis still has only 12-27 months per block.
 - **CHIRPS/PRISM differences:** PRISM validation shows strong test-period agreement (`Pearson r = 0.816`, `Spearman r = 0.720`) but CHIRPS is drier on average over the basin (`CHIRPS - PRISM dry-fraction bias = +0.046`), so target-data uncertainty should be acknowledged.
 
@@ -638,6 +865,25 @@ python scripts/xgb_shap_forecast_analysis.py --model both  # SHAP interpretation
 python scripts/validate_era5_spi.py              # cross-dataset validation
 python scripts/validate_chirps_prism_cvalley.py  # PRISM basin validation
 python scripts/run_temporal_robustness_audit.py  # rolling holdout sensitivity
+python scripts/run_climate_index_sensitivity_experiment.py --model-kind both  # PDO/ENSO common-valid sensitivity
+python scripts/run_gefsv12_landsurface_benchmark.py --out-prefix landsurface_gefsv12_rzsm_day15_hindcastcal --start-target 2000-01 --end-target 2019-12 --normal-end-year 2016 --validation-start-year 2000 --validation-end-year 2016 --test-start-year 2017 --test-end-year 2019 --copy-report
+python scripts/run_gefsv12_landsurface_sensitivity.py --region southern_great_plains --start-target 2000-01 --end-target 2019-12 --normal-end-year 2016 --validation-start-year 2000 --validation-end-year 2016 --test-start-year 2017 --test-end-year 2019 --valid-days 5 10 15 20 --init-lag-weeks 0 1 --copy-report
+python scripts/run_gefsv12_landsurface_stack_benchmark.py --regions cvalley southern_great_plains mediterranean_spain murray_darling horn_of_africa --copy-report
+python scripts/run_landsurface_domain_transfer_benchmark.py --copy-report
+python scripts/analyze_landsurface_persistence_regimes.py --copy-report
+python scripts/audit_landsurface_independent_targets.py --copy-report
+python scripts/audit_landsurface_forecast_archives.py --copy-report
+python scripts/run_operational_gefs_landsurface_benchmark.py --region cvalley --start-target 2021-01 --end-target 2025-12 --validation-start-year 2021 --validation-end-year 2023 --test-start-year 2024 --test-end-year 2025 --out-prefix landsurface_operational_gefs_subroot_cvalley_2021_2025_11member --copy-report
+python scripts/run_operational_gefs_landsurface_benchmark.py --region cvalley --soil-mode soill_0_1m --start-target 2021-01 --end-target 2025-12 --validation-start-year 2021 --validation-end-year 2023 --test-start-year 2024 --test-end-year 2025 --out-prefix landsurface_operational_gefs_soill_0_1m_cvalley_2021_2025_11member --copy-report
+python scripts/analyze_operational_gefs_diagnostics.py --copy-report
+python scripts/analyze_operational_gefs_diagnostics.py --forecast-csv results/report/landsurface/landsurface_operational_gefs_soill_0_1m_cvalley_2021_2025_11member_forecast.csv --out-prefix landsurface_operational_gefs_soill_0_1m_cvalley_2021_2025_diagnostics --copy-report
+python scripts/download_smap_l4_regional_subsets.py --regions cvalley --out-dir data/raw/smap_l4_spl4smgp_modern --start 2020-01 --end 2026-03 --snapshot-days 5 15 25
+python scripts/run_smap_l4_landsurface_validation.py --regions cvalley --smap-dir data/raw/smap_l4_spl4smgp_modern --start 2020-01 --end 2026-03 --validation-start-year 2020 --validation-end-year 2021 --target-tag modern_multi3snapshot --out-prefix landsurface_smap_l4_modern_multi3snapshot_cvalley_target --process-only --copy-report
+python scripts/run_operational_gefs_smap_validation.py --forecast-csv results/report/landsurface/landsurface_operational_gefs_subroot_cvalley_2021_2025_11member_forecast.csv --out-prefix landsurface_operational_gefs_soilw_0p1_1m_cvalley_smap_validation --copy-report
+python scripts/run_operational_gefs_smap_validation.py --forecast-csv results/report/landsurface/landsurface_operational_gefs_soill_0_1m_cvalley_2021_2025_11member_forecast.csv --out-prefix landsurface_operational_gefs_soill_0_1m_cvalley_smap_validation --copy-report
+python scripts/run_nldas_landsurface_validation.py --regions cvalley southern_great_plains --audit-only --copy-report
+python scripts/run_landsurface_target_product_transfer.py --include-smap-self-reference --copy-report
+python scripts/run_landsurface_calibration_transfer_ladder.py --copy-report
 python scripts/validate_usdm.py                  # USDM plausibility check
 python scripts/plot_spatial_skill.py             # per-pixel skill map
 python scripts/plot_case_study.py                # 2021-2026 case study
@@ -647,7 +893,7 @@ python scripts/generate_manuscript_results.py
 
 ### Results (reproduced outputs)
 
-- **[results/report/paper/](results/report/paper/)** — consolidated evidence pack: master/headline tables, mask methods, temporal robustness, seasonal signal audit, regionalization mechanism table, transition diagnostics, land-surface added-value table, and manuscript-facing figures.
+- **[results/report/paper/](results/report/paper/)** — consolidated evidence pack: master/headline tables, mask methods, temporal robustness, seasonal signal audit, regionalization mechanism table, transition diagnostics, land-surface added-value, climate-index sensitivity, GEFSv12 sensitivity/stack/domain-transfer/rare-event/persistence-regime and persistence-residual diagnostics, independent target audit, NLDAS validation, GLDAS/SMAP sensitivity, cross-product transfer, calibration-transfer ladder, target-product comparisons, SMAP product-residual calibration tables, operational GEFS replication, native-RZSM archive audit, and manuscript-facing figures.
 - **[results/report/master_results_table.csv](results/report/master_results_table.csv)** and **[results/report/master_results_headline.csv](results/report/master_results_headline.csv)** — compact source tables feeding the paper pack.
 
 ---

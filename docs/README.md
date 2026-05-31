@@ -1,6 +1,6 @@
 # Documentation Map
 
-Use this map to find the documentation acroos the project repo
+Use this map to find the documentation across the project repo.
 
 ## Start Here
 
@@ -42,6 +42,36 @@ copies are intentionally not generated to reduce documentation drift.
 - [`results/report/paper/table07_evaluation_inflation_audit.csv`](../results/report/paper/table07_evaluation_inflation_audit.csv)
 - [`results/report/paper/table08_transition_target_summary.csv`](../results/report/paper/table08_transition_target_summary.csv)
 - [`results/report/paper/table09_landsurface_added_value.csv`](../results/report/paper/table09_landsurface_added_value.csv)
+- [`results/report/paper/table10_climate_index_sensitivity.csv`](../results/report/paper/table10_climate_index_sensitivity.csv)
+- [`results/report/paper/table11_gefsv12_landsurface_sensitivity.csv`](../results/report/paper/table11_gefsv12_landsurface_sensitivity.csv)
+- [`results/report/paper/table12_gefsv12_landsurface_stack.csv`](../results/report/paper/table12_gefsv12_landsurface_stack.csv)
+- [`results/report/paper/table13_landsurface_reliability_resolution.csv`](../results/report/paper/table13_landsurface_reliability_resolution.csv)
+- [`results/report/paper/table14_landsurface_domain_transfer.csv`](../results/report/paper/table14_landsurface_domain_transfer.csv)
+- [`results/report/paper/table15_landsurface_rare_event.csv`](../results/report/paper/table15_landsurface_rare_event.csv)
+- [`results/report/paper/table16_landsurface_persistence_regimes.csv`](../results/report/paper/table16_landsurface_persistence_regimes.csv)
+- [`results/report/paper/table17_landsurface_independent_target_audit.csv`](../results/report/paper/table17_landsurface_independent_target_audit.csv)
+- [`results/report/paper/table18_landsurface_nldas_validation.csv`](../results/report/paper/table18_landsurface_nldas_validation.csv)
+- [`results/report/paper/table19_landsurface_target_product_comparison.csv`](../results/report/paper/table19_landsurface_target_product_comparison.csv)
+- [`results/report/paper/table20_landsurface_gldas_validation.csv`](../results/report/paper/table20_landsurface_gldas_validation.csv)
+- [`results/report/paper/table21_landsurface_era5_gldas_comparison.csv`](../results/report/paper/table21_landsurface_era5_gldas_comparison.csv)
+- [`results/report/paper/table22_landsurface_smap_l4_validation.csv`](../results/report/paper/table22_landsurface_smap_l4_validation.csv)
+- [`results/report/paper/table23_landsurface_smap_l4_snapshot_sensitivity.csv`](../results/report/paper/table23_landsurface_smap_l4_snapshot_sensitivity.csv)
+- [`results/report/paper/table24_landsurface_target_product_transfer.csv`](../results/report/paper/table24_landsurface_target_product_transfer.csv)
+- [`results/report/paper/table25_landsurface_calibration_transfer_ladder.csv`](../results/report/paper/table25_landsurface_calibration_transfer_ladder.csv)
+- [`results/report/paper/table26_landsurface_calibration_transfer_ladder_compact.csv`](../results/report/paper/table26_landsurface_calibration_transfer_ladder_compact.csv)
+- [`results/report/paper/table27_landsurface_target_product_adaptation_benchmark.csv`](../results/report/paper/table27_landsurface_target_product_adaptation_benchmark.csv)
+- [`results/report/paper/table28_landsurface_base_rate_yearly_sensitivity.csv`](../results/report/paper/table28_landsurface_base_rate_yearly_sensitivity.csv)
+- [`results/report/paper/table29_landsurface_forecast_archive_audit.csv`](../results/report/paper/table29_landsurface_forecast_archive_audit.csv)
+- [`results/report/paper/table30_operational_gefs_diagnostic.csv`](../results/report/paper/table30_operational_gefs_diagnostic.csv)
+- [`results/report/paper/table31_operational_gefs_smap_validation.csv`](../results/report/paper/table31_operational_gefs_smap_validation.csv)
+- [`results/report/paper/table32_landsurface_persistence_residual_selector.csv`](../results/report/paper/table32_landsurface_persistence_residual_selector.csv)
+- [`results/report/paper/table33_landsurface_persistence_residual_selector_compact.csv`](../results/report/paper/table33_landsurface_persistence_residual_selector_compact.csv)
+- [`results/report/paper/table34_smap_product_residual_selector.csv`](../results/report/paper/table34_smap_product_residual_selector.csv)
+- [`results/report/paper/table35_smap_product_residual_selector_compact.csv`](../results/report/paper/table35_smap_product_residual_selector_compact.csv)
+- [`results/report/paper/table36_operational_gefs_three_region_replication.csv`](../results/report/paper/table36_operational_gefs_three_region_replication.csv)
+- [`results/report/paper/table37_native_rzsm_archive_audit.csv`](../results/report/paper/table37_native_rzsm_archive_audit.csv)
+- [`results/report/paper/table38_native_rzsm_archive_candidates.csv`](../results/report/paper/table38_native_rzsm_archive_candidates.csv)
+- [`results/report/paper/table39_c3s_ecmwf_native_vsm_benchmark.csv`](../results/report/paper/table39_c3s_ecmwf_native_vsm_benchmark.csv)
 
 ## Literature Index
 
